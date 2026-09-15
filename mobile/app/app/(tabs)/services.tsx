@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image, type ImageSource } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   Platform,
   Pressable,
@@ -91,10 +92,12 @@ const SERVICES: ServiceItem[] = [
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function FeaturedServiceCard({ item }: { item: ServiceItem }) {
+function FeaturedServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () => void }) {
+  const isMug = item.name.toLowerCase().includes('mug');
   return (
     <Pressable
-      style={({ pressed }) => [styles.featuredCard, pressed && styles.cardPressed]}>
+      onPress={onPress}
+      style={({ pressed }) => [styles.featuredCard, isMug && styles.card3D, pressed && styles.cardPressed]}>
       {/* Image */}
       <View style={styles.featuredImgWrap}>
         <Image
@@ -106,6 +109,12 @@ function FeaturedServiceCard({ item }: { item: ServiceItem }) {
           <View style={[styles.badge, { backgroundColor: item.badgeColor }]}>
             <Ionicons name="star" size={11} color="#fff" style={{ marginRight: 3 }} />
             <Text style={styles.badgeText}>{item.badge}</Text>
+          </View>
+        )}
+        {isMug && (
+          <View style={styles.view3DBadge}>
+            <Ionicons name="cube" size={12} color="#fff" />
+            <Text style={styles.view3DText}>3D • Tap to view</Text>
           </View>
         )}
       </View>
@@ -132,10 +141,12 @@ function FeaturedServiceCard({ item }: { item: ServiceItem }) {
   );
 }
 
-function GridServiceCard({ item }: { item: ServiceItem }) {
+function GridServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () => void }) {
+  const isMug = item.name.toLowerCase().includes('mug');
   return (
     <Pressable
-      style={({ pressed }) => [styles.gridCard, pressed && styles.cardPressed]}>
+      onPress={onPress}
+      style={({ pressed }) => [styles.gridCard, isMug && styles.card3D, pressed && styles.cardPressed]}>
       {/* Image */}
       <View style={styles.gridImgWrap}>
         <Image
@@ -146,6 +157,12 @@ function GridServiceCard({ item }: { item: ServiceItem }) {
         {item.badge && (
           <View style={[styles.badge, { backgroundColor: item.badgeColor }]}>
             <Text style={styles.badgeText}>{item.badge}</Text>
+          </View>
+        )}
+        {isMug && (
+          <View style={styles.view3DBadgeSmall}>
+            <Ionicons name="cube" size={10} color="#fff" />
+            <Text style={styles.view3DTextSmall}>3D</Text>
           </View>
         )}
       </View>
@@ -172,6 +189,14 @@ function GridServiceCard({ item }: { item: ServiceItem }) {
 
 export default function ServicesScreen() {
   const [query, setQuery] = useState('');
+  const router = useRouter();
+
+  const handlePress = (item: ServiceItem) => {
+    const isMug = item.id === '1' || item.name.toLowerCase().includes('mug');
+    if (isMug) {
+      router.push('/mug-3d' as any);
+    }
+  };
 
   const featured = SERVICES.filter((s) => s.featured);
   const grid = SERVICES.filter((s) => !s.featured).filter((s) =>
@@ -201,7 +226,7 @@ export default function ServicesScreen() {
         {filteredFeatured.length > 0 && (
           <Animated.View entering={FadeInDown.delay(80).duration(500)}>
             {filteredFeatured.map((item) => (
-              <FeaturedServiceCard key={item.id} item={item} />
+              <FeaturedServiceCard key={item.id} item={item} onPress={() => handlePress(item)} />
             ))}
           </Animated.View>
         )}
@@ -211,7 +236,7 @@ export default function ServicesScreen() {
           <Animated.View entering={FadeInDown.delay(160).duration(500)} style={styles.gridSection}>
             <View style={styles.gridRow}>
               {grid.map((item) => (
-                <GridServiceCard key={item.id} item={item} />
+                <GridServiceCard key={item.id} item={item} onPress={() => handlePress(item)} />
               ))}
             </View>
           </Animated.View>
@@ -335,6 +360,46 @@ const styles = StyleSheet.create({
   },
 
   // ── Shared card pieces ─────────────────────────────────────
+  card3D: {
+    borderWidth: 1.5,
+    borderColor: BrandColors.primary,
+  },
+  view3DBadge: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(17,24,39,0.92)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  view3DText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
+  },
+  view3DBadgeSmall: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(17,24,39,0.88)',
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  view3DTextSmall: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
+  },
   cardPressed: {
     opacity: 0.85,
   },

@@ -43,7 +43,13 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
-      ["expo-audio", { "microphonePermission": "Allow Rens Digital to access your microphone for voice conversations with Prof Alex." }]
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Rens Digital to access your microphone for voice conversations with Prof Alex."
+        }
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { useRouter } from 'expo-router';
 import ScreenHeader from '@/components/screen-header';
 import { BrandColors } from '@/constants/theme';
 
@@ -30,6 +31,16 @@ const WIDE_CATEGORIES = [
 ];
 
 const FEATURED: { id: string; image: ImageSource; price: string; badge: string; badgeColor: string; name: string; rating: string; reviews: string }[] = [
+  {
+    id: '0',
+    image: require('@/assets/images/custom-mugs.jpeg'),
+    price: '₱9.99',
+    badge: '3D • Bestseller',
+    badgeColor: BrandColors.primary,
+    name: 'Custom Ceramic Mug',
+    rating: '4.9',
+    reviews: '210',
+  },
   {
     id: '1',
     image: require('@/assets/images/custom-thirts.jpg'),
@@ -55,6 +66,20 @@ const FEATURED: { id: string; image: ImageSource; price: string; badge: string; 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
+  const router = useRouter();
+
+  const handleCategoryPress = (id: string) => {
+    if (id === 'mugs') {
+      router.push('/mug-3d' as any);
+    }
+  };
+
+  const handleFeaturedPress = (item: (typeof FEATURED)[number]) => {
+    if (item.name.toLowerCase().includes('mug')) {
+      router.push('/mug-3d' as any);
+    }
+  };
+
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
@@ -109,9 +134,15 @@ export default function HomeScreen() {
             {CATEGORIES.map((cat) => (
               <Pressable
                 key={cat.id}
+                onPress={() => handleCategoryPress(cat.id)}
                 style={({ pressed }) => [styles.catItem, pressed && styles.catItemPressed]}>
-                <View style={styles.catIconBox}>
+                <View style={[styles.catIconBox, cat.id === 'mugs' && styles.catIconBox3D]}>
                   <Ionicons name={cat.icon} size={28} color={BrandColors.primary} />
+                  {cat.id === 'mugs' && (
+                    <View style={styles.cat3DBadge}>
+                      <Text style={styles.cat3DText}>3D</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={styles.catLabel}>{cat.label}</Text>
               </Pressable>
@@ -144,12 +175,14 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.featuredRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
             {FEATURED.map((item) => (
               <Pressable
                 key={item.id}
+                onPress={() => handleFeaturedPress(item)}
                 style={({ pressed }) => [
                   styles.featuredCard,
+                  item.id === '0' && styles.featuredCard3D,
                   pressed && styles.featuredCardPressed,
                 ]}>
                 {/* Product image */}
@@ -181,11 +214,17 @@ export default function HomeScreen() {
                       {item.rating}{' '}
                       <Text style={styles.reviewCount}>({item.reviews})</Text>
                     </Text>
+                    {item.id === '0' && (
+                      <View style={styles.inline3D}>
+                        <Ionicons name="cube-outline" size={11} color={BrandColors.primary} />
+                        <Text style={styles.inline3DText}>360°</Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
         </Animated.View>
 
         {/* Bottom spacing */}
@@ -340,6 +379,26 @@ const styles = StyleSheet.create({
       android: { elevation: 2 },
     }),
   },
+  catIconBox3D: {
+    borderWidth: 1.5,
+    borderColor: BrandColors.primary,
+    backgroundColor: '#EFF6FF',
+  },
+  cat3DBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: BrandColors.primary,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  cat3DText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
+  },
   catLabel: {
     fontSize: 12,
     color: '#374151',
@@ -391,8 +450,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
+  featuredScroll: {
+    gap: 12,
+    paddingRight: 16,
+  },
   featuredCard: {
-    flex: 1,
+    width: 170,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     overflow: 'hidden',
@@ -400,6 +463,10 @@ const styles = StyleSheet.create({
       ios: { shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
       android: { elevation: 3 },
     }),
+  },
+  featuredCard3D: {
+    borderWidth: 1.5,
+    borderColor: BrandColors.primary,
   },
   featuredCardPressed: {
     opacity: 0.85,
@@ -465,6 +532,21 @@ const styles = StyleSheet.create({
   reviewCount: {
     color: '#9CA3AF',
     fontFamily: 'Inter_400Regular',
+  },
+  inline3D: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginLeft: 6,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  inline3DText: {
+    fontSize: 10,
+    color: BrandColors.primary,
+    fontFamily: 'Manrope_700Bold',
   },
 
   bottomSpacer: {
