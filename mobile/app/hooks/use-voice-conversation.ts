@@ -26,7 +26,7 @@ export type VoiceState =
   | 'speaking'     // TTS playing back
   | 'error';       // something failed
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost/placides/backend/public/api/v1';
+const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.149.41.1:8080/api/v1'; // fallback for dev — override via .env EXPO_PUBLIC_API_URL
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -120,10 +120,17 @@ export function useVoiceConversation() {
       );
 
       if (sttUpload.status < 200 || sttUpload.status >= 300) {
-        throw new Error(`STT HTTP ${sttUpload.status}`);
+        const bodyPreview = sttUpload.body?.slice(0, 400) ?? '';
+        console.warn('[VoiceConversation] STT failed', sttUpload.status, bodyPreview, ' URL:', `${API}/groq/transcribe`);
+        throw new Error(`STT HTTP ${sttUpload.status} — ${bodyPreview.slice(0,120)}`);
       }
 
-      const sttJson = JSON.parse(sttUpload.body);
+      let sttJson: any;
+      try {
+        sttJson = JSON.parse(sttUpload.body);
+      } catch {
+        throw new Error(`STT invalid JSON (HTTP ${sttUpload.status}): ${sttUpload.body.slice(0,200)}`);
+      }
 
       if (sttJson.status !== 'success') {
         throw new Error(sttJson.message ?? 'Transcription failed');

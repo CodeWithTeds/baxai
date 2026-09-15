@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { Image, type ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -29,10 +29,10 @@ const WIDE_CATEGORIES = [
   { id: 'printing', label: 'Printing', sublabel: 'General', icon: 'print-outline' as const },
 ];
 
-const FEATURED = [
+const FEATURED: { id: string; image: ImageSource; price: string; badge: string; badgeColor: string; name: string; rating: string; reviews: string }[] = [
   {
     id: '1',
-    image: require('@/assets/images/shopping-owl.png'),
+    image: require('@/assets/images/custom-thirts.jpg'),
     price: '₱15.00',
     badge: 'Fast Turnaround',
     badgeColor: '#F53003',
@@ -42,7 +42,7 @@ const FEATURED = [
   },
   {
     id: '2',
-    image: require('@/assets/images/shopping-owl.png'),
+    image: require('@/assets/images/custom-stickers.jpg'),
     price: '₱0.50 ea',
     badge: 'High Demand',
     badgeColor: '#D97706',

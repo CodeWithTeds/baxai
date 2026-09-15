@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { Image, type ImageSource } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
@@ -22,7 +22,7 @@ type ServiceItem = {
   name: string;
   description: string;
   price: string;
-  image: ReturnType<typeof require>;
+  image: ImageSource;
   badge?: string;
   badgeColor?: string;
   featured?: boolean;
@@ -36,7 +36,7 @@ const SERVICES: ServiceItem[] = [
     name: 'Custom Mugs',
     description: 'High-quality ceramic prints for home or office.',
     price: 'From ₱9.99',
-    image: require('@/assets/images/shopping-owl.png'),
+    image: require('@/assets/images/custom-mugs.jpeg'),
     badge: 'Bestseller',
     badgeColor: BrandColors.primary,
     featured: true,
@@ -46,14 +46,14 @@ const SERVICES: ServiceItem[] = [
     name: 'Button Pins',
     description: 'Vibrant enamel-style pins.',
     price: 'From ₱1.50',
-    image: require('@/assets/images/shopping-owl.png'),
+    image: require('@/assets/images/button-pins.jpg'),
   },
   {
     id: '3',
     name: 'Custom Stickers',
     description: 'Die-cut vinyl, waterproof.',
     price: '₱0.50 ea',
-    image: require('@/assets/images/shopping-owl.png'),
+    image: require('@/assets/images/custom-stickers.jpg'),
     badge: 'Deal',
     badgeColor: '#D97706',
   },
@@ -62,7 +62,7 @@ const SERVICES: ServiceItem[] = [
     name: 'Custom T-Shirts',
     description: 'Premium full-colour prints on soft cotton.',
     price: 'From ₱15.00',
-    image: require('@/assets/images/shopping-owl.png'),
+    image: require('@/assets/images/custom-thirts.jpg'),
     badge: 'Fast Turnaround',
     badgeColor: '#F53003',
   },
@@ -71,14 +71,21 @@ const SERVICES: ServiceItem[] = [
     name: 'Tote Bags',
     description: 'Eco-friendly canvas with custom artwork.',
     price: 'From ₱12.00',
-    image: require('@/assets/images/shopping-owl.png'),
+    image: require('@/assets/images/tote-bags.jpg'),
   },
   {
     id: '6',
     name: 'Calendars',
     description: 'Wall & desk calendars, personalised.',
     price: 'From ₱8.00',
-    image: require('@/assets/images/shopping-owl.png'),
+    image: require('@/assets/images/calendars.jpg'),
+  },
+  {
+    id: '7',
+    name: 'Custom Pin',
+    description: 'Premium custom pin — single-piece showcase.',
+    price: 'From ₱1.20',
+    image: require('@/assets/images/custom-pin.jpeg'),
   },
 ];
 
