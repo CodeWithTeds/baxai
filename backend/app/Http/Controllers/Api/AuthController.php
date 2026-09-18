@@ -33,16 +33,16 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): JsonResponse
     {
-        // Auth Attempt 
+        // Auth Attempt
         if (! Auth::attempt($request->validated())) {
             throw ValidationException::withMessages([
-                'email' => 'Invalid credentials',
+                'username' => 'Invalid credentials',
             ]);
         }
 
-        // optional, void try catch if needed # $user = User::where('email', $request->email)->firstOrFail();
+        // optional, void try catch if needed # $user = User::where('username', $request->username)->firstOrFail();
         try {
-            $user = User::where('email', $request->email)->firstOrFail();
+            $user = User::where('username', $request->username)->firstOrFail();
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'message' => 'User not found',

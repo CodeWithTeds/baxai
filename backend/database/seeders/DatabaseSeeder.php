@@ -17,7 +17,19 @@ class DatabaseSeeder extends Seeder
 
         User::factory()->create([
             'name' => 'Test User',
+            'username' => 'testuser',
             'email' => 'test@example.com',
         ]);
+
+        // Default admin login: username `admin`, password `admin`.
+        User::updateOrCreate(
+            ['username' => 'admin'],
+            [
+                'name' => 'Admin',
+                'email' => 'admin@nuyda.local',
+                'password' => 'admin',
+                'email_verified_at' => now(),
+            ],
+        );
     }
 }

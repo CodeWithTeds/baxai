@@ -31,6 +31,25 @@ trait ProfileValidationRules
     }
 
     /**
+     * Get the validation rules used to validate usernames.
+     *
+     * @return array<int, \Illuminate\Contracts\Validation\Rule|array<mixed>|string>
+     */
+    protected function usernameRules(?int $userId = null): array
+    {
+        return [
+            'required',
+            'string',
+            'min:3',
+            'max:30',
+            'alpha_dash',
+            $userId === null
+                ? Rule::unique(User::class)
+                : Rule::unique(User::class)->ignore($userId),
+        ];
+    }
+
+    /**
      * Get the validation rules used to validate user emails.
      *
      * @return array<int, \Illuminate\Contracts\Validation\Rule|array<mixed>|string>
