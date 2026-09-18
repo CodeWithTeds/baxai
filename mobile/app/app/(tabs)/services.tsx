@@ -94,10 +94,12 @@ const SERVICES: ServiceItem[] = [
 
 function FeaturedServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () => void }) {
   const isMug = item.name.toLowerCase().includes('mug');
+  const isPin = item.name.toLowerCase().includes('pin');
+  const is3D = isMug || isPin;
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.featuredCard, isMug && styles.card3D, pressed && styles.cardPressed]}>
+      style={({ pressed }) => [styles.featuredCard, is3D && styles.card3D, pressed && styles.cardPressed]}>
       {/* Image */}
       <View style={styles.featuredImgWrap}>
         <Image
@@ -115,6 +117,12 @@ function FeaturedServiceCard({ item, onPress }: { item: ServiceItem; onPress?: (
           <View style={styles.view3DBadge}>
             <Ionicons name="cube" size={12} color="#fff" />
             <Text style={styles.view3DText}>3D • Tap to view</Text>
+          </View>
+        )}
+        {isPin && !isMug && (
+          <View style={[styles.view3DBadge, { backgroundColor: 'rgba(124,58,237,0.92)' }]}>
+            <Ionicons name="pricetag" size={12} color="#fff" />
+            <Text style={styles.view3DText}>7 shapes • 3D</Text>
           </View>
         )}
       </View>
@@ -143,10 +151,12 @@ function FeaturedServiceCard({ item, onPress }: { item: ServiceItem; onPress?: (
 
 function GridServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () => void }) {
   const isMug = item.name.toLowerCase().includes('mug');
+  const isPin = item.name.toLowerCase().includes('pin');
+  const is3D = isMug || isPin;
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.gridCard, isMug && styles.card3D, pressed && styles.cardPressed]}>
+      style={({ pressed }) => [styles.gridCard, is3D && styles.card3D, pressed && styles.cardPressed]}>
       {/* Image */}
       <View style={styles.gridImgWrap}>
         <Image
@@ -163,6 +173,12 @@ function GridServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () =>
           <View style={styles.view3DBadgeSmall}>
             <Ionicons name="cube" size={10} color="#fff" />
             <Text style={styles.view3DTextSmall}>3D</Text>
+          </View>
+        )}
+        {isPin && !isMug && (
+          <View style={[styles.view3DBadgeSmall, { backgroundColor: 'rgba(124,58,237,0.88)' }]}>
+            <Ionicons name="shapes" size={10} color="#fff" />
+            <Text style={styles.view3DTextSmall}>7×</Text>
           </View>
         )}
       </View>
@@ -193,8 +209,11 @@ export default function ServicesScreen() {
 
   const handlePress = (item: ServiceItem) => {
     const isMug = item.id === '1' || item.name.toLowerCase().includes('mug');
+    const isPin = item.name.toLowerCase().includes('pin');
     if (isMug) {
       router.push('/mug-3d' as any);
+    } else if (isPin) {
+      router.push('/pin-3d' as any);
     }
   };
 

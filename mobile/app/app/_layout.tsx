@@ -18,16 +18,33 @@ LogBox.ignoreLogs([
   'Property "opacity" of AnimatedComponent',
   'THREE.WebGLRenderer: WebGL 1 support was deprecated',
   'contains an invalid package.json configuration',
+  'EXT_color_buffer_float',
+  'renderbufferStorageMultisample',
+  'not a valid icon name',
 ]);
 
 // Patch console.warn to fully suppress the WebGL1 spam (LogBox ignore still prints LOG on iOS)
 if (__DEV__) {
   const _warn = console.warn;
+  const _error = console.error;
   console.warn = (...args: any[]) => {
     const msg = typeof args[0] === 'string' ? args[0] : '';
-    if (msg.includes('WebGL 1 support was deprecated') || msg.includes('invalid package.json configuration')) return;
+    if (
+      msg.includes('WebGL 1 support was deprecated') ||
+      msg.includes('invalid package.json configuration') ||
+      msg.includes('EXT_color_buffer_float') ||
+      msg.includes('not a valid icon name')
+    )
+      return;
     // @ts-ignore
     _warn(...args);
+  };
+  // also suppress EXGL multisample throw from being logged as ERROR until renderer fixed
+  console.error = (...args: any[]) => {
+    const msg = typeof args[0] === 'string' ? args[0] : args[0]?.message ?? '';
+    if (typeof msg === 'string' && (msg.includes('renderbufferStorageMultisample') || msg.includes('EXGL:'))) return;
+    // @ts-ignore
+    _error(...args);
   };
 }
 
@@ -65,6 +82,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="order/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="mug-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
+          <Stack.Screen name="pin-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         </Stack>
         <StatusBar style="auto" />

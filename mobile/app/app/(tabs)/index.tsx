@@ -71,6 +71,8 @@ export default function HomeScreen() {
   const handleCategoryPress = (id: string) => {
     if (id === 'mugs') {
       router.push('/mug-3d' as any);
+    } else if (id === 'pins') {
+      router.push('/pin-3d' as any);
     }
   };
 
@@ -131,22 +133,30 @@ export default function HomeScreen() {
 
           {/* Icon grid row */}
           <View style={styles.catRow}>
-            {CATEGORIES.map((cat) => (
-              <Pressable
-                key={cat.id}
-                onPress={() => handleCategoryPress(cat.id)}
-                style={({ pressed }) => [styles.catItem, pressed && styles.catItemPressed]}>
-                <View style={[styles.catIconBox, cat.id === 'mugs' && styles.catIconBox3D]}>
-                  <Ionicons name={cat.icon} size={28} color={BrandColors.primary} />
-                  {cat.id === 'mugs' && (
-                    <View style={styles.cat3DBadge}>
-                      <Text style={styles.cat3DText}>3D</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.catLabel}>{cat.label}</Text>
-              </Pressable>
-            ))}
+            {CATEGORIES.map((cat) => {
+              const is3D = cat.id === 'mugs' || cat.id === 'pins';
+              return (
+                <Pressable
+                  key={cat.id}
+                  onPress={() => handleCategoryPress(cat.id)}
+                  style={({ pressed }) => [styles.catItem, pressed && styles.catItemPressed]}>
+                  <View style={[styles.catIconBox, is3D && styles.catIconBox3D, cat.id === 'pins' && { borderColor: '#7C3AED', backgroundColor: '#F5F3FF' }]}>
+                    <Ionicons name={cat.icon} size={28} color={cat.id === 'pins' ? '#7C3AED' : BrandColors.primary} />
+                    {cat.id === 'mugs' && (
+                      <View style={styles.cat3DBadge}>
+                        <Text style={styles.cat3DText}>3D</Text>
+                      </View>
+                    )}
+                    {cat.id === 'pins' && (
+                      <View style={[styles.cat3DBadge, { backgroundColor: '#7C3AED' }]}>
+                        <Text style={styles.cat3DText}>3D</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.catLabel}>{cat.label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {/* Wide tiles row */}

@@ -26,7 +26,7 @@ const TRANSLATIONS: Record<Language, Translations> = {
     english: 'English',
     tagalog: 'Tagalog',
     // Welcome screen
-    brandName: 'Rens Digital Printing',
+    brandName: 'NUYDA ENTERPRISE',
     brandTagline: 'An AI-Powered E-Commerce and Printing Management System in Montalban.',
     getStarted: 'Get Started',
     alreadyHaveAccount: 'I already have an account',
@@ -41,7 +41,7 @@ const TRANSLATIONS: Record<Language, Translations> = {
     english: 'English',
     tagalog: 'Tagalog',
     // Welcome screen
-    brandName: 'Rens Digital Printing',
+    brandName: 'NUYDA ENTERPRISE',
     brandTagline: 'Isang AI-Powered na E-Commerce at Sistema ng Pamamahala ng Pag-print sa Montalban.',
     getStarted: 'Magsimula',
     alreadyHaveAccount: 'Mayroon na akong account',
@@ -60,7 +60,7 @@ type LanguageContextValue = {
   isLoaded: boolean;
 };
 
-const STORAGE_KEY = 'rens-language';
+const STORAGE_KEY = 'nuyda-language';
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 

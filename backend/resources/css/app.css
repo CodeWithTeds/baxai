@@ -141,3 +141,21 @@
         @apply bg-background text-foreground;
     }
 }
+
+/* NUYDA ENTERPRISE landing — Apple-style system typography */
+.landing {
+    font-family:
+        -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+        'Helvetica Neue', Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+.landing h1,
+.landing h2,
+.landing h3 {
+    font-family:
+        -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+        'Helvetica Neue', Helvetica, Arial, sans-serif;
+    letter-spacing: -0.022em;
+}

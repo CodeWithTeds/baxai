@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "NUYDA ENTERPRISE",
+    "slug": "nuyda-enterprise",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "app",
+    "scheme": "nuyda-enterprise",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -46,7 +46,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Allow Rens Digital to access your microphone for voice conversations with Prof Alex."
+          "microphonePermission": "Allow NUYDA ENTERPRISE to access your microphone for voice conversations with Prof Alex."
         }
       ],
       "expo-asset"

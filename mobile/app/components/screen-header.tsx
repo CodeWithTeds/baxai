@@ -29,7 +29,7 @@ interface ScreenHeaderProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ScreenHeader({
-  title = 'Rens Digital',
+  title = 'NUYDA ENTERPRISE',
   hideSearch = false,
   searchPlaceholder = 'Search...',
   searchValue,

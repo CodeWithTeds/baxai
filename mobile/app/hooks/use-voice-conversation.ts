@@ -35,7 +35,7 @@ export function useVoiceConversation() {
     {
       id: '0',
       role: 'assistant',
-      text: "Hi! I'm Owla, your Rens Digital assistant. Tap me to start speaking — I understand both English and Tagalog.",
+      text: "Hi! I'm Owla, your NUYDA ENTERPRISE assistant. Tap me to start speaking — I understand both English and Tagalog.",
     },
   ]);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');

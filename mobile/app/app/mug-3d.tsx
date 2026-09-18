@@ -45,22 +45,20 @@ export default function Mug3DScreen() {
     try {
       const { drawingBufferWidth: w, drawingBufferHeight: h } = gl;
 
-      // Renderer via expo-three — handles document/window polyfill + expo-gl quirks
-      // three@0.160 (pre-r163) supports WebGL1 from expo-gl; expo-three@7 polyfills correctly
+      // Renderer via expo-three — expo-gl is WebGL1 + no multisample, so antialias must be false or EXGL throws renderbufferStorageMultisample
       let renderer: any;
       try {
-        renderer = new (Renderer as any)({ gl });
+        renderer = new (Renderer as any)({ gl, antialias: false, alpha: false });
       } catch (e) {
         console.warn('[Mug3D] expo-three Renderer failed, fallback to raw', e);
-        renderer = new (THREE as any).WebGLRenderer({ context: gl } as any);
+        renderer = new (THREE as any).WebGLRenderer({ context: gl, antialias: false, alpha: false } as any);
       }
       // expo-three Renderer uses setSize/clearColor like THREE
       if (renderer.setSize) renderer.setSize(w, h);
       else if (renderer.setSizeAsync) await renderer.setSizeAsync(w, h);
       if (renderer.setClearColor) renderer.setClearColor(0xf3f4f6);
       if (renderer.shadowMap) {
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.shadowMap.enabled = false;
       }
       rendererRef.current = renderer as unknown as THREE.WebGLRenderer;
 
@@ -94,7 +92,9 @@ export default function Mug3DScreen() {
       scene.add(point);
 
       // ── Mug Group — just the cup, no decal/texture ─────────────────────────
+      const MUG_SCALE = 0.68;
       const mugGroup = new THREE.Group();
+      mugGroup.scale.set(MUG_SCALE, MUG_SCALE, MUG_SCALE);
       mugGroupRef.current = mugGroup;
 
       // Ceramic material
@@ -189,12 +189,12 @@ export default function Mug3DScreen() {
       });
       const ground = new THREE.Mesh(groundGeo, groundMat);
       ground.rotation.x = -Math.PI / 2;
-      ground.position.y = -height / 2 - 0.75;
+      ground.position.y = -1.05;
       ground.receiveShadow = true;
       scene.add(ground);
 
-      // subtle shadow disc under mug (fake AO)
-      const shadowGeo = new THREE.CircleGeometry(1.35, 32);
+      // subtle shadow disc under mug (fake AO) — scaled with MUG_SCALE
+      const shadowGeo = new THREE.CircleGeometry(0.92, 32);
       const shadowMat = new THREE.MeshBasicMaterial({
         color: 0x000000,
         transparent: true,
@@ -202,7 +202,7 @@ export default function Mug3DScreen() {
       });
       const shadowDisc = new THREE.Mesh(shadowGeo, shadowMat);
       shadowDisc.rotation.x = -Math.PI / 2;
-      shadowDisc.position.y = -height / 2 - 0.74;
+      shadowDisc.position.y = -1.04;
       scene.add(shadowDisc);
 
       scene.add(mugGroup);

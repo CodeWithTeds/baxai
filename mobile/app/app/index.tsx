@@ -27,11 +27,11 @@ export default function LanguageSelectionScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      {/* Header - Rens Digital */}
+      {/* Header - NUYDA ENTERPRISE */}
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
         <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
           <Ionicons name="print" size={20} color="#FFFFFF" style={styles.headerIcon} />
-          <Text style={styles.headerTitle}>Rens Digital</Text>
+          <Text style={styles.headerTitle}>NUYDA ENTERPRISE</Text>
         </Animated.View>
       </SafeAreaView>
 
