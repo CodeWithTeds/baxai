@@ -1,5 +1,17 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import {
+    BarChart3,
+    BookOpen,
+    Boxes,
+    FileCheck,
+    FolderGit2,
+    LayoutGrid,
+    Package,
+    Printer,
+    Settings,
+    ShoppingBag,
+    Users,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,13 +26,63 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { edit as profileEdit } from '@/routes/profile';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
+const overviewNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+];
+
+const sellNavItems: NavItem[] = [
+    {
+        title: 'Orders',
+        href: '#',
+        icon: ShoppingBag,
+    },
+    {
+        title: 'Products',
+        href: '/products',
+        icon: Package,
+    },
+    {
+        title: 'Customers',
+        href: '#',
+        icon: Users,
+    },
+];
+
+const printNavItems: NavItem[] = [
+    {
+        title: 'Printing',
+        href: '#',
+        icon: Printer,
+    },
+    {
+        title: 'Proofs',
+        href: '#',
+        icon: FileCheck,
+    },
+    {
+        title: 'Materials',
+        href: '#',
+        icon: Boxes,
+    },
+];
+
+const manageNavItems: NavItem[] = [
+    {
+        title: 'Reports',
+        href: '#',
+        icon: BarChart3,
+    },
+    {
+        title: 'Settings',
+        href: profileEdit(),
+        icon: Settings,
     },
 ];
 
@@ -53,7 +115,10 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain label="Overview" items={overviewNavItems} />
+                <NavMain label="Sell" items={sellNavItems} />
+                <NavMain label="Print" items={printNavItems} />
+                <NavMain label="Manage" items={manageNavItems} />
             </SidebarContent>
 
             <SidebarFooter>

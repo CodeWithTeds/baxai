@@ -6,6 +6,8 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\GroqController;
+use App\Http\Controllers\Api\ProductAiController;
+use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -21,6 +23,12 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::apiResource('tasks', TaskController::class);
+
+Route::post('products/ai-assist', [ProductAiController::class, 'assist']);
+Route::apiResource('products', ProductController::class);
+Route::post('products/bulk-activate', [ProductController::class, 'bulkActivate']);
+Route::post('products/bulk-archive', [ProductController::class, 'bulkArchive']);
+Route::post('products/bulk-destroy', [ProductController::class, 'bulkDestroy']);
 
 // ─── Groq AI proxy (no auth required — key is server-side only) ───────────────
 Route::prefix('groq')->group(function () {

@@ -1,12 +1,9 @@
 import { Head } from '@inertiajs/react';
 import {
-    BarChart3,
     Bell,
-    Boxes,
     Check,
     ChevronLeft,
     ChevronRight,
-    FileCheck,
     Files,
     Inbox,
     LayoutGrid,
@@ -14,18 +11,18 @@ import {
     MonitorSmartphone,
     Moon,
     NotebookPen,
-    Package,
     Pencil,
     Plus,
-    Printer,
     Search,
     Settings,
     ShoppingBag,
     Sun,
     Trash2,
     Users,
+    Printer,
 } from 'lucide-react';
 import { useState } from 'react';
+import { dashboard } from '@/routes';
 
 /* --------------------------------- theme ---------------------------------- */
 /* Palette: primary #0052CC · deep #003D9B · navy #1A1C1E · bg #ECEEF4 */
@@ -152,65 +149,6 @@ function Avatar({
     );
 }
 
-function SideGroup({
-    label,
-    children,
-}: {
-    label: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="flex w-full flex-col items-center">
-            <p className="pb-1 text-[8px] font-extrabold tracking-[0.2em] text-white/55 uppercase">
-                {label}
-            </p>
-            {children}
-        </div>
-    );
-}
-
-function SideIcon({
-    label,
-    active = false,
-    dot = false,
-    children,
-}: {
-    label: string;
-    active?: boolean;
-    dot?: boolean;
-    children: React.ReactNode;
-}) {
-    return (
-        <button
-            title={label}
-            aria-label={label}
-            className="group flex w-full flex-col items-center gap-1 rounded-xl py-1.5 transition-colors hover:bg-white/10"
-        >
-            <span
-                className={`relative flex h-10 w-10 items-center justify-center rounded-[13px] transition-all duration-200 ${
-                    active
-                        ? 'bg-white text-[#0052CC] shadow-[0_8px_18px_-6px_rgba(0,0,0,0.4)]'
-                        : 'text-white/85 group-hover:scale-105 group-hover:text-white'
-                }`}
-            >
-                {children}
-                {dot && (
-                    <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#3DD598] ring-2 ring-[#0052CC]" />
-                )}
-            </span>
-            <span
-                className={`text-[9px] leading-none font-bold ${
-                    active
-                        ? 'text-white'
-                        : 'text-white/65 group-hover:text-white'
-                }`}
-            >
-                {label}
-            </span>
-        </button>
-    );
-}
-
 /* ---------------------------------- data ---------------------------------- */
 
 const weekDays = ['Mon', 'Tue', 'Wed', 'Thr', 'Fri', 'Sat', 'Sun'];
@@ -254,71 +192,8 @@ export default function Dashboard() {
     return (
         <>
             <Head title="Dashboard" />
-            <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
-            <div
-                className="flex min-h-screen w-full bg-[#ECEEF4] text-[#1A1C1E]"
-                style={{
-                    fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif",
-                }}
-            >
-                {/* sidebar */}
-                <aside className="sticky top-0 hidden h-screen w-[120px] shrink-0 md:block">
-                    <svg
-                        aria-hidden
-                        className="absolute inset-0 h-full w-full"
-                        viewBox="0 0 120 900"
-                        preserveAspectRatio="none"
-                    >
-                        <path
-                            d="M0 0 H72 Q116 170 100 340 Q86 500 104 660 Q114 780 96 900 H0 Z"
-                            fill="#0052CC"
-                        />
-                    </svg>
-                    <nav
-                        aria-label="Admin"
-                        className="absolute inset-0 flex flex-col items-center gap-4 overflow-y-auto py-7 pr-4"
-                    >
-                        <SideGroup label="Overview">
-                            <SideIcon label="Dashboard" active>
-                                <LayoutGrid size={19} />
-                            </SideIcon>
-                        </SideGroup>
-                        <SideGroup label="Sell">
-                            <SideIcon label="Orders" dot>
-                                <ShoppingBag size={19} />
-                            </SideIcon>
-                            <SideIcon label="Products">
-                                <Package size={19} />
-                            </SideIcon>
-                            <SideIcon label="Customers">
-                                <Users size={19} />
-                            </SideIcon>
-                        </SideGroup>
-                        <SideGroup label="Print">
-                            <SideIcon label="Printing" dot>
-                                <Printer size={19} />
-                            </SideIcon>
-                            <SideIcon label="Proofs">
-                                <FileCheck size={19} />
-                            </SideIcon>
-                            <SideIcon label="Materials">
-                                <Boxes size={19} />
-                            </SideIcon>
-                        </SideGroup>
-                        <SideGroup label="Manage">
-                            <SideIcon label="Reports">
-                                <BarChart3 size={19} />
-                            </SideIcon>
-                            <SideIcon label="Settings">
-                                <Settings size={19} />
-                            </SideIcon>
-                        </SideGroup>
-                    </nav>
-                </aside>
-
-                {/* main */}
-                <div className="min-w-0 flex-1 px-4 pt-5 pb-24 sm:px-7 md:pb-10">
-                    <div className="mx-auto w-full max-w-[1380px]">
+            <div className="bg-[#ECEEF4] pt-1 pb-24 text-[#1A1C1E] md:pb-10">
+                <div className="mx-auto w-full max-w-[1380px]">
                         {/* top nav */}
                         <header className="flex flex-wrap items-center gap-3">
                             <nav className="flex items-center gap-5 text-[13px] font-semibold">
@@ -815,7 +690,6 @@ export default function Dashboard() {
                             </section>
                         </main>
                     </div>
-                </div>
 
                 {/* mobile nav */}
                 <nav
@@ -835,6 +709,11 @@ export default function Dashboard() {
     );
 }
 
-// Full-screen takeover: skip the default AppSidebar chrome —
-// this page is the whole screen.
-(Dashboard as unknown as { layout: [] }).layout = [];
+Dashboard.layout = {
+    breadcrumbs: [
+        {
+            title: 'Dashboard',
+            href: dashboard(),
+        },
+    ],
+};

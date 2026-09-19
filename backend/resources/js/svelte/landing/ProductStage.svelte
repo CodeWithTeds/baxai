@@ -79,6 +79,127 @@
         });
     }
 
+    /* ── Mascot artwork: the real owl PNG on mug + pin ── */
+    // Margins are baked into the textures as transparency, so every mesh
+    // maps plain 0..1 UVs — never sample outside the image (that smears
+    // edge pixels into streaks).
+    let mascotTex: THREE.CanvasTexture | null = null;
+    let mascotPinTex: THREE.CanvasTexture | null = null;
+    let mascotRequested = false;
+    const mascotWaiters: Array<() => void> = [];
+
+    function paddedTexture(img: HTMLImageElement, canvasAspect: number, artHeight: number): THREE.CanvasTexture {
+        const ch = 1000;
+        const cw = Math.round(ch * canvasAspect);
+        const scale = (ch * artHeight) / img.naturalHeight;
+        const dw = Math.round(img.naturalWidth * scale);
+        const dh = Math.round(img.naturalHeight * scale);
+        const cv = document.createElement('canvas');
+        cv.width = cw;
+        cv.height = ch;
+        const ctx = cv.getContext('2d');
+
+        if (ctx) {
+            ctx.drawImage(img, Math.round((cw - dw) / 2), Math.round((ch - dh) / 2), dw, dh);
+        }
+
+        const t = new THREE.CanvasTexture(cv);
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = 8;
+
+        return t;
+    }
+
+    function requestMascotTextures() {
+        if (mascotRequested) {
+            return;
+        }
+
+        mascotRequested = true;
+
+        // raw PNG keeps its transparency — no painted background anywhere
+        new THREE.TextureLoader().load(
+            '/images/owl-mascot-v2.png?v=2',
+            (t) => {
+                const img = t.image as HTMLImageElement;
+                // mug patch is landscape 1.44 x 0.98
+                mascotTex = paddedTexture(img, 1.44 / 0.98, 0.66);
+                // pin faces are mapped as squares
+                mascotPinTex = paddedTexture(img, 1, 0.62);
+                t.dispose();
+                mascotWaiters.splice(0).forEach((fn) => fn());
+            },
+            undefined,
+            () => {
+                /* artwork failed — products stay plain */
+            },
+        );
+    }
+
+    function onMascotReady(fn: () => void) {
+        if (mascotTex && mascotPinTex) {
+            fn();
+        } else {
+            mascotWaiters.push(fn);
+        }
+    }
+
+    /** Remap UVs so the full portrait artwork fits a region undistorted.
+     *  fit < 1 shrinks the artwork (clamped edges = backing color). */
+    function planarFitUVs(geo: THREE.BufferGeometry, fit = 1) {
+        geo.computeBoundingBox();
+        const bb = geo.boundingBox;
+
+        if (!bb) {
+            return;
+        }
+
+        const w = Math.max(1e-6, bb.max.x - bb.min.x);
+        const h = Math.max(1e-6, bb.max.y - bb.min.y);
+        const m = Math.max(w, h);
+        const ox = bb.min.x - (m - w) / 2;
+        const oy = bb.min.y - (m - h) / 2;
+        const pos = geo.attributes.position as THREE.BufferAttribute;
+        const uv = geo.attributes.uv as THREE.BufferAttribute;
+
+        for (let i = 0; i < pos.count; i++) {
+            uv.setXY(
+                i,
+                0.5 + ((pos.getX(i) - ox) / m - 0.5) / fit,
+                0.5 + ((pos.getY(i) - oy) / m - 0.5) / fit,
+            );
+        }
+
+        uv.needsUpdate = true;
+    }
+
+    /* ── Mascot sticker: owl decal hugging the mug ── */
+    function makeMascotSticker(): THREE.Mesh {
+        const mat = new THREE.MeshStandardMaterial({
+            transparent: true,
+            alphaTest: 0.08,
+            roughness: 0.35,
+            metalness: 0,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+        });
+
+        // curved patch facing +z, riding just above the ceramic.
+        // artwork margins are baked into the texture: plain 0..1 UVs.
+        const geo = new THREE.CylinderGeometry(1.035, 0.985, 0.98, 32, 1, true, -0.72, 1.44);
+        const sticker = new THREE.Mesh(geo, mat);
+        sticker.position.y = 0.02;
+        sticker.visible = false;
+
+        onMascotReady(() => {
+            mat.map = mascotTex;
+            mat.needsUpdate = true;
+            sticker.visible = true;
+        });
+
+        return sticker;
+    }
+
     /* ── Mug builders (mirrors mobile/app/app/mug-3d.tsx) ── */
     function buildMug(): { group: THREE.Group; ceramicMat: THREE.MeshStandardMaterial } {
         const group = new THREE.Group();
@@ -104,7 +225,10 @@
             bodyProfile.push(new THREE.Vector2(r, y));
         }
 
-        const outer = new THREE.Mesh(new THREE.LatheGeometry(bodyProfile, 48), ceramicMat);
+        const outerGeo = new THREE.LatheGeometry(bodyProfile, 48);
+        // hide the lathe UV seam at the back of the mug
+        outerGeo.rotateY(Math.PI);
+        const outer = new THREE.Mesh(outerGeo, ceramicMat);
         outer.castShadow = true;
         outer.receiveShadow = true;
         group.add(outer);
@@ -156,6 +280,8 @@
         capBot.position.set(topR - 0.02, -0.5, 0);
         capBot.scale.set(1, 0.9, 0.9);
         group.add(capBot);
+
+        group.add(makeMascotSticker());
 
         return { group, ceramicMat };
     }
@@ -221,6 +347,22 @@
         return s;
     }
 
+    function pinShapeFor(shape: PinShape): THREE.Shape | null {
+        if (shape === 'square') {
+            return roundedRectShape(1.7, 1.7, 0.06);
+        } else if (shape === 'rounded') {
+            return roundedRectShape(1.7, 1.7, 0.28);
+        } else if (shape === 'star') {
+            return starShape(0.95, 0.48, 5);
+        } else if (shape === 'heart') {
+            return heartShape(0.85);
+        } else if (shape === 'shield') {
+            return shieldShape(1.55, 1.75);
+        }
+
+        return null;
+    }
+
     function buildPinGeometry(shape: PinShape): THREE.BufferGeometry {
         if (shape === 'round') {
             const geo = new THREE.CylinderGeometry(0.98, 0.98, 0.14, 64);
@@ -238,19 +380,7 @@
             curveSegments: 24,
         };
 
-        let shapeObj: THREE.Shape | null = null;
-
-        if (shape === 'square') {
-            shapeObj = roundedRectShape(1.7, 1.7, 0.06);
-        } else if (shape === 'rounded') {
-            shapeObj = roundedRectShape(1.7, 1.7, 0.28);
-        } else if (shape === 'star') {
-            shapeObj = starShape(0.95, 0.48, 5);
-        } else if (shape === 'heart') {
-            shapeObj = heartShape(0.85);
-        } else if (shape === 'shield') {
-            shapeObj = shieldShape(1.55, 1.75);
-        }
+        const shapeObj = pinShapeFor(shape);
 
         if (shapeObj) {
             const g = new THREE.ExtrudeGeometry(shapeObj, extrude);
@@ -334,12 +464,18 @@
             const domeGeo = new THREE.SphereGeometry(domeR, 48, 24, 0, Math.PI * 2, 0, thetaLen);
             domeGeo.rotateX(Math.PI / 2);
             domeGeo.translate(0, 0, -domeR * Math.cos(thetaLen) + 0.07);
-            g.add(
-                new THREE.Mesh(
-                    domeGeo,
-                    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.16, metalness: 0.04 }),
-                ),
-            );
+            planarFitUVs(domeGeo);
+            const domeMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.16,
+                metalness: 0.04,
+                alphaTest: 0.5,
+            });
+            onMascotReady(() => {
+                domeMat.map = mascotPinTex;
+                domeMat.needsUpdate = true;
+            });
+            g.add(new THREE.Mesh(domeGeo, domeMat));
 
             const inner = new THREE.Mesh(new THREE.CircleGeometry(0.975, 64), capMat);
             inner.position.z = 0.0701;
@@ -353,7 +489,19 @@
             return g;
         }
 
-        const mesh = new THREE.Mesh(buildPinGeometry(shape), [rimMat, capMat]);
+        const geo = buildPinGeometry(shape);
+        planarFitUVs(geo);
+        const faceMat = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            roughness: 0.3,
+            metalness: 0.05,
+            alphaTest: 0.5,
+        });
+        onMascotReady(() => {
+            faceMat.map = mascotPinTex;
+            faceMat.needsUpdate = true;
+        });
+        const mesh = new THREE.Mesh(geo, [faceMat, capMat]);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         const safety = buildSafetyPin();
@@ -361,6 +509,18 @@
         safety.scale.set(0.85, 0.85, 0.85);
         const wrap = new THREE.Group();
         wrap.add(mesh, safety);
+
+        // plain white backing so the cutout shows white, not hollow interior
+        const backingShape = pinShapeFor(shape);
+
+        if (backingShape) {
+            const backing = new THREE.Mesh(
+                new THREE.ShapeGeometry(backingShape, 24),
+                new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }),
+            );
+            backing.position.z = 0.04;
+            wrap.add(backing);
+        }
 
         return wrap;
     }
@@ -391,6 +551,8 @@
                 if (cancelled || !host) {
                     return;
                 }
+
+                requestMascotTextures();
 
                 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
                 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
