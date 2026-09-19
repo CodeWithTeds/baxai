@@ -201,9 +201,9 @@ export default function Product3DPreview({
 
     if (!showCanvas) {
         return (
-            <div className="flex h-[220px] flex-col items-center justify-center gap-2 rounded-xl bg-[#F8F9FC] text-center">
-                <Cuboid size={28} className="text-[#B9BED1]" />
-                <p className="text-[13px] font-semibold text-[#8A8FA3]">2D product — no 3D preview</p>
+            <div className="flex h-[200px] flex-col items-center justify-center gap-2 rounded-lg bg-[#F8F9FC] text-center">
+                <Cuboid size={24} className="text-[#B9BED1]" />
+                <p className="text-[13px] text-[#8A8FA3]">2D product — no 3D preview</p>
                 <p className="px-6 text-[12px] text-[#B9BED1]">Pick a 3D viewer above or generate with AI to enable it.</p>
             </div>
         );
@@ -212,17 +212,17 @@ export default function Product3DPreview({
     return (
         <div>
             <div className="relative">
-                <div ref={mountRef} className="h-[260px] w-full cursor-grab touch-none rounded-xl bg-gradient-to-b from-[#F8F9FC] to-[#ECEEF4] active:cursor-grabbing" />
+                <div ref={mountRef} className="h-[220px] w-full cursor-grab touch-none rounded-lg bg-[#F4F5F9] active:cursor-grabbing" />
                 {loading && (
-                    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-[#F8F9FC]/70">
-                        <p className="text-[13px] font-semibold text-[#8A8FA3]">Loading 3D model…</p>
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#F8F9FC]/70">
+                        <p className="text-[13px] text-[#8A8FA3]">Loading 3D model…</p>
                     </div>
                 )}
             </div>
-            {loadError && <p className="mt-2 text-[13px] font-semibold text-red-600">{loadError}</p>}
+            {loadError && <p className="mt-2 text-[13px] text-red-600">{loadError}</p>}
             {canTint && (
-                <div className="mt-3 flex items-center gap-2">
-                    <span className="text-[12px] font-bold text-[#8A8FA3]">Preview color:</span>
+                <div className="mt-2 flex items-center gap-2">
+                    <span className="text-[12px] text-[#8A8FA3]">Preview color:</span>
                     {PALETTE.map((c) => (
                         <button
                             key={c}

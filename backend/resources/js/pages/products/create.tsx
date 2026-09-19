@@ -45,12 +45,12 @@ const VIEWERS = [
 ];
 
 const inputCls =
-    'h-11 rounded-xl border-[#E9EBF3] bg-white px-4 text-[15px] text-[#1A1C1E] placeholder:text-[#B9BED1] focus-visible:border-[#1A1C1E] focus-visible:ring-0';
+    'h-9 rounded-lg border-[#E9EBF3] bg-white px-3 text-sm text-[#1A1C1E] placeholder:text-[#B9BED1] focus-visible:border-[#1A1C1E] focus-visible:ring-0';
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
     return (
-        <div className="space-y-1.5">
-            <p className="text-[13px] font-bold text-[#1A1C1E]">{label}</p>
+        <div className="space-y-1">
+            <p className="text-[13px] text-[#1A1C1E]">{label}</p>
             {children}
             {error && <InputError message={error} />}
         </div>
@@ -59,8 +59,8 @@ function Field({ label, error, children }: { label: string; error?: string; chil
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
-        <section className="rounded-2xl bg-white p-6 shadow-[0_10px_30px_-24px_rgba(26,28,30,0.3)]">
-            <h3 className="mb-4 text-[16px] font-extrabold tracking-tight text-[#1A1C1E]">{title}</h3>
+        <section className="rounded-xl bg-white p-4 shadow-[0_10px_30px_-24px_rgba(26,28,30,0.3)]">
+            <h3 className="mb-3 text-sm tracking-tight text-[#1A1C1E]">{title}</h3>
             {children}
         </section>
     );
@@ -76,7 +76,7 @@ function Chip({
     onChange: (v: boolean) => void;
 }) {
     return (
-        <label className="flex cursor-pointer items-center gap-3 py-2 text-[14px] font-semibold text-[#1A1C1E]">
+        <label className="flex cursor-pointer items-center gap-2 py-1 text-[13px] text-[#1A1C1E]">
             <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} />
             {title}
         </label>
@@ -142,20 +142,20 @@ any) {
 
     return (
         <form onSubmit={onSubmit}>
-            <div className="grid items-start gap-4 xl:grid-cols-2">
+            <div className="grid items-start gap-3 xl:grid-cols-2">
                 {/* LEFT — basic + pricing */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                     <Section title="Basic info">
                         <button
                             type="button"
                             onClick={generateWithAi}
                             disabled={aiLoading}
-                            className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1A1C1E] py-2.5 text-[14px] font-bold text-white transition hover:bg-black disabled:opacity-50"
+                            className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-[#E9EBF3] bg-white py-2 text-[13px] text-[#1A1C1E] transition hover:bg-[#F6F7FB] disabled:opacity-50"
                         >
-                            {aiLoading ? 'Generating…' : '✨ Generate details with AI'}
+                            {aiLoading ? 'Generating…' : 'Generate details with AI'}
                         </button>
-                        {aiError && <p className="mb-3 text-[13px] font-semibold text-red-600">{aiError}</p>}
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        {aiError && <p className="mb-2 text-[13px] text-red-600">{aiError}</p>}
+                        <div className="grid gap-2 sm:grid-cols-2">
                             <Field label="Name *" error={errors.name}>
                                 <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Custom Ceramic Mug 11oz" className={inputCls} />
                             </Field>
@@ -201,8 +201,8 @@ any) {
                                     <textarea
                                         value={data.description ?? ''}
                                         onChange={(e) => setData('description', e.target.value)}
-                                        rows={3}
-                                        className="w-full rounded-xl border border-[#E9EBF3] bg-white px-4 py-2.5 text-[15px] text-[#1A1C1E] outline-none placeholder:text-[#B9BED1] focus:border-[#1A1C1E]"
+                                        rows={2}
+                                        className="w-full rounded-lg border border-[#E9EBF3] bg-white px-3 py-2 text-sm text-[#1A1C1E] outline-none placeholder:text-[#B9BED1] focus:border-[#1A1C1E]"
                                         placeholder="Materials, print method, use case…"
                                     />
                                 </Field>
@@ -211,7 +211,7 @@ any) {
                     </Section>
 
                     <Section title="Pricing & inventory">
-                        <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="grid gap-2 sm:grid-cols-3">
                             <Field label="Base ₱ *" error={errors.base_price}>
                                 <Input type="number" step="0.01" min="0" value={data.base_price} onChange={(e) => setData('base_price', e.target.value)} placeholder="9.99" className={inputCls} />
                             </Field>
@@ -235,7 +235,7 @@ any) {
                 </div>
 
                 {/* RIGHT — preview + customizable + visibility */}
-                <div className="space-y-4">
+                <div className="space-y-3">
                     <Section title="3D preview">
                         <Product3DPreview
                             viewerType={data.viewer_type ?? 'none'}
@@ -259,7 +259,7 @@ any) {
                                 <Chip title="Featured home" checked={!!data.is_featured_home} onChange={(v) => setData('is_featured_home', v)} />
                             )}
                         </div>
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
                             <Field label="3D viewer" error={errors.viewer_type}>
                                 <Select value={data.viewer_type ?? 'none'} onValueChange={(v) => setData('viewer_type', v)}>
                                     <SelectTrigger className={cn(inputCls, 'w-full')}>
@@ -295,12 +295,12 @@ any) {
                             <Chip title="Featured home" checked={!!data.is_featured_home} onChange={(v) => setData('is_featured_home', v)} />
                             <Chip title="Featured services" checked={!!data.is_featured_services} onChange={(v) => setData('is_featured_services', v)} />
                         </div>
-                        <div className="mt-4 flex gap-2">
-                            <Button type="submit" disabled={processing} className="flex-1 rounded-xl bg-[#1A1C1E] py-3 text-[14px] font-bold text-white hover:bg-black">
+                        <div className="mt-3 flex gap-2">
+                            <Button type="submit" disabled={processing} className="flex-1">
                                 {processing ? 'Saving…' : submitLabel}
                             </Button>
                             <Link href="/products">
-                                <Button variant="outline" type="button" className="rounded-xl bg-[#EEF0F7] px-5 py-3 text-[14px] font-bold text-[#1A1C1E] hover:bg-[#E2E5F1]">
+                                <Button variant="outline" type="button">
                                     Cancel
                                 </Button>
                             </Link>
