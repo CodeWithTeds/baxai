@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import {
 import InputError from '@/components/input-error';
 import { Checkbox } from '@/components/ui/checkbox';
 import Product3DPreview from '@/components/product-3d-preview';
+import { VESSEL_VIEWERS } from '@/components/vessel-builder';
 import { cn } from '@/lib/utils';
 
 const CATEGORIES = [
@@ -35,7 +36,7 @@ const STATUSES = [
 
 const VIEWERS = [
     { value: 'none', label: 'None — 2D only' },
-    { value: 'mug', label: 'Mug — 3D' },
+    ...VESSEL_VIEWERS,
     { value: 'pin', label: 'Pin — 3D' },
     { value: 'shirt', label: 'T-Shirt — 3D' },
     { value: 'tote', label: 'Tote Bag — 3D' },
@@ -43,6 +44,36 @@ const VIEWERS = [
     { value: 'calendar', label: 'Calendar — 3D' },
     { value: 'glb', label: 'Custom .glb model' },
 ];
+
+// Default 3D template per category so an uploaded reference shows immediately.
+const VIEWER_FOR_CATEGORY: Record<string, string> = {
+    mugs: 'mug',
+    pins: 'pin',
+    tshirts: 'shirt',
+    tote_bags: 'tote',
+    stickers: 'sticker',
+    calendars: 'calendar',
+};
+
+const REFERENCE_ACCEPT = 'image/jpeg,image/png,image/webp';
+const REFERENCE_MAX_BYTES = 5 * 1024 * 1024;
+
+const FIELD_LABELS: Record<string, string> = {
+    name: 'Name',
+    sku: 'SKU',
+    category: 'Category',
+    status: 'Status',
+    base_price: 'Base price',
+    compare_at_price: 'Compare-at price',
+    short_description: 'Short description',
+    thumbnail: 'Thumbnail',
+    reference_image: 'Reference image',
+    viewer_type: '3D viewer',
+    model_3d_url: '3D model URL',
+    max_text_length: 'Max text length',
+};
+
+const prettyField = (field: string) => FIELD_LABELS[field] ?? field.replace(/_/g, ' ');
 
 const inputCls =
     'h-9 rounded-lg border-[#E9EBF3] bg-white px-3 text-sm text-[#1A1C1E] placeholder:text-[#B9BED1] focus-visible:border-[#1A1C1E] focus-visible:ring-0';
@@ -95,6 +126,51 @@ export function ProductForm({
 any) {
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState('');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [refPreview, setRefPreview] = useState('');
+    const [refError, setRefError] = useState('');
+
+    const handleReferenceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+            setRefError('Please choose a JPG, PNG or WebP image.');
+            return;
+        }
+        if (file.size > REFERENCE_MAX_BYTES) {
+            setRefError('Image must be 5 MB or smaller.');
+            return;
+        }
+        setRefError('');
+        if (refPreview.startsWith('blob:')) URL.revokeObjectURL(refPreview);
+        setRefPreview(URL.createObjectURL(file));
+        setData('reference_image', file as never);
+        // Default to the matching 3D template so the design shows immediately.
+        const mapped = VIEWER_FOR_CATEGORY[data.category];
+        if ((data.viewer_type ?? 'none') === 'none' && mapped) {
+            setData('viewer_type', mapped as never);
+            setData('has_3d_preview', true as never);
+        }
+    };
+
+    const clearReference = () => {
+        if (refPreview.startsWith('blob:')) URL.revokeObjectURL(refPreview);
+        setRefPreview('');
+        setRefError('');
+        setData('reference_image', null as never);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const referenceUrl = refPreview || data.thumbnail || '';
+
+    const errorBoxRef = useRef<HTMLDivElement>(null);
+    const errorEntries = Object.entries((errors ?? {}) as Record<string, string>);
+
+    useEffect(() => {
+        if (errorEntries.length > 0) errorBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Scroll only when a fresh validation response arrives.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [errors]);
 
     const generateWithAi = async () => {
         if (!data.name?.trim()) {
@@ -142,6 +218,20 @@ any) {
 
     return (
         <form onSubmit={onSubmit}>
+            {errorEntries.length > 0 && (
+                <div ref={errorBoxRef} className="mb-3 scroll-mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                    <p className="text-sm font-medium text-red-800">
+                        Please fix {errorEntries.length} field{errorEntries.length > 1 ? 's' : ''} to continue:
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[13px] text-red-700">
+                        {errorEntries.map(([field, message]) => (
+                            <li key={field}>
+                                <span className="font-medium">{prettyField(field)}:</span> {String(message)}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
             <div className="grid items-start gap-3 xl:grid-cols-2">
                 {/* LEFT — basic + pricing */}
                 <div className="space-y-3">
@@ -237,10 +327,58 @@ any) {
                 {/* RIGHT — preview + customizable + visibility */}
                 <div className="space-y-3">
                     <Section title="3D preview">
+                        <div className="mb-3 rounded-lg border border-dashed border-[#E9EBF3] bg-[#F8F9FC] p-3">
+                            <p className="text-[13px] font-medium text-[#1A1C1E]">Reference image → 3D model</p>
+                            <p className="mt-0.5 text-[12px] text-[#8A8FA3]">
+                                Upload a photo of the actual product — it is projected onto the 3D template below and saved as the thumbnail.
+                            </p>
+                            <div className="mt-2 flex items-center gap-3">
+                                {referenceUrl ? (
+                                    <img
+                                        src={referenceUrl}
+                                        alt="Reference preview"
+                                        className="h-16 w-16 rounded-lg border border-[#E9EBF3] object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-white text-[11px] text-[#B9BED1]">
+                                        No image
+                                    </div>
+                                )}
+                                <div className="flex flex-col items-start gap-1">
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept={REFERENCE_ACCEPT}
+                                        className="hidden"
+                                        onChange={handleReferenceSelect}
+                                    />
+                                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                                        {referenceUrl ? 'Change image' : 'Upload image'}
+                                    </Button>
+                                    {refPreview && (
+                                        <button
+                                            type="button"
+                                            onClick={clearReference}
+                                            className="text-[12px] text-red-600 hover:underline"
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            {refError && <p className="mt-1.5 text-[13px] text-red-600">{refError}</p>}
+                            {errors.reference_image && <InputError message={errors.reference_image} />}
+                            {refPreview && (
+                                <p className="mt-1.5 text-[12px] text-[#8A8FA3]">
+                                    Will be saved as the product thumbnail on {initial ? 'save' : 'create'}.
+                                </p>
+                            )}
+                        </div>
                         <Product3DPreview
                             viewerType={data.viewer_type ?? 'none'}
                             label={data.name ?? ''}
                             modelUrl={data.model_3d_url ?? ''}
+                            designImageUrl={referenceUrl}
                         />
                     </Section>
 
@@ -329,6 +467,7 @@ const EMPTY_PRODUCT = {
     low_stock_alert_at: 20,
     track_inventory: true,
     thumbnail: '',
+    reference_image: null,
     gallery_images: [],
     has_3d_preview: false,
     is_customizable: false,

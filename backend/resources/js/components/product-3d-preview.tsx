@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Cuboid } from 'lucide-react';
+import { buildVessel, isVesselType } from './vessel-builder';
 
 // Real product models (CC0 unless noted — see public/models/CREDITS.md)
 const DEFAULT_GLB: Record<string, string> = {
@@ -33,10 +34,13 @@ export default function Product3DPreview({
     viewerType,
     label,
     modelUrl,
+    designImageUrl,
 }: {
     viewerType: string;
     label: string;
     modelUrl?: string;
+    /** Reference artwork (uploaded photo) projected onto the template as a print decal. */
+    designImageUrl?: string;
 }) {
     const mountRef = useRef<HTMLDivElement>(null);
     const [color, setColor] = useState('#FFFFFF');
@@ -45,8 +49,11 @@ export default function Product3DPreview({
     const stateRef = useRef({ rotY: 0.5, rotX: 0.1, dragging: false, lastX: 0, lastY: 0 });
 
     const showCanvas = viewerType !== 'none';
+    const isVessel = isVesselType(viewerType);
     const glbUrl = (modelUrl || '').trim() || DEFAULT_GLB[viewerType] || '';
-    const canTint = TINTABLE.has(viewerType);
+    const designUrl = (designImageUrl || '').trim();
+    // Vessels take the tint as their ceramic/steel color at build time.
+    const canTint = TINTABLE.has(viewerType) || isVessel;
 
     useEffect(() => {
         if (!showCanvas || !mountRef.current) return;
@@ -77,6 +84,59 @@ export default function Product3DPreview({
         const group = new THREE.Group();
         scene.add(group);
 
+        let cancelled = false;
+        let designTexture: THREE.Texture | null = null;
+
+        // Project the uploaded reference artwork onto the template as a print
+        // decal, sized from the normalized model bounds so it adapts to any GLB.
+        const applyDesign = (target: THREE.Group) => {
+            if (!designUrl) return;
+            new THREE.TextureLoader().load(
+                designUrl,
+                (tex) => {
+                    if (cancelled) {
+                        tex.dispose();
+                        return;
+                    }
+                    tex.colorSpace = THREE.SRGBColorSpace;
+                    designTexture = tex;
+                    const box = new THREE.Box3().setFromObject(target);
+                    const size = box.getSize(new THREE.Vector3());
+                    const center = box.getCenter(new THREE.Vector3());
+                    const img = tex.image as HTMLImageElement | undefined;
+                    const aspect = img?.width && img?.height ? img.width / img.height : 1;
+                    let w = Math.max(size.x * 0.55, 0.3);
+                    let h = w / aspect;
+                    const maxH = Math.max(size.y * 0.6, 0.3);
+                    if (h > maxH) {
+                        h = maxH;
+                        w = h * aspect;
+                    }
+                    const mesh = new THREE.Mesh(
+                        new THREE.PlaneGeometry(w, h),
+                        new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }),
+                    );
+                    mesh.position.set(center.x, center.y, box.max.z + 0.02);
+                    target.add(mesh);
+                },
+                undefined,
+                () => {
+                    if (!cancelled) setLoadError('Could not load the reference image preview.');
+                },
+            );
+        };
+
+        const addShadowDisc = (target: THREE.Group) => {
+            const b = new THREE.Box3().setFromObject(target);
+            const disc = new THREE.Mesh(
+                new THREE.CircleGeometry(Math.max(b.getSize(new THREE.Vector3()).x * 0.62, 0.7), 32),
+                new THREE.MeshBasicMaterial({ color: 0x1a1c1e, transparent: true, opacity: 0.09 }),
+            );
+            disc.rotation.x = -Math.PI / 2;
+            disc.position.y = b.min.y - 0.02;
+            scene.add(disc);
+        };
+
         const finish = (obj: THREE.Object3D) => {
             // normalize to ~2 units, centered
             const box = new THREE.Box3().setFromObject(obj);
@@ -101,18 +161,59 @@ export default function Product3DPreview({
                 });
             }
 
-            // ground shadow disc
-            const b3 = new THREE.Box3().setFromObject(group);
-            const disc = new THREE.Mesh(
-                new THREE.CircleGeometry(Math.max(b3.getSize(new THREE.Vector3()).x * 0.62, 0.7), 32),
-                new THREE.MeshBasicMaterial({ color: 0x1a1c1e, transparent: true, opacity: 0.09 }),
-            );
-            disc.rotation.x = -Math.PI / 2;
-            disc.position.y = b3.min.y - 0.02;
-            scene.add(disc);
+            addShadowDisc(group);
+
+            applyDesign(group);
         };
 
-        if (glbUrl) {
+        // Procedural drinkware (mug, tumbler, stein, …) — centered but never
+        // rescaled, so an espresso reads smaller than a stein. The reference
+        // artwork wraps around the wall as a curved print label.
+        const finishVessel = () => {
+            const built = buildVessel(viewerType, color);
+            const vbox = new THREE.Box3().setFromObject(built.group);
+            const vcenter = vbox.getCenter(new THREE.Vector3());
+            built.group.position.sub(vcenter);
+            group.add(built.group);
+            addShadowDisc(group);
+
+            if (!designUrl) return;
+            new THREE.TextureLoader().load(
+                designUrl,
+                (tex) => {
+                    if (cancelled) {
+                        tex.dispose();
+                        return;
+                    }
+                    tex.colorSpace = THREE.SRGBColorSpace;
+                    designTexture = tex;
+                    const img = tex.image as HTMLImageElement | undefined;
+                    const aspect = img?.width && img?.height ? img.width / img.height : 1;
+                    const avgR = (built.label.rTop + built.label.rBottom) / 2;
+                    let lw = 2.0 * avgR;
+                    let lh = lw / aspect;
+                    if (lh > built.label.height) {
+                        lh = built.label.height;
+                        lw = lh * aspect;
+                    }
+                    const arc = Math.min(2.0, lw / (avgR || 1));
+                    const mesh = new THREE.Mesh(
+                        new THREE.CylinderGeometry(built.label.rTop, built.label.rBottom, lh, 32, 1, true, -arc / 2, arc),
+                        new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }),
+                    );
+                    mesh.position.set(-vcenter.x, built.label.y - vcenter.y, -vcenter.z);
+                    group.add(mesh);
+                },
+                undefined,
+                () => {
+                    if (!cancelled) setLoadError('Could not load the reference image preview.');
+                },
+            );
+        };
+
+        if (isVessel) {
+            finishVessel();
+        } else if (glbUrl) {
             setLoading(true);
             new GLTFLoader().load(
                 glbUrl,
@@ -176,6 +277,8 @@ export default function Product3DPreview({
         mount.addEventListener('pointercancel', up);
 
         return () => {
+            cancelled = true;
+            designTexture?.dispose();
             cancelAnimationFrame(raf);
             ro.disconnect();
             mount.removeEventListener('pointerdown', down);
@@ -197,14 +300,14 @@ export default function Product3DPreview({
             renderer.dispose();
             if (renderer.domElement.parentElement === mount) mount.removeChild(renderer.domElement);
         };
-    }, [showCanvas, viewerType, glbUrl, color, label, canTint]);
+    }, [showCanvas, viewerType, glbUrl, designUrl, color, label, canTint]);
 
     if (!showCanvas) {
         return (
             <div className="flex h-[200px] flex-col items-center justify-center gap-2 rounded-lg bg-[#F8F9FC] text-center">
                 <Cuboid size={24} className="text-[#B9BED1]" />
                 <p className="text-[13px] text-[#8A8FA3]">2D product — no 3D preview</p>
-                <p className="px-6 text-[12px] text-[#B9BED1]">Pick a 3D viewer above or generate with AI to enable it.</p>
+                <p className="px-6 text-[12px] text-[#B9BED1]">Pick a 3D viewer below, upload a reference image, or generate with AI to enable it.</p>
             </div>
         );
     }

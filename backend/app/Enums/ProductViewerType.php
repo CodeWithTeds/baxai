@@ -6,6 +6,16 @@ enum ProductViewerType: string
 {
     case NONE = 'none';
     case MUG = 'mug';
+    case GLASS_CUP = 'glass_cup';
+    case TUMBLER = 'tumbler';
+    case TRAVEL_MUG = 'travel_mug';
+    case COFFEE_CUP = 'coffee_cup';
+    case TEACUP = 'teacup';
+    case ESPRESSO = 'espresso';
+    case LATTE = 'latte';
+    case CAPPUCCINO = 'cappuccino';
+    case STEIN = 'stein';
+    case TANKARD = 'tankard';
     case PIN = 'pin';
     case SHIRT = 'shirt';
     case TOTE = 'tote';

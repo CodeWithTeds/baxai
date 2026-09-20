@@ -125,7 +125,7 @@ export default function ProductsIndex({
         if (!confirm(`Apply ${action} to ${selected.length} products?`)) return;
         setProcessing(true);
         router.post(
-            `/api/v1/products/${action}`,
+            `/products/${action}`,
             { ids: selected },
             {
                 onFinish: () => {

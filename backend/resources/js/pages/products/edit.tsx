@@ -20,6 +20,7 @@ export default function EditProduct({ product }: { product: any }) {
         low_stock_alert_at: product.low_stock_alert_at ?? 20,
         track_inventory: !!product.track_inventory,
         thumbnail: product.thumbnail ?? '',
+        reference_image: null,
         gallery_images: product.gallery_images ?? [],
         has_3d_preview: !!product.has_3d_preview,
         is_customizable: !!product.is_customizable,

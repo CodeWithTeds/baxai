@@ -1,14 +1,46 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Cuboid, Pencil, Trash2 } from 'lucide-react';
+import Product3DPreview from '@/components/product-3d-preview';
+import { CheckCircle2, Cuboid, Pencil, Trash2 } from 'lucide-react';
 import { dashboard } from '@/routes';
 
 export default function ShowProduct({ product }: { product: any }) {
+    const { flash } = usePage().props as unknown as { flash?: { success?: string } };
     return (
         <>
             <Head title={product.name} />
+            {flash?.success && (
+                <div className="mb-4 flex items-center gap-2 rounded-xl border bg-card px-4 py-3 text-sm">
+                    <CheckCircle2 size={16} className="text-emerald-600" /> {flash.success}
+                </div>
+            )}
             <div className="overflow-hidden rounded-xl border bg-card">
+                    {(product.thumbnail || (product.has_3d_preview && product.viewer_type !== 'none')) && (
+                        <div className="grid gap-4 border-b p-6 sm:grid-cols-2">
+                            {product.thumbnail && (
+                                <div>
+                                    <p className="mb-2 text-[12px] font-medium text-gray-400">REFERENCE IMAGE</p>
+                                    <img
+                                        src={product.thumbnail}
+                                        alt={product.name}
+                                        className="max-h-64 w-full rounded-lg border object-contain bg-gray-50"
+                                    />
+                                </div>
+                            )}
+                            {product.has_3d_preview && product.viewer_type !== 'none' && (
+                                <div>
+                                    <p className="mb-2 text-[12px] font-medium text-gray-400">3D MODEL</p>
+                                    <Product3DPreview
+                                        viewerType={product.viewer_type}
+                                        label={product.name}
+                                        modelUrl={product.model_3d_url}
+                                        designImageUrl={product.thumbnail}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <div className="flex flex-wrap items-start gap-4 p-6">
                         <div className="flex-1">
                             <div className="mb-2 flex items-center gap-2">

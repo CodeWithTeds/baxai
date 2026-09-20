@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Api\BulkProductRequest;
 use App\Http\Requests\Api\StoreProductRequest;
 use App\Http\Requests\Api\UpdateProductRequest;
 use App\Models\Product;
@@ -71,5 +72,26 @@ class ProductController extends Controller
         $product->delete();
 
         return redirect()->route('products.index')->with('success', 'Product archived successfully.');
+    }
+
+    public function bulkActivate(BulkProductRequest $request): RedirectResponse
+    {
+        $count = $this->service->activate($request->validated()['ids']);
+
+        return redirect()->route('products.index')->with('success', "{$count} products activated.");
+    }
+
+    public function bulkArchive(BulkProductRequest $request): RedirectResponse
+    {
+        $count = $this->service->archive($request->validated()['ids']);
+
+        return redirect()->route('products.index')->with('success', "{$count} products archived.");
+    }
+
+    public function bulkDestroy(BulkProductRequest $request): RedirectResponse
+    {
+        $count = $this->products->bulkDelete($request->validated()['ids']);
+
+        return redirect()->route('products.index')->with('success', "{$count} products deleted.");
     }
 }

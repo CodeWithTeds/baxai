@@ -48,7 +48,8 @@ Given a product name, category and optional hint, return ONLY a JSON object (no 
 - sku: uppercase code from the name, e.g. MUG-11OZ-WHT (letters, numbers, dashes only, max 20 chars)
 - print_method: best print method for the category (sublimation, vinyl, DTG, offset)
 - print_size: typical print area, e.g. 8 x 3.5 cm
-- viewer_type: map the category — mugs→mug, pins→pin, tshirts→shirt, tote_bags→tote, stickers→sticker, calendars→calendar, otherwise none
+- viewer_type: map the category — mugs→mug, pins→pin, tshirts→shirt, tote_bags→tote, stickers→sticker, calendars→calendar, otherwise none.
+  For drinkware names be specific: glass cup→glass_cup, tumbler→tumbler, travel/insulated mug→travel_mug, coffee cup→coffee_cup, teacup→teacup, espresso/demitasse→espresso, latte→latte, cappuccino→cappuccino, beer mug/stein→stein, tankard→tankard, otherwise mug.
 - has_3d_preview: true if viewer_type is not none
 - is_customizable: true for mugs, pins, tshirts, tote_bags, stickers — else false
 - allow_color_change, allow_custom_text, allow_image_upload: booleans sensible for the category
@@ -109,12 +110,13 @@ PROMPT;
         $out = array_intersect_key($data, array_flip($allowed));
 
         // Force viewer_type into a valid enum value so saving never fails validation
-        $viewers = ['none', 'mug', 'pin', 'shirt', 'tote', 'sticker', 'calendar', 'glb'];
+        $viewers = ['none', 'mug', 'glass_cup', 'tumbler', 'travel_mug', 'coffee_cup', 'teacup', 'espresso', 'latte', 'cappuccino', 'stein', 'tankard', 'pin', 'shirt', 'tote', 'sticker', 'calendar', 'glb'];
         $vt = strtolower(trim((string) ($out['viewer_type'] ?? '')));
         if (! in_array($vt, $viewers, true)) {
             $haystack = strtolower($vt.' '.$category.' '.$name);
             $vt = 'none';
-            foreach (['mug' => 'mug', 'pin' => 'pin', 'shirt' => 'shirt', 't-shirt' => 'shirt', 'tote' => 'tote', 'sticker' => 'sticker', 'calendar' => 'calendar'] as $needle => $mapped) {
+            // Specific drinkware first — generic 'mug' must come after 'travel mug' etc.
+            foreach (['travel' => 'travel_mug', 'glass' => 'glass_cup', 'tumbler' => 'tumbler', 'demitasse' => 'espresso', 'espresso' => 'espresso', 'cappuccino' => 'cappuccino', 'latte' => 'latte', 'teacup' => 'teacup', 'tea cup' => 'teacup', 'coffee cup' => 'coffee_cup', 'stein' => 'stein', 'beer' => 'stein', 'tankard' => 'tankard', 'mug' => 'mug', 'pin' => 'pin', 'shirt' => 'shirt', 't-shirt' => 'shirt', 'tote' => 'tote', 'sticker' => 'sticker', 'calendar' => 'calendar'] as $needle => $mapped) {
                 if (str_contains($haystack, $needle)) {
                     $vt = $mapped;
                     break;

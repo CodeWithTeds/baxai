@@ -5,12 +5,15 @@ namespace App\Http\Requests\Api;
 use App\Enums\ProductCategory;
 use App\Enums\ProductStatus;
 use App\Enums\ProductViewerType;
+use App\Http\Requests\Api\Concerns\ProductValidationMessages;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UpdateProductRequest extends FormRequest
 {
+    use ProductValidationMessages;
+
     public function authorize(): bool
     {
         return true;
@@ -39,6 +42,7 @@ class UpdateProductRequest extends FormRequest
             'low_stock_alert_at' => 'nullable|integer|min:0',
             'track_inventory' => 'boolean',
             'thumbnail' => 'nullable|string|max:2048',
+            'reference_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'gallery_images' => 'nullable|array|max:5',
             'gallery_images.*' => 'string|max:2048',
             'has_3d_preview' => 'boolean',
