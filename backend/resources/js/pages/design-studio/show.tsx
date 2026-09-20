@@ -15,6 +15,8 @@ import {
     ImagePlus,
     Layers,
     CircleStop,
+    Save,
+    Shirt,
     Trash2,
     Type,
     Video,
@@ -31,12 +33,14 @@ export default function DesignStudio({ initialType }: { initialType: string }) {
         DESIGNER_PRODUCTS.some((p) => p.type === initialType) ? initialType : 'mug',
     );
     const config = designerConfigFor(type);
+    const isShirt = type === 'shirt';
     const [objects, setObjects] = useState<DesignObject[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [bg, setBg] = useState('#FFFFFF');
     const [version, setVersion] = useState(0);
     const [parts, setParts] = useState<StudioPart[]>([]);
     const [recording, setRecording] = useState(false);
+    const [shirtView, setShirtView] = useState<'front' | 'flat'>('front');
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const studioRef = useRef<StudioApi | null>(null);
     const fileRef = useRef<HTMLInputElement | null>(null);
@@ -59,8 +63,10 @@ export default function DesignStudio({ initialType }: { initialType: string }) {
         setType(t);
         setObjects([]);
         setSelectedId(null);
-        setBg('#FFFFFF');
+        // Shirt screenshot is blue tee with white logo floating — transparent bg lets shirt color show through
+        setBg(t === 'shirt' ? 'transparent' : '#FFFFFF');
         setParts([]);
+        setShirtView('front');
         bump();
     };
 
@@ -214,9 +220,22 @@ export default function DesignStudio({ initialType }: { initialType: string }) {
                                     e.target.value = '';
                                 }}
                             />
-                            <div className="mt-3 flex items-center gap-2">
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
                                 <span className="text-[12px] font-bold text-[#8A8FA3]">Print area</span>
-                                <input type="color" value={bg} onChange={(e) => { setBg(e.target.value); bump(); }} className="h-7 w-10 cursor-pointer rounded border border-[#E9EBF3] bg-white" />
+                                {isShirt ? (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setBg('transparent'); bump(); }}
+                                            className={cn('rounded-full px-3 py-1 text-[11px] font-bold transition', bg === 'transparent' ? 'bg-[#1A1C1E] text-white' : 'bg-[#F1F2F7] text-[#3A3D48] hover:bg-[#E5E7EF]')}
+                                        >
+                                            Transparent
+                                        </button>
+                                        <input type="color" value={bg === 'transparent' ? '#6CA6CD' : bg} onChange={(e) => { setBg(e.target.value); bump(); }} className="h-7 w-10 cursor-pointer rounded border border-[#E9EBF3] bg-white" />
+                                    </>
+                                ) : (
+                                    <input type="color" value={bg} onChange={(e) => { setBg(e.target.value); bump(); }} className="h-7 w-10 cursor-pointer rounded border border-[#E9EBF3] bg-white" />
+                                )}
                             </div>
                         </section>
 
@@ -328,9 +347,19 @@ export default function DesignStudio({ initialType }: { initialType: string }) {
                     </section>
 
                     {/* RIGHT — 3D */}
-                    <section className="rounded-2xl bg-white p-4 shadow-sm lg:sticky lg:top-4">
-                        <h3 className="mb-3 text-[13px] font-extrabold">3D mockup — drag to spin</h3>
-                        <div className="h-[420px] overflow-hidden rounded-xl bg-gradient-to-b from-[#F8F9FC] to-[#ECEEF4]">
+                    <section className={cn('rounded-2xl p-4 shadow-sm lg:sticky lg:top-4', isShirt ? 'bg-[#0A0A0A] text-white' : 'bg-white')}>
+                        <h3 className={cn('mb-3 text-[13px] font-extrabold', isShirt ? 'text-white' : 'text-[#1A1C1E]')}>3D mockup — drag to spin</h3>
+                        <div
+                            className={cn('relative overflow-hidden rounded-xl', isShirt ? 'h-[480px] border border-[#222] bg-[#0A0A0A]' : 'h-[420px] bg-gradient-to-b from-[#F8F9FC] to-[#ECEEF4]')}
+                            style={
+                                isShirt
+                                    ? {
+                                          backgroundColor: '#0A0A0A',
+                                          backgroundImage: 'repeating-linear-gradient(90deg, #0f0f0f 0 56px, #161616 56px 58px, #0f0f0f 58px 112px)',
+                                      }
+                                    : undefined
+                            }
+                        >
                             <StudioPreview3D
                                 ref={studioRef}
                                 config={config}
@@ -344,8 +373,44 @@ export default function DesignStudio({ initialType }: { initialType: string }) {
                                     a.click();
                                 }}
                             />
+                            {isShirt && (
+                                <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+                                    <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-[#2f5bff] bg-black/85 px-1.5 py-1.5 shadow-lg backdrop-blur">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShirtView('front')}
+                                            aria-label="Front view"
+                                            className={cn(
+                                                'flex h-9 w-9 items-center justify-center rounded-full transition',
+                                                shirtView === 'front' ? 'bg-[#2f5bff] text-white' : 'text-white hover:bg-white/10',
+                                            )}
+                                        >
+                                            <Shirt size={18} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShirtView('flat')}
+                                            aria-label="Flat print area"
+                                            className={cn(
+                                                'flex h-9 w-9 items-center justify-center rounded-full transition',
+                                                shirtView === 'flat' ? 'bg-[#2f5bff] text-white' : 'text-white hover:bg-white/10',
+                                            )}
+                                        >
+                                            <Shirt size={18} className="opacity-80" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={snapshot}
+                                            aria-label="Save PNG"
+                                            className="flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+                                        >
+                                            <Save size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <p className="mt-2 text-[12px] text-[#B9BED1]">PNG downloads the mockup • Record captures a spin video.</p>
+                        <p className={cn('mt-2 text-[12px]', isShirt ? 'text-[#9AA0B4]' : 'text-[#B9BED1]')}>PNG downloads the mockup • Record captures a spin video.{isShirt ? ' Design is draped — follows fabric folds, not flat.' : ''}</p>
                     </section>
                 </main>
             </div>

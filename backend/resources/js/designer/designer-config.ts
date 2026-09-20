@@ -88,5 +88,15 @@ export const DESIGNER_PRODUCTS: DesignerProductConfig[] = [
 ];
 
 export function designerConfigFor(type: string): DesignerProductConfig {
-    return DESIGNER_PRODUCTS.find((p) => p.type === type) ?? DESIGNER_PRODUCTS[0];
+    const direct = DESIGNER_PRODUCTS.find((p) => p.type === type);
+    if (direct) return direct;
+    // Apply the T-Shirt — Regular — 3D (alias) design to every t-shirt sub-type
+    // so backend/shirt.glb plain layout appears for all common + neckline variants.
+    // They keep their own category/viewer_type but share the same regular model/layout.
+    const isShirt = type === 'shirt' || type.startsWith('shirt_');
+    if (isShirt) {
+        const base = DESIGNER_PRODUCTS.find((p) => p.type === 'shirt')!;
+        return { ...base, type, label: type.replace(/^shirt_/, '').replace(/_/g, ' ') + ' — T-Shirt' };
+    }
+    return DESIGNER_PRODUCTS[0];
 }

@@ -6,12 +6,17 @@ import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
+    SelectSeparator,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
 import InputError from '@/components/input-error';
 import { Checkbox } from '@/components/ui/checkbox';
+import { BAG_VIEWERS } from '@/components/bag-builder';
+import { SHIRT_CATEGORIES, SHIRT_VIEWERS } from '@/components/shirt-builder';
 import Product3DPreview from '@/components/product-3d-preview';
 import { VESSEL_VIEWERS } from '@/components/vessel-builder';
 import { cn } from '@/lib/utils';
@@ -37,13 +42,35 @@ const STATUSES = [
 const VIEWERS = [
     { value: 'none', label: 'None — 2D only' },
     ...VESSEL_VIEWERS,
+    ...BAG_VIEWERS,
+    ...SHIRT_VIEWERS,
     { value: 'pin', label: 'Pin — 3D' },
-    { value: 'shirt', label: 'T-Shirt — 3D' },
-    { value: 'tote', label: 'Tote Bag — 3D' },
     { value: 'sticker', label: 'Sticker — 3D' },
     { value: 'calendar', label: 'Calendar — 3D' },
     { value: 'glb', label: 'Custom .glb model' },
 ];
+
+// Plain-only shirt categories are rendered as grouped SelectGroups — keeps own category as requested
+// Legacy alias `shirt` is kept at top of Common so old products still show correctly.
+const VIEWER_GROUPS = [
+    { id: 'none', label: '—', items: [{ value: 'none', label: 'None — 2D only' }] },
+    { id: 'drinkware', label: '☕ Drinkware', items: VESSEL_VIEWERS as unknown as { value: string; label: string }[] },
+    { id: 'bags', label: '👜 Bags', items: BAG_VIEWERS as unknown as { value: string; label: string }[] },
+    {
+        id: 'common',
+        label: '👕 Common T-shirt types',
+        items: [
+            { value: 'shirt', label: 'T-Shirt — Regular — 3D (alias)' },
+            ...SHIRT_CATEGORIES.find((c) => c.id === 'common')!.viewers.map((v) => ({ value: v.value, label: v.label })),
+        ],
+    },
+    {
+        id: 'neckline',
+        label: '👔 Neckline types',
+        items: SHIRT_CATEGORIES.find((c) => c.id === 'neckline')!.viewers.map((v) => ({ value: v.value, label: v.label })),
+    },
+    { id: 'other', label: 'Other', items: [{ value: 'pin', label: 'Pin — 3D' }, { value: 'sticker', label: 'Sticker — 3D' }, { value: 'calendar', label: 'Calendar — 3D' }, { value: 'glb', label: 'Custom .glb model' }] },
+] as const;
 
 const FIELD_LABELS: Record<string, string> = {
     name: 'Name',
@@ -202,12 +229,10 @@ any) {
 
     return (
         <form onSubmit={onSubmit}>
-            {/* top text — Mailgun-style, like Suppressions header */}
-            <div className="mb-3 max-w-[720px]">
+            {/* top text — compact single line so it never gets sliced at the viewport edge */}
+            <div className="mb-3">
                 <h2 className="text-[14px] font-bold text-[#1A1C1E]" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>Create product</h2>
-                <p className="mt-1 text-[12px] leading-relaxed text-[#6B7280]">
-                    Easily add new items to your catalog with pricing, inventory and 3D preview settings. Fill in the basic info and your product will be ready to publish and track.
-                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-[#6B7280]">Add pricing, inventory and 3D preview settings for your new product.</p>
             </div>
 
             {errorEntries.length > 0 && (
@@ -336,17 +361,26 @@ any) {
                             designImageUrl={data.thumbnail ?? ''}
                         />
                         <div className="mt-3">
-                            <Field label="3D vessel / template" error={errors.viewer_type}>
+                            <Field label="3D vessel / template — plain only, same white layout" error={errors.viewer_type}>
                                 <Select value={data.viewer_type ?? 'none'} onValueChange={(v) => setData('viewer_type', v)}>
                                     <SelectTrigger className={cn(inputCls, 'w-full')}>
                                         <SelectValue placeholder="Select" />
                                     </SelectTrigger>
-                                    <SelectContent>
-                                        {VIEWERS.map((v) => (
-                                            <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                                    <SelectContent className="max-h-[380px]">
+                                        {VIEWER_GROUPS.map((group, idx) => (
+                                            <SelectGroup key={group.id}>
+                                                <SelectLabel className="bg-[#F9FAFB] text-[11px] font-bold tracking-wide text-[#1A1C1E]">{group.label}</SelectLabel>
+                                                {group.items.map((v) => (
+                                                    <SelectItem key={`${group.id}-${v.value}`} value={v.value} className="pl-6 text-[11px] font-normal">
+                                                        {v.label}
+                                                    </SelectItem>
+                                                ))}
+                                                {idx < VIEWER_GROUPS.length - 1 && <SelectSeparator />}
+                                            </SelectGroup>
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                <p className="mt-1 text-[10px] font-normal text-[#6B7280]">👕 12 common + 👔 4 neckline — each has its own category, all plain white with same studio layout.</p>
                             </Field>
                         </div>
                     </Section>

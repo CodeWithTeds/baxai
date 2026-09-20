@@ -15,7 +15,7 @@ import type { ReactNode } from 'react';
 function Group({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div>
-            <p className="px-3 pb-1.5 text-[11px] font-bold tracking-wider text-white/60 uppercase">
+            <p className="px-3 pb-1.5 text-[11px] tracking-wider text-white/60 uppercase" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>
                 {label}
             </p>
             <div className="flex flex-col gap-0.5">{children}</div>
@@ -38,13 +38,13 @@ function Item({
 }) {
     const { url } = usePage();
     const isActive = active || (href ? url.startsWith(href) : false);
-    const cls = `group flex w-full items-center justify-start gap-3 rounded-lg px-3 py-2 text-left text-[13.5px] font-semibold transition-colors ${
+    const cls = `group flex w-full items-center justify-start gap-3 rounded-lg px-3 py-2 text-left text-[13.5px] transition-colors ${
         isActive ? 'bg-white text-[#0052CC] shadow' : 'text-white/85 hover:bg-white/10 hover:text-white'
     }`;
     const inner = (
         <>
             <span className="flex h-5 w-5 shrink-0 items-center justify-center">{children}</span>
-            <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+            <span className="min-w-0 flex-1 truncate text-left" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>{label}</span>
             {dot && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#3DD598]" />}
         </>
     );
@@ -68,7 +68,7 @@ function Item({
  */
 export default function PlacidesSidebar() {
     return (
-        <aside className="sticky top-0 hidden h-screen w-52 shrink-0 flex-col bg-[#0052CC] md:flex">
+        <aside className="sticky top-0 hidden h-screen w-52 shrink-0 flex-col bg-[#0052CC] md:flex" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             <div className="flex h-14 shrink-0 items-center gap-2 px-4">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[15px] font-extrabold text-[#0052CC]">
                     P

@@ -51,8 +51,11 @@ export default function DesignCanvas({ canvasRef, w, h, bg, objects, setObjects,
         canvas.height = h;
         const ctx = canvas.getContext('2d')!;
         ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = bg;
-        ctx.fillRect(0, 0, w, h);
+        // Transparent bg keeps the shirt fabric visible — essential for the draped blue-tee look in the screenshot
+        if (bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)') {
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, w, h);
+        }
 
         objects.forEach((o) => {
             const { w: ow, h: oh } = objectSize(o, ctx);

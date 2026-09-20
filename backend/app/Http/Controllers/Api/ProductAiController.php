@@ -48,8 +48,10 @@ Given a product name, category and optional hint, return ONLY a JSON object (no 
 - sku: uppercase code from the name, e.g. MUG-11OZ-WHT (letters, numbers, dashes only, max 20 chars)
 - print_method: best print method for the category (sublimation, vinyl, DTG, offset)
 - print_size: typical print area, e.g. 8 x 3.5 cm
-- viewer_type: map the category — mugs→mug, pins→pin, tshirts→shirt, tote_bags→tote, stickers→sticker, calendars→calendar, otherwise none.
-  For drinkware names be specific: glass cup→glass_cup, tumbler→tumbler, travel/insulated mug→travel_mug, coffee cup→coffee_cup, teacup→teacup, espresso/demitasse→espresso, latte→latte, cappuccino→cappuccino, beer mug/stein→stein, tankard→tankard, otherwise mug.
+- viewer_type: map the category — mugs→(mug variant), pins→pin, tshirts→(tee variant), tote_bags→(tote variant), stickers→sticker, calendars→calendar, otherwise none.
+  For drinkware be specific: glass cup→glass_cup, tumbler→tumbler, travel/insulated mug→travel_mug, coffee cup→coffee_cup, teacup→teacup, espresso/demitasse→espresso, latte→latte, cappuccino→cappuccino, beer mug/stein→stein, tankard→tankard, otherwise mug.
+  For tote_bags be specific: grocery→grocery_tote, clear→clear_tote, beach→beach_tote, laptop→laptop_tote, leather→leather_tote, convertible→convertible_tote, mini→mini_tote, shoulder→shoulder_bag, crossbody→crossbody, drawstring→drawstring, canvas→canvas_bag, zip→zip_tote, gusseted→gusseted_tote, flat→flat_tote, book→book_tote, otherwise tote.
+   For tshirts be specific: oversized→shirt_oversized, boxy→shirt_boxy, relaxed→shirt_relaxed, slim→shirt_slim, cropped→shirt_cropped, baby→shirt_baby, longline→shirt_longline, heavy/te thick→shirt_heavy, ringer→shirt_ringer, pocket→shirt_pocket, graphic→shirt_graphic, v-neck/v neck→shirt_vneck, scoop→shirt_scoop, henley→shirt_henley, crew→shirt_crew, otherwise shirt.
 - has_3d_preview: true if viewer_type is not none
 - is_customizable: true for mugs, pins, tshirts, tote_bags, stickers — else false
 - allow_color_change, allow_custom_text, allow_image_upload: booleans sensible for the category
@@ -110,13 +112,13 @@ PROMPT;
         $out = array_intersect_key($data, array_flip($allowed));
 
         // Force viewer_type into a valid enum value so saving never fails validation
-        $viewers = ['none', 'mug', 'glass_cup', 'tumbler', 'travel_mug', 'coffee_cup', 'teacup', 'espresso', 'latte', 'cappuccino', 'stein', 'tankard', 'pin', 'shirt', 'tote', 'sticker', 'calendar', 'glb'];
+        $viewers = ['none', 'mug', 'glass_cup', 'tumbler', 'travel_mug', 'coffee_cup', 'teacup', 'espresso', 'latte', 'cappuccino', 'stein', 'tankard', 'pin', 'shirt', 'shirt_regular', 'shirt_oversized', 'shirt_boxy', 'shirt_relaxed', 'shirt_slim', 'shirt_cropped', 'shirt_baby', 'shirt_longline', 'shirt_heavy', 'shirt_ringer', 'shirt_pocket', 'shirt_graphic', 'shirt_crew', 'shirt_vneck', 'shirt_scoop', 'shirt_henley', 'tote', 'mini_tote', 'shoulder_bag', 'crossbody', 'drawstring', 'canvas_bag', 'zip_tote', 'gusseted_tote', 'flat_tote', 'book_tote', 'grocery_tote', 'clear_tote', 'beach_tote', 'laptop_tote', 'leather_tote', 'convertible_tote', 'sticker', 'calendar', 'glb'];
         $vt = strtolower(trim((string) ($out['viewer_type'] ?? '')));
         if (! in_array($vt, $viewers, true)) {
             $haystack = strtolower($vt.' '.$category.' '.$name);
             $vt = 'none';
-            // Specific drinkware first — generic 'mug' must come after 'travel mug' etc.
-            foreach (['travel' => 'travel_mug', 'glass' => 'glass_cup', 'tumbler' => 'tumbler', 'demitasse' => 'espresso', 'espresso' => 'espresso', 'cappuccino' => 'cappuccino', 'latte' => 'latte', 'teacup' => 'teacup', 'tea cup' => 'teacup', 'coffee cup' => 'coffee_cup', 'stein' => 'stein', 'beer' => 'stein', 'tankard' => 'tankard', 'mug' => 'mug', 'pin' => 'pin', 'shirt' => 'shirt', 't-shirt' => 'shirt', 'tote' => 'tote', 'sticker' => 'sticker', 'calendar' => 'calendar'] as $needle => $mapped) {
+            // Shirts / necklines first, then totes, then drinkware — generic last
+            foreach (['henley' => 'shirt_henley', 'ringer' => 'shirt_ringer', 'pocket' => 'shirt_pocket', 'graphic' => 'shirt_graphic', 'baby' => 'shirt_baby', 'cropped' => 'shirt_cropped', 'longline' => 'shirt_longline', 'heavy' => 'shirt_heavy', 'oversized' => 'shirt_oversized', 'boxy' => 'shirt_boxy', 'relaxed' => 'shirt_relaxed', 'slim' => 'shirt_slim', 'v-neck' => 'shirt_vneck', 'v neck' => 'shirt_vneck', 'scoop' => 'shirt_scoop', 'crew' => 'shirt_crew', 'convertible' => 'convertible_tote', 'leather' => 'leather_tote', 'laptop' => 'laptop_tote', 'grocery' => 'grocery_tote', 'beach' => 'beach_tote', 'clear tote' => 'clear_tote', 'clear' => 'clear_tote', 'book' => 'book_tote', 'gusseted' => 'gusseted_tote', 'flat tote' => 'flat_tote', 'zip' => 'zip_tote', 'canvas' => 'canvas_bag', 'crossbody' => 'crossbody', 'shoulder' => 'shoulder_bag', 'mini tote' => 'mini_tote', 'mini' => 'mini_tote', 'drawstring' => 'drawstring', 'travel' => 'travel_mug', 'glass' => 'glass_cup', 'tumbler' => 'tumbler', 'demitasse' => 'espresso', 'espresso' => 'espresso', 'cappuccino' => 'cappuccino', 'latte' => 'latte', 'teacup' => 'teacup', 'tea cup' => 'teacup', 'coffee cup' => 'coffee_cup', 'stein' => 'stein', 'beer' => 'stein', 'tankard' => 'tankard', 'mug' => 'mug', 'pin' => 'pin', 'shirt' => 'shirt', 't-shirt' => 'shirt', 'tote' => 'tote', 'sticker' => 'sticker', 'calendar' => 'calendar'] as $needle => $mapped) {
                 if (str_contains($haystack, $needle)) {
                     $vt = $mapped;
                     break;

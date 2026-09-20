@@ -82,6 +82,25 @@ it('accepts procedural vessel viewer types', function (): void {
     }
 });
 
+it('accepts procedural bag viewer types', function (): void {
+    $user = User::factory()->create();
+
+    foreach (['tote', 'mini_tote', 'grocery_tote', 'clear_tote', 'leather_tote', 'laptop_tote', 'beach_tote', 'canvas_bag', 'zip_tote', 'crossbody'] as $i => $viewer) {
+        $response = $this->actingAs($user)->postJson('/api/v1/products', [
+            'name' => "Bag {$viewer}",
+            'category' => 'tote_bags',
+            'status' => 'active',
+            'base_price' => 14.99,
+            'sku' => "BAG-TEST-{$i}",
+            'is_customizable' => true,
+            'viewer_type' => $viewer,
+            'has_3d_preview' => true,
+        ]);
+
+        $response->assertCreated()->assertJsonPath('data.viewer_type', $viewer);
+    }
+});
+
 it('bulk archives products via the web routes with an Inertia redirect', function (): void {
     $user = User::factory()->create(['email_verified_at' => now()]);
     $products = Product::factory()->count(2)->create(['status' => 'active']);
