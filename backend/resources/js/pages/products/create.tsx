@@ -17,6 +17,7 @@ import InputError from '@/components/input-error';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BAG_VIEWERS } from '@/components/bag-builder';
 import { SHIRT_CATEGORIES, SHIRT_VIEWERS } from '@/components/shirt-builder';
+import { ShirtFlatIcon } from '@/components/shirt-flat';
 import Product3DPreview from '@/components/product-3d-preview';
 import { VESSEL_VIEWERS } from '@/components/vessel-builder';
 import { cn } from '@/lib/utils';
@@ -51,6 +52,9 @@ const VIEWERS = [
 ];
 
 // Plain-only shirt categories are rendered as grouped SelectGroups — keeps own category as requested
+// Only these T-shirt templates are offered: Regular (alias + regular), Slim-fit, Cropped.
+// (Other fit morphs still exist in code + backend enum so old products keep rendering.)
+const SHIRT_PICKABLE = ['shirt_regular', 'shirt_slim', 'shirt_cropped'] as const;
 // Legacy alias `shirt` is kept at top of Common so old products still show correctly.
 const VIEWER_GROUPS = [
     { id: 'none', label: '—', items: [{ value: 'none', label: 'None — 2D only' }] },
@@ -61,13 +65,10 @@ const VIEWER_GROUPS = [
         label: '👕 Common T-shirt types',
         items: [
             { value: 'shirt', label: 'T-Shirt — Regular — 3D (alias)' },
-            ...SHIRT_CATEGORIES.find((c) => c.id === 'common')!.viewers.map((v) => ({ value: v.value, label: v.label })),
+            ...SHIRT_CATEGORIES.find((c) => c.id === 'common')!
+                .viewers.filter((v) => (SHIRT_PICKABLE as readonly string[]).includes(v.value))
+                .map((v) => ({ value: v.value, label: v.label })),
         ],
-    },
-    {
-        id: 'neckline',
-        label: '👔 Neckline types',
-        items: SHIRT_CATEGORIES.find((c) => c.id === 'neckline')!.viewers.map((v) => ({ value: v.value, label: v.label })),
     },
     { id: 'other', label: 'Other', items: [{ value: 'pin', label: 'Pin — 3D' }, { value: 'sticker', label: 'Sticker — 3D' }, { value: 'calendar', label: 'Calendar — 3D' }, { value: 'glb', label: 'Custom .glb model' }] },
 ] as const;
@@ -372,7 +373,12 @@ any) {
                                                 <SelectLabel className="bg-[#F9FAFB] text-[11px] font-bold tracking-wide text-[#1A1C1E]">{group.label}</SelectLabel>
                                                 {group.items.map((v) => (
                                                     <SelectItem key={`${group.id}-${v.value}`} value={v.value} className="pl-6 text-[11px] font-normal">
-                                                        {v.label}
+                                                        <span className="flex items-center gap-2">
+                                                            {group.id === 'common' && (
+                                                                <ShirtFlatIcon type={v.value} className="h-7 w-6 shrink-0" />
+                                                            )}
+                                                            {v.label}
+                                                        </span>
                                                     </SelectItem>
                                                 ))}
                                                 {idx < VIEWER_GROUPS.length - 1 && <SelectSeparator />}
@@ -380,7 +386,7 @@ any) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                <p className="mt-1 text-[10px] font-normal text-[#6B7280]">👕 12 common + 👔 4 neckline — each has its own category, all plain white with same studio layout.</p>
+                                <p className="mt-1 text-[10px] font-normal text-[#6B7280]">👕 Regular, Slim-fit + Cropped — plain white with same studio layout.</p>
                             </Field>
                         </div>
                     </Section>

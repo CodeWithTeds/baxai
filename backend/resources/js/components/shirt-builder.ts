@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 // Shirt builder — PLAIN ONLY. Same clean white isolated layout for every tee.
 // Each variant is a plain solid-color sewing (no pre-printed graphics) with
@@ -91,35 +90,290 @@ export function isHeavyShirtType(v: string): boolean {
     return p.weight === 'heavy' || v === 'shirt_oversized' || v === 'shirt_boxy';
 }
 
-// --- Fabric helper — PLAIN only, no pre-print, solid color ---
-function fabricMat(weight: ShirtParams['weight'], color: string): THREE.Material {
-    const c = new THREE.Color(color);
-    const canvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
-    let bump: THREE.CanvasTexture | null = null;
-    if (canvas) {
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d')!;
-        ctx.fillStyle = '#808080';
-        ctx.fillRect(0, 0, 128, 128);
-        const dots = weight === 'heavy' ? 9000 : 6000;
-        for (let i = 0; i < dots; i++) {
-            const x = Math.random() * 128,
-                y = Math.random() * 128;
-            ctx.fillStyle = Math.random() > 0.5 ? '#7a7a7a' : '#8e8e8e';
-            ctx.fillRect(x, y, 1, 1);
+// --- Fit-style morphs: SAME Regular shirt.glb, re-proportioned per category ---
+// Follows the fit-guide layout: Slim narrower, Regular baseline, Oversized
+// wider+longer, Boxy wide+short, Cropped short, Baby small+fitted,
+// Longline extra-long, Heavyweight thicker fabric feel, Ringer contrast trim,
+// Pocket chest pocket, Graphic bigger print area, necklines carved.
+
+export type ShirtNeck = 'crew' | 'v' | 'scoop' | 'boat' | 'henley';
+
+export interface ShirtFit {
+    /** width multiplier about model center */
+    w: number;
+    /** length multiplier anchored at the shoulders (collar stays, hem moves) */
+    len: number;
+    /** depth/volume multiplier */
+    depth: number;
+    /** waist taper 0..1 (slim/baby follow the body) */
+    taper: number;
+    /** dropped-shoulder amount as fraction of height (oversized/boxy hang off-shoulder) */
+    shoulderDrop: number;
+    /** extra width beyond the shoulder line (wide loose sleeves vs fitted) */
+    sleeveFlare: number;
+    neck: ShirtNeck;
+    ringer: boolean;
+    pocket: boolean;
+    heavy: boolean;
+    graphic: boolean;
+    /** print-area fractions of chest width / body height */
+    decalW: number;
+    decalH: number;
+}
+
+const REGULAR_FIT: ShirtFit = {
+    w: 1, len: 1, depth: 1, taper: 0, shoulderDrop: 0, sleeveFlare: 0, neck: 'crew',
+    ringer: false, pocket: false, heavy: false, graphic: false,
+    decalW: 0.55, decalH: 0.42,
+};
+
+export const SHIRT_FITS: Record<string, ShirtFit> = {
+    shirt: { ...REGULAR_FIT },
+    shirt_regular: { ...REGULAR_FIT },
+    shirt_oversized: { ...REGULAR_FIT, w: 1.3, len: 1.14, depth: 1.14, shoulderDrop: 0.07, sleeveFlare: 0.12, decalW: 0.58, decalH: 0.44 },
+    shirt_boxy: { ...REGULAR_FIT, w: 1.26, len: 0.78, depth: 1.1, shoulderDrop: 0.08, sleeveFlare: 0.1, decalW: 0.58, decalH: 0.4 },
+    shirt_relaxed: { ...REGULAR_FIT, w: 1.1, len: 1.04, depth: 1.04, shoulderDrop: 0.02, sleeveFlare: 0.03 },
+    shirt_slim: { ...REGULAR_FIT, w: 0.8, len: 0.98, depth: 0.96, taper: 0.1, sleeveFlare: -0.03, decalW: 0.52, decalH: 0.42 },
+    shirt_cropped: { ...REGULAR_FIT, w: 1.06, len: 0.62, depth: 1.0, shoulderDrop: 0.02, decalW: 0.52, decalH: 0.36 },
+    shirt_baby: { ...REGULAR_FIT, w: 0.74, len: 0.68, depth: 0.94, taper: 0.08, decalW: 0.5, decalH: 0.36 },
+    shirt_longline: { ...REGULAR_FIT, w: 1.0, len: 1.32, depth: 1.0, decalW: 0.55, decalH: 0.4 },
+    shirt_heavy: { ...REGULAR_FIT, w: 1.05, len: 1.03, depth: 1.08, heavy: true },
+    shirt_ringer: { ...REGULAR_FIT, ringer: true },
+    shirt_pocket: { ...REGULAR_FIT, pocket: true },
+    shirt_graphic: { ...REGULAR_FIT, w: 1.02, len: 1.02, graphic: true, decalW: 0.66, decalH: 0.54 },
+    shirt_crew: { ...REGULAR_FIT, neck: 'crew' },
+    shirt_vneck: { ...REGULAR_FIT, neck: 'v' },
+    shirt_scoop: { ...REGULAR_FIT, neck: 'scoop' },
+    shirt_henley: { ...REGULAR_FIT, neck: 'henley' },
+};
+
+export function shirtFitFor(type: string): ShirtFit {
+    return SHIRT_FITS[type] ?? SHIRT_FITS.shirt_regular;
+}
+
+/** Collar + cuff material names in shirt.glb (contrast trim for Ringer). */
+export const SHIRT_TRIM_MATS = new Set(['03___Default', '08___Default']);
+
+/** Contrast trim color for Ringer: dark trim on light shirts, white on dark. */
+export function shirtTrimContrast(colorHex: string): string {
+    const c = new THREE.Color(colorHex);
+    const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    return lum > 0.45 ? '#1A1C1E' : '#FFFFFF';
+}
+
+function shirtMeshes(group: THREE.Group): THREE.Mesh[] {
+    const out: THREE.Mesh[] = [];
+    group.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) out.push(o as THREE.Mesh);
+    });
+    return out;
+}
+
+/**
+ * Re-proportion the Regular shirt.glb per fit category — same model, same
+ * materials, just reshaped. Runs in model units BEFORE normalize/scale.
+ * - width about center, length anchored at shoulders, depth for volume
+ * - neckline carve for v/scoop/boat (front only, collar follows)
+ * - chest pocket + henley placket/buttons modelled in place via raycast
+ */
+export function morphShirtGLB(group: THREE.Group, type: string): { fit: ShirtFit; sizeRatio: number } {
+    const fit = shirtFitFor(type);
+    const meshes = shirtMeshes(group);
+    if (meshes.length === 0) return { fit, sizeRatio: 1 };
+
+    group.updateMatrixWorld(true);
+    let box = new THREE.Box3().setFromObject(group);
+    let size = box.getSize(new THREE.Vector3());
+    let center = box.getCenter(new THREE.Vector3());
+    if (size.x <= 0 || size.y <= 0) return { fit, sizeRatio: 1 };
+    // Baseline size BEFORE reshaping — callers normalize against this so every
+    // fit shares one uniform scale and relative sizes stay visible on screen
+    // (baby renders smaller, oversized bigger) instead of each being stretched
+    // to fill the frame identically.
+    const preMax = Math.max(size.x, size.y, size.z) || 1;
+
+    const tmp = new THREE.Vector3();
+    const inv = new THREE.Matrix4();
+    const morphPoint = (p: THREE.Vector3) => {
+        // width (+ waist taper for slim/baby)
+        const t = Math.max(0, Math.min(1, (box.max.y - p.y) / (size.y || 1)));
+        let ws = fit.w;
+        if (fit.taper > 0) ws *= 1 - fit.taper * Math.sin(t * Math.PI);
+        p.x = center.x + (p.x - center.x) * ws;
+        // length anchored at shoulders so the collar never moves
+        p.y = box.max.y - (box.max.y - p.y) * fit.len;
+        // depth/volume
+        p.z = center.z + (p.z - center.z) * fit.depth;
+    };
+
+    // 1) proportional reshape (world space, baked back to local)
+    for (const mesh of meshes) {
+        mesh.updateWorldMatrix(true, false);
+        inv.copy(mesh.matrixWorld).invert();
+        const pos = mesh.geometry.attributes.position as THREE.BufferAttribute | undefined;
+        if (!pos) continue;
+        for (let i = 0; i < pos.count; i++) {
+            tmp.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+            morphPoint(tmp);
+            tmp.applyMatrix4(inv);
+            pos.setXYZ(i, tmp.x, tmp.y, tmp.z);
         }
-        bump = new THREE.CanvasTexture(canvas);
-        bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
-        bump.repeat.set(weight === 'heavy' ? 3 : 2, weight === 'heavy' ? 3 : 2);
+        pos.needsUpdate = true;
+        mesh.geometry.computeVertexNormals();
+        // positions changed — drop cached bounds so later Box3/raycast calls measure fresh
+        mesh.geometry.boundingBox = null;
+        mesh.geometry.boundingSphere = null;
     }
-    const base = {
-        color: c,
-        roughness: weight === 'heavy' ? 0.72 : 0.82,
-        metalness: 0.01,
-    } as const;
-    if (bump) return new THREE.MeshStandardMaterial({ ...base, bumpMap: bump, bumpScale: weight === 'heavy' ? 0.022 : 0.015 });
-    return new THREE.MeshStandardMaterial(base);
+
+    // 1b) dropped shoulders + sleeve flare — what makes oversized/boxy read loose
+    // like the fit guide (seam hangs off-shoulder, sleeves flare wide) vs slim
+    // (sleeves pull in). Torso body (|x| inside the shoulder line) is untouched.
+    if (fit.shoulderDrop > 0 || fit.sleeveFlare !== 0) {
+        group.updateMatrixWorld(true);
+        box = new THREE.Box3().setFromObject(group);
+        size = box.getSize(new THREE.Vector3());
+        center = box.getCenter(new THREE.Vector3());
+        const shoulderX = size.x * 0.26;
+        for (const mesh of shirtMeshes(group)) {
+            mesh.updateWorldMatrix(true, false);
+            inv.copy(mesh.matrixWorld).invert();
+            const pos = mesh.geometry.attributes.position as THREE.BufferAttribute | undefined;
+            if (!pos) continue;
+            let touched = false;
+            for (let i = 0; i < pos.count; i++) {
+                tmp.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+                const ax = Math.abs(tmp.x - center.x);
+                if (ax > shoulderX) {
+                    const ramp = Math.min(1, (ax - shoulderX) / (size.x * 0.18 || 1));
+                    const r = ramp * ramp * (3 - 2 * ramp); // smoothstep — no visible seam kink
+                    if (fit.shoulderDrop > 0) tmp.y -= fit.shoulderDrop * size.y * r;
+                    if (fit.sleeveFlare !== 0) tmp.x = center.x + (tmp.x - center.x) * (1 + fit.sleeveFlare * r);
+                    tmp.applyMatrix4(inv);
+                    pos.setXYZ(i, tmp.x, tmp.y, tmp.z);
+                    touched = true;
+                }
+            }
+            if (touched) {
+                pos.needsUpdate = true;
+                mesh.geometry.computeVertexNormals();
+                mesh.geometry.boundingBox = null;
+                mesh.geometry.boundingSphere = null;
+            }
+        }
+    }
+
+    // 2) neckline carve — front verts near the collar follow a V/scoop/boat profile
+    if (fit.neck === 'v' || fit.neck === 'scoop' || fit.neck === 'boat') {
+        group.updateMatrixWorld(true);
+        box = new THREE.Box3().setFromObject(group);
+        size = box.getSize(new THREE.Vector3());
+        center = box.getCenter(new THREE.Vector3());
+        const halfW = size.x * (fit.neck === 'v' ? 0.1 : fit.neck === 'scoop' ? 0.14 : 0.22);
+        const zoneBottom = box.max.y - size.y * (fit.neck === 'v' ? 0.2 : 0.16);
+        const dropAmt = size.y * (fit.neck === 'v' ? 0.17 : fit.neck === 'scoop' ? 0.1 : 0.055);
+        for (const mesh of shirtMeshes(group)) {
+            mesh.updateWorldMatrix(true, false);
+            inv.copy(mesh.matrixWorld).invert();
+            const pos = mesh.geometry.attributes.position as THREE.BufferAttribute | undefined;
+            if (!pos) continue;
+            let touched = false;
+            for (let i = 0; i < pos.count; i++) {
+                tmp.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+                const dx = Math.abs(tmp.x - center.x);
+                if (tmp.y > zoneBottom && dx < halfW && tmp.z > center.z) {
+                    const u = dx / (halfW || 1);
+                    const drop =
+                        fit.neck === 'v'
+                            ? dropAmt * (1 - u)
+                            : fit.neck === 'scoop'
+                              ? dropAmt * Math.cos((u * Math.PI) / 2)
+                              : dropAmt * (0.75 + 0.25 * Math.cos((u * Math.PI) / 2));
+                    tmp.y -= Math.max(0, drop);
+                    tmp.applyMatrix4(inv);
+                    pos.setXYZ(i, tmp.x, tmp.y, tmp.z);
+                    touched = true;
+                }
+            }
+            if (touched) {
+                pos.needsUpdate = true;
+                mesh.geometry.computeVertexNormals();
+                // positions changed — drop cached bounds so later Box3/raycast calls measure fresh
+                mesh.geometry.boundingBox = null;
+                mesh.geometry.boundingSphere = null;
+            }
+        }
+    }
+
+    // 3) details modelled in place (surface found via raycast so they sit flush)
+    group.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(group);
+    size = box.getSize(new THREE.Vector3());
+    center = box.getCenter(new THREE.Vector3());
+    const ray = new THREE.Raycaster();
+    const surfaceZ = (x: number, y: number): number => {
+        ray.set(new THREE.Vector3(x, y, box.max.z + Math.max(size.z, size.x) * 0.5), new THREE.Vector3(0, 0, -1));
+        const hits = ray.intersectObjects(shirtMeshes(group), false);
+        return hits.length > 0 ? hits[0].point.z : box.max.z - size.z * 0.02;
+    };
+    const fabric = (name: string) =>
+        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: fit.heavy ? 0.9 : 0.82, metalness: 0.02, name });
+
+    if (fit.pocket) {
+        // wearer's left chest = viewer's right (+x from the front)
+        const px = center.x + size.x * 0.2;
+        const py = box.max.y - size.y * 0.34;
+        const pz = surfaceZ(px, py);
+        const pw = size.x * 0.11;
+        const ph = size.y * 0.1;
+        const thick = Math.max(size.z * 0.02, size.x * 0.008);
+        const pocket = new THREE.Mesh(new THREE.BoxGeometry(pw, ph, thick), fabric('Pocket'));
+        pocket.position.set(px, py, pz + thick / 2 - thick * 0.3);
+        pocket.castShadow = true;
+        group.add(pocket);
+        const seam = new THREE.Mesh(
+            new THREE.BoxGeometry(pw + size.x * 0.008, size.y * 0.006, thick * 0.5),
+            new THREE.MeshStandardMaterial({ color: 0x9ca3af, transparent: true, opacity: 0.5, name: 'PocketSeam' }),
+        );
+        seam.position.set(px, py + ph / 2, pz + thick * 0.4);
+        group.add(seam);
+    }
+
+    if (fit.neck === 'henley') {
+        const px = center.x;
+        const py = box.max.y - size.y * 0.12;
+        const pz = surfaceZ(px, py);
+        const thick = Math.max(size.z * 0.02, size.x * 0.008);
+        const placket = new THREE.Mesh(new THREE.BoxGeometry(size.x * 0.045, size.y * 0.13, thick), fabric('Placket'));
+        placket.position.set(px, py, pz + thick / 2 - thick * 0.3);
+        group.add(placket);
+        for (let i = 0; i < 3; i++) {
+            const btn = new THREE.Mesh(
+                new THREE.CylinderGeometry(size.x * 0.008, size.x * 0.008, thick * 0.6, 12),
+                new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.35, metalness: 0.05, name: 'Buttons' }),
+            );
+            btn.rotation.x = Math.PI / 2;
+            btn.position.set(px, box.max.y - size.y * (0.08 + i * 0.035), pz + thick * 0.55);
+            group.add(btn);
+        }
+    }
+
+    // 4) heavyweight fabric feel
+    if (fit.heavy) {
+        for (const mesh of shirtMeshes(group)) {
+            const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+            mats.forEach((m) => {
+                const sm = m as THREE.MeshStandardMaterial;
+                if ('roughness' in sm) sm.roughness = 0.9;
+            });
+        }
+    }
+
+    // Relative size vs the unmorphed Regular baseline — lets callers keep one
+    // uniform scale so fits visibly differ in size (baby smaller, oversized bigger).
+    group.updateMatrixWorld(true);
+    const postSize = new THREE.Box3().setFromObject(group).getSize(new THREE.Vector3());
+    const sizeRatio = Math.max(postSize.x, postSize.y, postSize.z) / preMax;
+    return { fit, sizeRatio };
 }
 
 // --- Wrinkle helpers shared between torso and decal ---
@@ -168,236 +422,6 @@ export function applyShirtDecalDrape(
     // (caller already placed mesh at frontZ, this displacement is relative)
 }
 
-export function buildShirt(type: string, color = '#FFFFFF'): { group: THREE.Group; labelW: number; labelH: number; torsoW: number; torsoH: number; torsoD: number; isBoxyHeavy: boolean } {
-    const p = SHIRTS[type] ?? SHIRTS.shirt;
-    const group = new THREE.Group();
-    const mat = fabricMat(p.weight, color);
-    const isRinger = !!p.ringer;
-    const isPocket = !!p.pocket;
-    const isGraphic = !!p.graphic;
-    const isHenley = p.neck === 'henley';
+// NOTE: the old blocky procedural buildShirt was removed — every fit now
+// re-proportions the same Regular shirt.glb via morphShirtGLB above.
 
-    // Torso — true 3D volume like the mockup, not a flat card — PLAIN
-    const torsoW = p.width + p.chestEase;
-    const torsoH = p.length;
-    const isBoxyHeavy = (p.weight === 'heavy' && p.chestEase >= 0.2) || type === 'shirt_oversized' || type === 'shirt_boxy';
-    const torsoD = isBoxyHeavy ? torsoW * 0.26 : torsoW * 0.22; // chest depth — gives that inflated mannequin volume
-    const wb: THREE.BufferGeometry = new RoundedBoxGeometry(torsoW, torsoH, torsoD, 6, 0.06);
-    const pos = wb.attributes.position as THREE.BufferAttribute;
-    const v = new THREE.Vector3();
-    for (let i = 0; i < pos.count; i++) {
-        v.fromBufferAttribute(pos, i);
-        const ny = (v.y + torsoH / 2) / torsoH;
-        const ax = Math.abs(v.x);
-        // dropped shoulder — seam sits ~0.10 below natural shoulder for boxy/oversized
-        const shoulderDrop = isBoxyHeavy ? 0.12 : 0;
-        if (ny > 0.78 - shoulderDrop * 0.5) {
-            const shoulderStart = torsoW / 2 - 0.52;
-            if (ax > shoulderStart) {
-                const t = (ax - shoulderStart) / 0.52;
-                v.y -= t * (0.2 + shoulderDrop);
-                v.x *= 1 - t * 0.05;
-            }
-        }
-        if (p.bodyTaper > 0) v.x *= 1 - p.bodyTaper * Math.sin(ny * Math.PI) * 0.55;
-        // fabric folds — subtle, screen-accurate (not noisy) — plain fabric
-        v.z += shirtWrinkle(v.x, v.y, torsoH, isBoxyHeavy) + shirtChestBulge(v.x, torsoW) * 0.35;
-        // crisp side seam line for boxy
-        if (isBoxyHeavy && Math.abs(ax - torsoW / 2) < 0.04) v.z += 0.004;
-        if (v.y > torsoH / 2 - 0.2 && ax < p.neckWidth) {
-            if (p.neck === 'v') {
-                const k = 1 - ax / p.neckWidth;
-                if (k > 0) v.y -= k * p.neckDepth;
-            } else if (p.neck === 'scoop') {
-                const k = Math.cos((v.x / p.neckWidth) * (Math.PI / 2));
-                if (k > 0) v.y -= k * p.neckDepth;
-            } else if (p.neck === 'henley') {
-                // Henley: shallower crew + vertical placket slit
-                const k = Math.cos((v.x / p.neckWidth) * (Math.PI / 2));
-                if (k > 0) v.y -= k * p.neckDepth * 0.9;
-            } else {
-                const k = Math.cos((v.x / p.neckWidth) * (Math.PI / 2));
-                if (k > 0) v.y -= k * p.neckDepth;
-            }
-        }
-        pos.setXYZ(i, v.x, v.y, v.z);
-    }
-    wb.computeVertexNormals();
-    const torso = new THREE.Mesh(wb, mat);
-    torso.name = 'torso';
-    torso.castShadow = true;
-    torso.receiveShadow = true;
-    group.add(torso);
-
-    // Inner neck hole — dark interior so the opening reads as a hole, not a dent
-    {
-        const holeR = p.neckWidth * 0.52;
-        const hole = new THREE.Mesh(
-            new THREE.CylinderGeometry(holeR, holeR * 0.96, 0.16, 24, 1, true),
-            new THREE.MeshStandardMaterial({ color: 0x2a2a2e, roughness: 0.9, side: THREE.DoubleSide }),
-        );
-        hole.position.set(0, torsoH / 2 - 0.08, 0);
-        group.add(hole);
-        const bottomCap = new THREE.Mesh(
-            new THREE.CylinderGeometry(holeR * 0.96, holeR * 0.9, 0.01, 24),
-            new THREE.MeshStandardMaterial({ color: 0x1a1c1e, roughness: 1 }),
-        );
-        bottomCap.position.set(0, torsoH / 2 - 0.16, 0);
-        group.add(bottomCap);
-    }
-
-    // Sleeves — dropped-shoulder for boxy/heavyweight, otherwise regular set-in — PLAIN
-    for (const side of [-1, 1] as const) {
-        const rTop = p.sleeveWidth * 0.42;
-        const rBot = p.sleeveWidth * 0.36;
-        const sGeo = new THREE.CylinderGeometry(rTop, rBot, p.sleeveLen, 20, 1, true);
-        const sleeve = new THREE.Mesh(sGeo, mat);
-        const dropY = isBoxyHeavy ? -0.14 : 0;
-        sleeve.rotation.z = side * (Math.PI / 2 + (isBoxyHeavy ? 0.06 : 0.14));
-        sleeve.position.set(side * (torsoW / 2 + p.sleeveLen / 2 - 0.08), torsoH / 2 - 0.42 + dropY, 0);
-        sleeve.castShadow = true;
-        const inner = new THREE.Mesh(
-            new THREE.CylinderGeometry(rTop * 0.96, rBot * 0.96, p.sleeveLen, 20, 1, true),
-            new THREE.MeshStandardMaterial({ color: 0x1a1c1e, roughness: 1, side: THREE.BackSide, transparent: true, opacity: 0.14 }),
-        );
-        inner.rotation.copy(sleeve.rotation);
-        inner.position.copy(sleeve.position);
-        group.add(sleeve);
-        group.add(inner);
-        // shoulder seam — heavier for boxy
-        const seam = new THREE.Mesh(
-            new THREE.TorusGeometry(rTop, isBoxyHeavy ? 0.016 : 0.012, 6, 20),
-            new THREE.MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: isBoxyHeavy ? 0.14 : 0.1 }),
-        );
-        seam.rotation.y = Math.PI / 2;
-        seam.position.set(side * (torsoW / 2 - 0.02), torsoH / 2 - 0.42 + dropY, 0);
-        seam.rotation.z = side * 0.2;
-        group.add(seam);
-        // cuff hem stitching — detailed double line like mockup — plain
-        // Ringer uses contrasting cuff color
-        const cuffColor = isRinger ? 0x1a1c1e : 0x9ca3af;
-        const cuffOpacity = isRinger ? 0.9 : 0.65;
-        const cuff = new THREE.Mesh(
-            new THREE.TorusGeometry(rBot * 0.98, 0.008, 6, 20),
-            new THREE.MeshStandardMaterial({ color: cuffColor, transparent: true, opacity: cuffOpacity }),
-        );
-        cuff.rotation.y = Math.PI / 2;
-        cuff.position.set(side * (torsoW / 2 + p.sleeveLen - 0.06), torsoH / 2 - 0.42 + dropY, 0);
-        group.add(cuff);
-        if (isBoxyHeavy) {
-            const cuff2 = new THREE.Mesh(
-                new THREE.TorusGeometry(rBot * 0.98, 0.004, 6, 20),
-                new THREE.MeshStandardMaterial({ color: 0x9ca3af, transparent: true, opacity: 0.35 }),
-            );
-            cuff2.rotation.y = Math.PI / 2;
-            cuff2.position.set(side * (torsoW / 2 + p.sleeveLen - 0.08), torsoH / 2 - 0.42 + dropY, 0);
-            group.add(cuff2);
-        }
-    }
-
-    // Neck rib — smooth ribbed collar like mockup, thicker for heavyweight — PLAIN
-    // Ringer variant gets contrasting collar
-    {
-        const ribColor = isRinger ? 0x1a1c1e : 0xe5e7eb;
-        const ribInnerColor = isRinger ? 0x111214 : 0xcbd0e0;
-        const ribInnerOpacity = isRinger ? 0.85 : 0.55;
-        const rib = new THREE.Mesh(
-            new THREE.TorusGeometry(p.neckWidth * 0.64, isBoxyHeavy ? 0.024 : 0.018, 10, 26, Math.PI),
-            new THREE.MeshStandardMaterial({ color: ribColor, roughness: 0.65 }),
-        );
-        rib.rotation.x = Math.PI / 2;
-        rib.rotation.z = Math.PI;
-        rib.position.set(0, torsoH / 2 - 0.02, 0);
-        if (p.neck === 'v') rib.scale.set(1, 1.35, 1);
-        if (isHenley) rib.scale.set(1, 0.9, 1);
-        group.add(rib);
-        const ribInner = new THREE.Mesh(
-            new THREE.TorusGeometry(p.neckWidth * 0.64, 0.007, 8, 26, Math.PI),
-            new THREE.MeshStandardMaterial({ color: ribInnerColor, transparent: true, opacity: ribInnerOpacity }),
-        );
-        ribInner.rotation.x = Math.PI / 2;
-        ribInner.rotation.z = Math.PI;
-        ribInner.position.set(0, torsoH / 2 - 0.02, 0);
-        if (p.neck === 'v') ribInner.scale.set(1, 1.35, 1);
-        group.add(ribInner);
-    }
-
-    // Henley placket + buttons — plain fabric with buttons
-    if (isHenley) {
-        const placket = new THREE.Mesh(
-            new THREE.BoxGeometry(0.14, 0.36, 0.02),
-            new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.8 }),
-        );
-        placket.position.set(0, torsoH / 2 - 0.22, torsoD / 2 + 0.025);
-        group.add(placket);
-        for (let i = 0; i < 3; i++) {
-            const btn = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.018, 0.018, 0.008, 12),
-                new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.1 }),
-            );
-            btn.rotation.x = Math.PI / 2;
-            btn.position.set(0, torsoH / 2 - 0.16 - i * 0.09, torsoD / 2 + 0.036);
-            group.add(btn);
-            const thread = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.003, 0.003, 0.012, 6),
-                new THREE.MeshStandardMaterial({ color: 0x9ca3af }),
-            );
-            thread.rotation.z = Math.PI / 2;
-            thread.position.copy(btn.position);
-            thread.position.z += 0.002;
-            group.add(thread);
-        }
-    }
-
-    // Pocket — chest pocket for pocket tee — plain, same fabric
-    if (isPocket) {
-        const pw = 0.28;
-        const ph = 0.3;
-        const pocketGeo = new THREE.BoxGeometry(pw, ph, 0.015);
-        const pocketPos = pocketGeo.attributes.position as THREE.BufferAttribute;
-        const pv = new THREE.Vector3();
-        for (let i = 0; i < pocketPos.count; i++) {
-            pv.fromBufferAttribute(pocketPos, i);
-            // slight chest bulge so pocket follows torso curve
-            const bulge = shirtChestBulge(pv.x - 0.22, torsoW) * 0.6;
-            pv.z += bulge;
-            pocketPos.setZ(i, pv.z);
-        }
-        pocketGeo.computeVertexNormals();
-        const pocket = new THREE.Mesh(pocketGeo, mat);
-        // left chest (from viewer perspective, shirt's left is +X? Actually viewer front is +Z, left is -X? Keep consistent with previous: pocket on left chest from viewer = shirt's left? Use +? We'll place at +X? Let's use -0.32 from center to match typical left chest)
-        pocket.position.set(-0.32, 0.18, torsoD / 2 + 0.012);
-        pocket.castShadow = true;
-        group.add(pocket);
-        // pocket seam
-        const pSeam = new THREE.Mesh(
-            new THREE.BoxGeometry(pw + 0.02, 0.008, 0.008),
-            new THREE.MeshStandardMaterial({ color: 0x9ca3af, transparent: true, opacity: 0.5 }),
-        );
-        pSeam.position.set(-0.32, 0.18 + ph / 2, torsoD / 2 + 0.022);
-        group.add(pSeam);
-    }
-
-    // Bottom hem stitching — double line for heavyweight — plain
-    {
-        const hem = new THREE.Mesh(
-            new THREE.BoxGeometry(torsoW - 0.02, 0.016, 0.085),
-            new THREE.MeshStandardMaterial({ color: 0x9ca3af, transparent: true, opacity: 0.5 }),
-        );
-        hem.position.set(0, -torsoH / 2 + 0.04, 0);
-        group.add(hem);
-        if (isBoxyHeavy) {
-            const hem2 = new THREE.Mesh(
-                new THREE.BoxGeometry(torsoW - 0.04, 0.008, 0.08),
-                new THREE.MeshStandardMaterial({ color: 0x9ca3af, transparent: true, opacity: 0.28 }),
-            );
-            hem2.position.set(0, -torsoH / 2 + 0.07, 0);
-            group.add(hem2);
-        }
-    }
-
-    // Graphic tee has a larger print area, others standard plain area
-    const labelW = isGraphic ? torsoW * 0.82 : torsoW * 0.62;
-    const labelH = isGraphic ? torsoH * 0.56 : torsoH * 0.42;
-    return { group, labelW, labelH, torsoW, torsoH, torsoD, isBoxyHeavy };
-}

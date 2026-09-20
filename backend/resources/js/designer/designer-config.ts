@@ -37,12 +37,12 @@ export const DESIGNER_PRODUCTS: DesignerProductConfig[] = [
         decalW: 0.4,
         decalY: 0.1,
         partLabels: {
-            '07___Default': 'Body',
-            '13___Default': 'Sleeves',
+            _crayfishdiffuse: 'Body',
+            '07___Default': 'Trim',
+            '13___Default': 'Sleeve trim',
             '03___Default': 'Collar',
             '02___Default': 'Hem',
             '08___Default': 'Cuff',
-            _crayfishdiffuse: 'Inner',
         },
     },
     {
@@ -90,13 +90,20 @@ export const DESIGNER_PRODUCTS: DesignerProductConfig[] = [
 export function designerConfigFor(type: string): DesignerProductConfig {
     const direct = DESIGNER_PRODUCTS.find((p) => p.type === type);
     if (direct) return direct;
-    // Apply the T-Shirt — Regular — 3D (alias) design to every t-shirt sub-type
-    // so backend/shirt.glb plain layout appears for all common + neckline variants.
-    // They keep their own category/viewer_type but share the same regular model/layout.
+    // Every t-shirt sub-type shares the SAME Regular shirt.glb model/layout —
+    // the studio re-proportions it per category (morphShirtGLB), so each fit
+    // keeps its own category/viewer_type but the same realistic look.
     const isShirt = type === 'shirt' || type.startsWith('shirt_');
     if (isShirt) {
         const base = DESIGNER_PRODUCTS.find((p) => p.type === 'shirt')!;
-        return { ...base, type, label: type.replace(/^shirt_/, '').replace(/_/g, ' ') + ' — T-Shirt' };
+        if (type === 'shirt_regular') {
+            return { ...base, type, label: 'Regular — T-Shirt' };
+        }
+        return {
+            ...base,
+            type,
+            label: type.replace(/^shirt_/, '').replace(/_/g, ' ') + ' — T-Shirt',
+        };
     }
     return DESIGNER_PRODUCTS[0];
 }

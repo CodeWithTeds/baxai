@@ -2,7 +2,7 @@ import { RefObject, forwardRef, useEffect, useImperativeHandle, useRef } from 'r
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { DesignerProductConfig } from './designer-config';
-import { applyShirtDecalDrape, buildShirt, isShirtType } from '@/components/shirt-builder';
+import { applyShirtDecalDrape, isShirtType, morphShirtGLB, SHIRT_TRIM_MATS, shirtTrimContrast } from '@/components/shirt-builder';
 
 export interface StudioPart {
     id: string;
@@ -222,101 +222,28 @@ const StudioPreview3D = forwardRef<StudioApi, Props>(function StudioPreview3D(
             group.add(decal);
         };
 
-        const finishShirtProcedural = () => {
-            // PLAIN ONLY — same white isolated layout as product preview, not blue screenshot
-            const built = buildShirt('shirt', '#FFFFFF'); // plain white, recolorable via parts
-            // but we want the first shirt color to be whatever the user picks via parts — so start with #FFFFFF and let setPartColor handle
-            // Reset to shirt's true material handling: we rebuild with white and collect parts
-            // Rebuild group with correct scaling: match finish() normalization (2 units)
-            const preBox = new THREE.Box3().setFromObject(built.group);
-            const preSize = preBox.getSize(new THREE.Vector3());
-            const preCenter = preBox.getCenter(new THREE.Vector3());
-            const s = 2.0 / (Math.max(preSize.x, preSize.y, preSize.z) || 1);
-            built.group.scale.setScalar(s);
-            built.group.position.sub(preCenter.clone().multiplyScalar(s));
-            group.add(built.group);
-
-            // collect colorable parts from procedural group (fabric mat)
-            const seen = new Map<string, string>();
-            built.group.traverse((o) => {
-                const mesh = o as THREE.Mesh;
-                if (!mesh.isMesh) return;
-                const ms = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-                ms.forEach((m) => {
-                    const sm = m as THREE.MeshStandardMaterial;
-                    if (!('color' in sm)) return;
-                    const name = sm.name || 'fabric';
-                    if (!matsRef.current.has(name)) matsRef.current.set(name, []);
-                    matsRef.current.get(name)!.push(sm);
-                    if (!seen.has(name)) seen.set(name, '#' + sm.color.getHexString());
-                });
-            });
-            // fabric is single material but we still expose it
-            if (seen.size === 0) {
-                // fallback: torso material
-                const anyMesh = built.group.children.find((c) => (c as THREE.Mesh).isMesh) as THREE.Mesh | undefined;
-                if (anyMesh) {
-                    const m = anyMesh.material as THREE.MeshStandardMaterial;
-                    seen.set('fabric', '#' + m.color.getHexString());
-                    matsRef.current.set('fabric', [m]);
-                }
-            }
-            cbRef.current.onParts(
-                [...seen.entries()].map(([id, color]) => ({
-                    id,
-                    label: config.partLabels[id] ?? id,
-                    color,
-                })),
-            );
-
-            addShadowDisc(group);
-
-            // draped decal from live design canvas — matches product-3d-preview logic
-            const b2 = new THREE.Box3().setFromObject(built.group);
-            const ct = b2.getCenter(new THREE.Vector3());
-            const sz = b2.getSize(new THREE.Vector3());
-            const aspect = designCanvas.height / Math.max(designCanvas.width, 1);
-            // screenshot: small left-chest logo; if design is small, it will naturally be small.
-            // We keep config decalW but clamp to built print area so it never exceeds shirt
-            const targetW = Math.min(sz.x * config.decalW, built.torsoW * s * 0.62);
-            let w = targetW;
-            let h = w * aspect;
-            const maxH = built.torsoH * s * 0.42;
-            if (h > maxH) {
-                h = maxH;
-                w = h / aspect;
-            }
-            const geo = new THREE.PlaneGeometry(w, h, 22, 22);
-            applyShirtDecalDrape(geo, {
-                centerY: ct.y + sz.y * config.decalY,
-                frontZ: 0,
-                torsoW: built.torsoW * s,
-                torsoH: built.torsoH * s,
-                isBoxyHeavy: built.isBoxyHeavy,
-            });
-            const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.85, metalness: 0.02, side: THREE.DoubleSide, alphaTest: 0.02 });
-            const decal = new THREE.Mesh(geo, mat);
-            const frontZ = b2.max.z + 0.015;
-            decal.position.set(ct.x, ct.y + sz.y * config.decalY, frontZ);
-            decalRef.current = decal;
-            group.add(decal);
-        };
-
         const finishShirtGLBStudio = (obj: THREE.Object3D) => {
-            // Real shirt.glb (Shirt_adid) — PLAIN ONLY: tint to uniform white like procedural plain tees.
-            // Same white isolated layout for every category, not the old Adidas multi-color.
+            // Real shirt.glb (Shirt_adid) for EVERY fit — same look, same layout.
+            // morphShirtGLB re-proportions the same model per category (Slim
+            // narrower, Oversized wider+longer, Boxy wide+short, Cropped short…).
+            // PLAIN ONLY: tint to uniform white, keep inner hole dark.
+            const { fit, sizeRatio } = morphShirtGLB(obj as unknown as THREE.Group, config.type);
             const preBox = new THREE.Box3().setFromObject(obj);
             const preSize = preBox.getSize(new THREE.Vector3());
             const preCenter = preBox.getCenter(new THREE.Vector3());
             const maxDim = Math.max(preSize.x, preSize.y, preSize.z);
-            const s = maxDim > 10 ? 2.0 / maxDim : 2.0 / (Math.max(preSize.x, preSize.y, preSize.z) || 1);
+            // Uniform scale from the Regular baseline — relative sizes stay visible.
+            const s = maxDim > 10 ? (2.0 * sizeRatio) / maxDim : 2.0 / (Math.max(preSize.x, preSize.y, preSize.z) || 1);
             obj.scale.setScalar(s);
             obj.position.sub(preCenter.clone().multiplyScalar(s));
             // recenter to origin after scale
             const bboxInner = new THREE.Box3().setFromObject(obj);
             const centerOffset = bboxInner.getCenter(new THREE.Vector3());
             obj.position.sub(centerOffset);
-            // Plain only — recolor every fabric part to white (keep inner hole dark)
+            // Plain only — every GLB part (including the main _crayfishdiffuse
+            // shell) starts white so the shirt is pure white with no black patches.
+            // Ringer starts with contrast collar + cuffs (still recolorable via parts).
+            const trimContrast = fit.ringer ? shirtTrimContrast('#FFFFFF') : null;
             obj.traverse((o) => {
                 const mesh = o as THREE.Mesh;
                 if (!mesh.isMesh) return;
@@ -324,12 +251,14 @@ const StudioPreview3D = forwardRef<StudioApi, Props>(function StudioPreview3D(
                 ms.forEach((m) => {
                     const sm = m as THREE.MeshStandardMaterial;
                     if (!('color' in sm)) return;
-                    if (sm.name === '_crayfishdiffuse') {
-                        sm.color.set(0x1a1c1e);
+                    if (trimContrast && SHIRT_TRIM_MATS.has(sm.name)) {
+                        sm.color.set(trimContrast);
+                    } else if (sm.name === 'PocketSeam') {
+                        // keep stitching gray
                     } else {
                         sm.color.set(0xffffff);
                     }
-                    sm.roughness = 0.82;
+                    if (!fit.heavy) sm.roughness = 0.82;
                     sm.metalness = 0.02;
                     sm.needsUpdate = true;
                 });
@@ -361,15 +290,15 @@ const StudioPreview3D = forwardRef<StudioApi, Props>(function StudioPreview3D(
 
             addShadowDisc(group);
 
-            // Live design canvas decal — draped so artwork follows the Adidas shirt folds (not flat)
+            // Live design canvas decal — draped so artwork follows the shirt folds (not flat).
+            // Print area follows the fit (graphic bigger, baby/cropped smaller).
             const b2 = new THREE.Box3().setFromObject(obj);
             const ct = b2.getCenter(new THREE.Vector3());
             const sz = b2.getSize(new THREE.Vector3());
             const aspect = designCanvas.height / Math.max(designCanvas.width, 1);
-            // Use same print-area math as product-3d-preview's Shirt GLB path (0.55 chest, 0.42 height)
-            let w = Math.min(sz.x * config.decalW, sz.x * 0.55);
+            let w = Math.min(sz.x * config.decalW, sz.x * fit.decalW);
             let h = w * aspect;
-            const maxH = sz.y * 0.42;
+            const maxH = sz.y * fit.decalH;
             if (h > maxH) { h = maxH; w = h / aspect; }
             const geo = new THREE.PlaneGeometry(w, h, 22, 22);
             applyShirtDecalDrape(geo, {
@@ -377,7 +306,7 @@ const StudioPreview3D = forwardRef<StudioApi, Props>(function StudioPreview3D(
                 frontZ: 0,
                 torsoW: sz.x,
                 torsoH: sz.y,
-                isBoxyHeavy: false,
+                isBoxyHeavy: fit.w >= 1.15,
             });
             const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.85, metalness: 0.02, side: THREE.DoubleSide, alphaTest: 0.02 });
             const decal = new THREE.Mesh(geo, mat);
@@ -389,32 +318,20 @@ const StudioPreview3D = forwardRef<StudioApi, Props>(function StudioPreview3D(
 
         let cancelled = false;
         if (isShirtStudio) {
-            // User wants backend/shirt.glb design visible in the T-Shirt + layout.
-            // For shirt, the GLB is the Shirt_adid model (6 materials). Load it directly
-            // instead of the procedural RoundedBox tee, so the Adidas design appears.
-            if (config.model.startsWith('procedural:')) {
-                // Fallback sticker-like procedural if no GLB is configured
-                const g = new THREE.Group();
-                const std = (c: string) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.02 });
-                const rimM = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.08, 48), std('#FFFFFF'));
-                const face = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.82, 0.1, 48), std('#FFFFFF'));
-                rimM.rotation.x = Math.PI / 2;
-                face.rotation.x = Math.PI / 2;
-                g.add(rimM, face);
-                if (!cancelled) finish(g);
-            } else {
-                new GLTFLoader().load(
-                    config.model,
-                    (gltf) => {
-                        if (!cancelled) finishShirtGLBStudio(gltf.scene);
-                    },
-                    undefined,
-                    () => {
-                        // GLB failed — show procedural tee so layout never goes blank
-                        if (!cancelled) finishShirtProcedural();
-                    },
-                );
-            }
+            // Every fit loads the SAME Regular shirt.glb, re-proportioned per
+            // category by morphShirtGLB inside finishShirtGLBStudio.
+            const shirtUrl = config.model.startsWith('procedural:') ? '/models/shirt.glb' : config.model;
+            new GLTFLoader().load(
+                shirtUrl,
+                (gltf) => {
+                    if (!cancelled) finishShirtGLBStudio(gltf.scene);
+                },
+                undefined,
+                () => {
+                    // GLB failed — never show a blocky stand-in, leave the canvas empty
+                    if (!cancelled) cbRef.current.onParts([]);
+                },
+            );
         } else if (config.model.startsWith('procedural:')) {
             const g = new THREE.Group();
             const std = (c: string) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.02 });

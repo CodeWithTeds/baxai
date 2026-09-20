@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Cuboid } from 'lucide-react';
 import { buildBag, isBagType } from './bag-builder';
-import { applyShirtDecalDrape, buildShirt, isShirtType } from './shirt-builder';
+import { applyShirtDecalDrape, isShirtType, morphShirtGLB, SHIRT_TRIM_MATS, shirtTrimContrast } from './shirt-builder';
 import { buildVessel, isVesselType } from './vessel-builder';
 
 // Real product models (CC0 unless noted — see public/models/CREDITS.md)
@@ -57,11 +57,12 @@ export default function Product3DPreview({
     const isVessel = isVesselType(viewerType);
     const isBag = isBagType(viewerType);
     const isShirt = isShirtType(viewerType);
-    // Apply the T-Shirt — Regular — 3D (alias) design to every t-shirt type.
-    // All isShirt types share the same base model `shirt.glb` (plain white isolated layout)
-    // so backend/shirt.glb appears for every category variant as requested.
+    // T-Shirt — Regular — 3D (alias) is the base design: EVERY t-shirt category
+    // renders the same shirt.glb with the same layout/lighting, re-proportioned
+    // per fit (slim narrower, oversized wider+longer, boxy wide+short, …).
+    // An explicit custom model_3d_url still wins when provided.
     const effectiveShirtGlb = DEFAULT_GLB['shirt'] ?? '/models/shirt.glb';
-    const glbUrl = (modelUrl || '').trim() || DEFAULT_GLB[viewerType] || (isShirt ? effectiveShirtGlb : '');
+    const glbUrl = (modelUrl || '').trim() || (isShirt ? effectiveShirtGlb : '');
     const designUrl = (designImageUrl || '').trim();
     // Vessels + bags + shirts take the tint as their body color at build time.
     const canTint = TINTABLE.has(viewerType) || isVessel || isBag || isShirt;
@@ -285,58 +286,23 @@ export default function Product3DPreview({
             );
         };
 
-        const finishShirtProcedural = () => {
-            const built = buildShirt(viewerType, color);
-            // scale with margin so sleeves/neck never touch the frame (fixes spout clipping)
-            const preBox = new THREE.Box3().setFromObject(built.group);
-            const preSize = preBox.getSize(new THREE.Vector3());
-            const maxDim = Math.max(preSize.x, preSize.y, preSize.z);
-            const fitScale = maxDim > 0 ? Math.min(1, 1.68 / maxDim) : 1;
-            built.group.scale.setScalar(fitScale);
-            const bbox = new THREE.Box3().setFromObject(built.group);
-            const center = bbox.getCenter(new THREE.Vector3());
-            built.group.position.sub(center);
-            group.add(built.group);
-            addShadowDisc(group);
-            if (!designUrl) return;
-            new THREE.TextureLoader().load(designUrl, (tex) => {
-                if (cancelled) { tex.dispose(); return; }
-                tex.colorSpace = THREE.SRGBColorSpace;
-                tex.anisotropy = 8;
-                designTexture = tex;
-                const img = tex.image as HTMLImageElement | undefined;
-                const aspect = img?.width && img?.height ? img.width / img.height : 1;
-                // balanced sizing: uses builder's print area (torsoW*0.62) but keeps aspect
-                let w = built.labelW * fitScale; let h = w / aspect;
-                const maxH = built.labelH * fitScale;
-                if (h > maxH) { h = maxH; w = h * aspect; }
-                // high-res plane so the drape looks smooth, not faceted flat
-                const geo = new THREE.PlaneGeometry(w, h, 22, 22);
-                const box2 = new THREE.Box3().setFromObject(built.group);
-                const frontZ = box2.max.z + 0.015 - center.z;
-                // decal center Y is at group center (0 after centering) — same as torso center
-                const worldTorsoW = built.torsoW * fitScale;
-                const worldTorsoH = built.torsoH * fitScale;
-                applyShirtDecalDrape(geo, { centerY: -center.y, frontZ: 0, torsoW: worldTorsoW, torsoH: worldTorsoH, isBoxyHeavy: built.isBoxyHeavy });
-                // front face is slightly curved, so place mesh at frontZ and let draped vertices add bulge/wrinkle
-                const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.85, metalness: 0.02, side: THREE.DoubleSide, alphaTest: 0.02 });
-                const mesh = new THREE.Mesh(geo, mat);
-                mesh.position.set(-center.x, -center.y, frontZ);
-                group.add(mesh);
-            }, undefined, () => { if (!cancelled) setLoadError('Could not load the reference image preview.'); });
-        };
-
         const finishShirtFromGLB = (obj: THREE.Object3D) => {
-            // This is the REAL shirt.glb — Shirt_adid with 6 materials. Use true GLB geometry,
-            // not the procedural RoundedBox. Normalize like generic finish(), but keep shirt
-            // camera + lighting and draped decal behaviour from the procedural path.
+            // The REAL shirt.glb (Shirt_adid) for EVERY fit — same look, same layout.
+            // Each category re-proportions the same model via morphShirtGLB so Slim
+            // reads narrower, Oversized wider+longer, Boxy wide+short, Cropped short,
+            // etc. — exactly like the fit-guide layout, never a blocky stand-in.
+            const shirtGroup = obj as unknown as THREE.Group;
+            const { fit, sizeRatio } = morphShirtGLB(shirtGroup, viewerType);
             const preBox = new THREE.Box3().setFromObject(obj);
             const preSize = preBox.getSize(new THREE.Vector3());
             const preCenter = preBox.getCenter(new THREE.Vector3());
             const maxDim = Math.max(preSize.x, preSize.y, preSize.z);
-            // Adaptive scale: procedural tees are ~1.5 units (fitScale ~1), but shirt.glb is ~340k units
-            // so we normalize to 2 units. Use 2.0 / maxDim when maxDim is huge, otherwise 1.68 margin.
-            const fitScale = maxDim > 10 ? 2.0 / maxDim : Math.min(1, 1.68 / (maxDim || 1));
+            // Uniform scale from the Regular baseline (sizeRatio): relative sizes
+            // stay visible — baby renders smaller, oversized bigger, longline taller —
+            // instead of every fit being stretched to fill the frame identically.
+            // Adaptive scale: shirt.glb is ~340k units so we normalize to 2 units.
+            // Use 2.0 / maxDim when maxDim is huge, otherwise 1.68 margin.
+            const fitScale = maxDim > 10 ? (2.0 * sizeRatio) / maxDim : Math.min(1, 1.68 / (maxDim || 1));
             obj.scale.setScalar(fitScale);
             obj.position.sub(preCenter.clone().multiplyScalar(fitScale));
             // Recompute after scale/center for final placement
@@ -347,8 +313,10 @@ export default function Product3DPreview({
             group.add(obj);
 
             // Plain only — same white isolated layout for every tee.
-            // Tint the real Shirt_adid GLB to a uniform plain color (white default, or palette pick)
-            // so it matches the procedural plain tees. Keeps inner hole dark.
+            // Every GLB part (including the main _crayfishdiffuse shell) takes the
+            // preview color, so white stays pure white with no black patches.
+            // Ringer gets contrast collar + cuffs.
+            const trimContrast = fit.ringer ? shirtTrimContrast(color) : null;
             obj.traverse((o) => {
                 const mesh = o as THREE.Mesh;
                 if (!mesh.isMesh) return;
@@ -356,13 +324,14 @@ export default function Product3DPreview({
                 mats.forEach((m) => {
                     const sm = m as THREE.MeshStandardMaterial;
                     if (!('color' in sm)) return;
-                    // Keep inner cavity dark for realism; everything else plain
-                    if (sm.name === '_crayfishdiffuse') {
-                        sm.color.set(0x1a1c1e);
-                        sm.roughness = 0.9;
+                    if (trimContrast && SHIRT_TRIM_MATS.has(sm.name)) {
+                        sm.color.set(trimContrast);
+                        sm.roughness = 0.7;
+                    } else if (sm.name === 'PocketSeam') {
+                        // keep stitching gray
                     } else {
                         sm.color.set(color);
-                        sm.roughness = 0.82;
+                        if (!fit.heavy) sm.roughness = 0.82;
                         sm.metalness = 0.02;
                     }
                     sm.needsUpdate = true;
@@ -383,13 +352,13 @@ export default function Product3DPreview({
                 const finalSize = finalBox.getSize(new THREE.Vector3());
                 const torsoW = finalSize.x;
                 const torsoH = finalSize.y;
-                // Shirt_adid front print area is ~55% of chest width, 42% of body height — matches procedural label
-                let w = torsoW * 0.55; let h = w / aspect;
-                const maxH = torsoH * 0.42;
+                // Print area follows the fit (graphic gets a bigger canvas, baby/cropped smaller)
+                let w = torsoW * fit.decalW; let h = w / aspect;
+                const maxH = torsoH * fit.decalH;
                 if (h > maxH) { h = maxH; w = h * aspect; }
                 const geo = new THREE.PlaneGeometry(w, h, 22, 22);
-                // Apply the same fabric drape as procedural so custom artwork hugs the Adidas shirt correctly
-                applyShirtDecalDrape(geo, { centerY: 0, frontZ: 0, torsoW, torsoH, isBoxyHeavy: false });
+                // Drape the artwork so it hugs the shirt folds instead of floating flat
+                applyShirtDecalDrape(geo, { centerY: 0, frontZ: 0, torsoW, torsoH, isBoxyHeavy: fit.w >= 1.15 });
                 const box2 = new THREE.Box3().setFromObject(obj);
                 const frontZ = box2.max.z + 0.015;
                 const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.85, metalness: 0.02, side: THREE.DoubleSide, alphaTest: 0.02 });
@@ -404,9 +373,9 @@ export default function Product3DPreview({
         } else if (isBag) {
             finishBag();
         } else if (isShirt) {
-            // User requested: the T-Shirt — Regular — 3D (alias) design applied to every t-shirt type.
-            // So every isShirt variant now renders the same regular shirt.glb (plain white isolated layout)
-            // — same geometry, same lighting, same white background — but keeps its own viewer_type/category.
+            // Every fit renders the SAME Regular shirt.glb (same look, same layout),
+            // re-proportioned per category by morphShirtGLB. A custom model_3d_url
+            // still wins when explicitly provided.
             const useGLBForPlain = !!glbUrl;
             if (useGLBForPlain) {
                 setLoading(true);
@@ -419,16 +388,15 @@ export default function Product3DPreview({
                     },
                     undefined,
                     () => {
-                        // GLB failed — fall back to high-quality procedural so the t-shirt never shows empty
+                        // GLB failed — never fall back to a blocky stand-in, show the error
                         if (!cancelled) {
-                            setLoadError('Could not load the shirt model — showing procedural tee.');
-                            finishShirtProcedural();
+                            setLoadError('Could not load the shirt model. Check public/models/shirt.glb.');
                         }
                         setLoading(false);
                     },
                 );
             } else {
-                finishShirtProcedural();
+                setLoadError('No shirt model configured.');
             }
         } else if (glbUrl) {
             setLoading(true);
@@ -465,7 +433,7 @@ export default function Product3DPreview({
         let raf = 0;
         const animate = () => {
             raf = requestAnimationFrame(animate);
-            if (!st.dragging) st.rotY += 0.008;
+            // No auto-spin — the preview stays still until the user drags it.
             group.rotation.y += (st.rotY - group.rotation.y) * 0.12;
             group.rotation.x += (st.rotX - group.rotation.x) * 0.12;
             renderer.render(scene, camera);
@@ -570,7 +538,7 @@ export default function Product3DPreview({
                     ))}
                 </div>
             )}
-            <p className={`font-normal text-[#6B7280] ${isHero ? 'mt-2 text-[11px]' : 'mt-2 text-[11px]'}`}>Drag to rotate • auto-spins when idle.</p>
+            <p className={`font-normal text-[#6B7280] ${isHero ? 'mt-2 text-[11px]' : 'mt-2 text-[11px]'}`}>Drag to rotate.</p>
             {!isHero && <p className="mt-1 text-[10px] font-normal text-[#9CA3AF]">Models: Kenney, Quaternius (CC0) • Tee: Poly by Google, Calendar: jeremy (CC-BY)</p>}
         </div>
     );
