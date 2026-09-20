@@ -58,12 +58,12 @@ export const DESIGNER_PRODUCTS: DesignerProductConfig[] = [
     {
         type: 'pin',
         label: 'Button Pin',
-        model: '/models/pin.glb',
+        model: 'procedural:pin_circle',
         canvasW: 500,
         canvasH: 500,
         decalW: 0.55,
         decalY: 0.0,
-        partLabels: { Yellow: 'Face', DarkYellow: 'Rim' },
+        partLabels: { Face: 'Face', Rim: 'Rim', Back: 'Back', Metal: 'Pin back', Backing: 'Backing', Cap: 'Edge' },
     },
     {
         type: 'calendar',
@@ -103,6 +103,19 @@ export function designerConfigFor(type: string): DesignerProductConfig {
             ...base,
             type,
             label: type.replace(/^shirt_/, '').replace(/_/g, ' ') + ' — T-Shirt',
+        };
+    }
+    // Every button-pin shape shares the landing-page pin design —
+    // the studio builds it procedurally per shape (buildPin).
+    const isPin = type === 'pin' || type.startsWith('pin_');
+    if (isPin) {
+        const base = DESIGNER_PRODUCTS.find((p) => p.type === 'pin')!;
+        if (type === 'pin') return base;
+        return {
+            ...base,
+            type,
+            model: `procedural:${type}`,
+            label: type.replace(/^pin_/, '').replace(/_/g, ' ') + ' — Button Pin',
         };
     }
     return DESIGNER_PRODUCTS[0];

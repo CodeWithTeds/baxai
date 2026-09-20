@@ -17,6 +17,17 @@ enum ProductViewerType: string
     case STEIN = 'stein';
     case TANKARD = 'tankard';
     case PIN = 'pin';
+    case PIN_CIRCLE = 'pin_circle';
+    case PIN_SQUARE = 'pin_square';
+    case PIN_RECTANGLE = 'pin_rectangle';
+    case PIN_OVAL = 'pin_oval';
+    case PIN_HEART = 'pin_heart';
+    case PIN_STAR = 'pin_star';
+    case PIN_HEXAGON = 'pin_hexagon';
+    case PIN_TRIANGLE = 'pin_triangle';
+    case PIN_DIAMOND = 'pin_diamond';
+    case PIN_CLOUD = 'pin_cloud';
+    case PIN_FLOWER = 'pin_flower';
     case SHIRT = 'shirt';
     case SHIRT_REGULAR = 'shirt_regular';
     case SHIRT_OVERSIZED = 'shirt_oversized';

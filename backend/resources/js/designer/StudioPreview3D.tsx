@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { DesignerProductConfig } from './designer-config';
 import { applyShirtDecalDrape, isShirtType, morphShirtGLB, SHIRT_TRIM_MATS, shirtTrimContrast } from '@/components/shirt-builder';
+import { buildPin, buildPinDecal, isPinType } from '@/components/pin-builder';
 
 export interface StudioPart {
     id: string;
@@ -99,6 +100,7 @@ const StudioPreview3D = forwardRef<StudioApi, Props>(function StudioPreview3D(
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
         const isShirtStudio = config.type === 'shirt' || isShirtType(config.type);
+        const isPinStudio = config.type === 'pin' || isPinType(config.type);
 
         if (isShirtStudio) {
             camera.position.set(0.35, 0.48, 3.9);
@@ -147,7 +149,7 @@ const StudioPreview3D = forwardRef<StudioApi, Props>(function StudioPreview3D(
         texRef.current = tex;
 
         const addShadowDisc = (target: THREE.Group) => {
-            if (!isShirtStudio) return;
+            if (!isShirtStudio && !isPinStudio) return;
             const b = new THREE.Box3().setFromObject(target);
             const sizeX = b.getSize(new THREE.Vector3()).x;
             const radius = Math.max(sizeX * 0.36, 0.42);
@@ -316,6 +318,53 @@ const StudioPreview3D = forwardRef<StudioApi, Props>(function StudioPreview3D(
             group.add(decal);
         };
 
+        const finishPinStudio = () => {
+            // Landing-page button pin per shape + live design-canvas artwork
+            // hugging the face. Starts plain white, recolorable via parts.
+            const built = buildPin(config.type, '#FFFFFF');
+            const preBox = new THREE.Box3().setFromObject(built.group);
+            const preSize = preBox.getSize(new THREE.Vector3());
+            const preCenter = preBox.getCenter(new THREE.Vector3());
+            const s = 2.0 / (Math.max(preSize.x, preSize.y, preSize.z) || 1);
+            built.group.scale.setScalar(s);
+            built.group.position.sub(preCenter.clone().multiplyScalar(s));
+            const bbox = new THREE.Box3().setFromObject(built.group);
+            built.group.position.sub(bbox.getCenter(new THREE.Vector3()));
+            group.add(built.group);
+
+            const seen = new Map<string, string>();
+            built.group.traverse((o) => {
+                const mesh = o as THREE.Mesh;
+                if (!mesh.isMesh) return;
+                const ms = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+                ms.forEach((m) => {
+                    const sm = m as THREE.MeshStandardMaterial;
+                    if (!('color' in sm)) return;
+                    const name = sm.name || 'part';
+                    if (!matsRef.current.has(name)) matsRef.current.set(name, []);
+                    matsRef.current.get(name)!.push(sm);
+                    if (!seen.has(name)) seen.set(name, '#' + sm.color.getHexString());
+                });
+            });
+            cbRef.current.onParts(
+                [...seen.entries()].map(([id, color]) => ({
+                    id,
+                    label: config.partLabels[id] ?? id,
+                    color,
+                })),
+            );
+
+            addShadowDisc(group);
+
+            // artwork decal in local pin units, transformed like the pin itself
+            const decal = buildPinDecal(config.type, tex);
+            const lp = decal.position.clone();
+            decal.scale.setScalar(s);
+            decal.position.copy(lp.multiplyScalar(s).add(built.group.position));
+            decalRef.current = decal;
+            group.add(decal);
+        };
+
         let cancelled = false;
         if (isShirtStudio) {
             // Every fit loads the SAME Regular shirt.glb, re-proportioned per
@@ -332,6 +381,8 @@ const StudioPreview3D = forwardRef<StudioApi, Props>(function StudioPreview3D(
                     if (!cancelled) cbRef.current.onParts([]);
                 },
             );
+        } else if (isPinStudio) {
+            if (!cancelled) finishPinStudio();
         } else if (config.model.startsWith('procedural:')) {
             const g = new THREE.Group();
             const std = (c: string) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, metalness: 0.02 });

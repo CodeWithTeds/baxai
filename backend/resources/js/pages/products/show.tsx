@@ -103,7 +103,7 @@ export default function ShowProduct({ product }: { product: any }) {
                                 <Pencil size={14} /> Edit
                             </Button>
                         </Link>
-                        <Link href={`/design-studio/${['mug', 'shirt', 'tote', 'pin', 'calendar', 'sticker'].includes(product.viewer_type) || String(product.viewer_type ?? '').startsWith('shirt_') ? product.viewer_type : 'mug'}`}>
+                        <Link href={`/design-studio/${['mug', 'shirt', 'tote', 'pin', 'calendar', 'sticker'].includes(product.viewer_type) || String(product.viewer_type ?? '').startsWith('shirt_') || String(product.viewer_type ?? '').startsWith('pin_') ? product.viewer_type : 'mug'}`}>
                             <Button size="sm" variant="secondary">
                                 <Cuboid size={14} /> Design Studio
                             </Button>

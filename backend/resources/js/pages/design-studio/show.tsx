@@ -30,7 +30,9 @@ const INKS = ['#1A1C1E', '#FFFFFF', '#0052CC', '#EF4444', '#22C55E', '#F59E0B', 
 
 export default function DesignStudio({ initialType }: { initialType: string }) {
     const isKnownType = (t: string) =>
-        DESIGNER_PRODUCTS.some((p) => p.type === t) || t === 'shirt' || t.startsWith('shirt_');
+        DESIGNER_PRODUCTS.some((p) => p.type === t) ||
+        t === 'shirt' || t.startsWith('shirt_') ||
+        t === 'pin' || t.startsWith('pin_');
     const [type, setType] = useState(isKnownType(initialType) ? initialType : 'mug');
     const config = designerConfigFor(type);
     const isShirt = type === 'shirt' || type.startsWith('shirt_');

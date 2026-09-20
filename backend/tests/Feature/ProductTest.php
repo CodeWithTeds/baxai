@@ -101,6 +101,25 @@ it('accepts procedural bag viewer types', function (): void {
     }
 });
 
+it('accepts procedural pin viewer types', function (): void {
+    $user = User::factory()->create();
+
+    foreach (['pin', 'pin_circle', 'pin_square', 'pin_rectangle', 'pin_oval', 'pin_heart', 'pin_star', 'pin_hexagon', 'pin_triangle', 'pin_diamond', 'pin_cloud', 'pin_flower'] as $i => $viewer) {
+        $response = $this->actingAs($user)->postJson('/api/v1/products', [
+            'name' => "Pin {$viewer}",
+            'category' => 'pins',
+            'status' => 'active',
+            'base_price' => 4.99,
+            'sku' => "PIN-TEST-{$i}",
+            'is_customizable' => true,
+            'viewer_type' => $viewer,
+            'has_3d_preview' => true,
+        ]);
+
+        $response->assertCreated()->assertJsonPath('data.viewer_type', $viewer);
+    }
+});
+
 it('bulk archives products via the web routes with an Inertia redirect', function (): void {
     $user = User::factory()->create(['email_verified_at' => now()]);
     $products = Product::factory()->count(2)->create(['status' => 'active']);

@@ -17,6 +17,7 @@ import InputError from '@/components/input-error';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BAG_VIEWERS } from '@/components/bag-builder';
 import { SHIRT_CATEGORIES, SHIRT_VIEWERS } from '@/components/shirt-builder';
+import { PIN_SHAPES } from '@/components/pin-builder';
 import { ShirtFlatIcon } from '@/components/shirt-flat';
 import Product3DPreview from '@/components/product-3d-preview';
 import { VESSEL_VIEWERS } from '@/components/vessel-builder';
@@ -70,7 +71,8 @@ const VIEWER_GROUPS = [
                 .map((v) => ({ value: v.value, label: v.label })),
         ],
     },
-    { id: 'other', label: 'Other', items: [{ value: 'pin', label: 'Pin — 3D' }, { value: 'sticker', label: 'Sticker — 3D' }, { value: 'calendar', label: 'Calendar — 3D' }, { value: 'glb', label: 'Custom .glb model' }] },
+    { id: 'pins', label: '📌 Button Pin shapes', items: PIN_SHAPES.map((v) => ({ value: v.value, label: v.label })) },
+    { id: 'other', label: 'Other', items: [{ value: 'sticker', label: 'Sticker — 3D' }, { value: 'calendar', label: 'Calendar — 3D' }, { value: 'glb', label: 'Custom .glb model' }] },
 ] as const;
 
 const FIELD_LABELS: Record<string, string> = {

@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Cuboid } from 'lucide-react';
 import { buildBag, isBagType } from './bag-builder';
 import { applyShirtDecalDrape, isShirtType, morphShirtGLB, SHIRT_TRIM_MATS, shirtTrimContrast } from './shirt-builder';
+import { isPinType, buildPin, buildPinDecal } from './pin-builder';
 import { buildVessel, isVesselType } from './vessel-builder';
 
 // Real product models (CC0 unless noted — see public/models/CREDITS.md)
@@ -57,15 +58,18 @@ export default function Product3DPreview({
     const isVessel = isVesselType(viewerType);
     const isBag = isBagType(viewerType);
     const isShirt = isShirtType(viewerType);
+    const isPin = isPinType(viewerType);
     // T-Shirt — Regular — 3D (alias) is the base design: EVERY t-shirt category
     // renders the same shirt.glb with the same layout/lighting, re-proportioned
     // per fit (slim narrower, oversized wider+longer, boxy wide+short, …).
+    // Button pins render procedurally in the landing-page design.
     // An explicit custom model_3d_url still wins when provided.
     const effectiveShirtGlb = DEFAULT_GLB['shirt'] ?? '/models/shirt.glb';
-    const glbUrl = (modelUrl || '').trim() || (isShirt ? effectiveShirtGlb : '');
+    const glbUrl =
+        (modelUrl || '').trim() || (!isPin ? DEFAULT_GLB[viewerType] || '' : '') || (isShirt ? effectiveShirtGlb : '');
     const designUrl = (designImageUrl || '').trim();
-    // Vessels + bags + shirts take the tint as their body color at build time.
-    const canTint = TINTABLE.has(viewerType) || isVessel || isBag || isShirt;
+    // Vessels + bags + shirts + pins take the tint as their body color at build time.
+    const canTint = TINTABLE.has(viewerType) || isVessel || isBag || isShirt || isPin;
 
     useEffect(() => {
         if (!showCanvas || !mountRef.current) return;
@@ -368,6 +372,37 @@ export default function Product3DPreview({
             }, undefined, () => { if (!cancelled) setLoadError('Could not load the reference image preview.'); });
         };
 
+        const finishPin = () => {
+            // Landing-page button pin per shape: metal rim, printed face, white
+            // backing, safety-pin back. Normalized so every shape frames alike.
+            const built = buildPin(viewerType, color);
+            const preBox = new THREE.Box3().setFromObject(built.group);
+            const preSize = preBox.getSize(new THREE.Vector3());
+            const preCenter = preBox.getCenter(new THREE.Vector3());
+            const maxDim = Math.max(preSize.x, preSize.y, preSize.z);
+            const s = 1.9 / (maxDim || 1);
+            built.group.scale.setScalar(s);
+            built.group.position.sub(preCenter.clone().multiplyScalar(s));
+            const bbox = new THREE.Box3().setFromObject(built.group);
+            built.group.position.sub(bbox.getCenter(new THREE.Vector3()));
+            group.add(built.group);
+            addShadowDisc(group);
+            if (!designUrl) return;
+            new THREE.TextureLoader().load(designUrl, (tex) => {
+                if (cancelled) { tex.dispose(); return; }
+                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.anisotropy = 8;
+                designTexture = tex;
+                // Decal is built in local pin units — apply the same
+                // scale + offset as the pin so it hugs the face exactly.
+                const decal = buildPinDecal(viewerType, tex);
+                const lp = decal.position.clone();
+                decal.scale.setScalar(s);
+                decal.position.copy(lp.multiplyScalar(s).add(built.group.position));
+                group.add(decal);
+            }, undefined, () => { if (!cancelled) setLoadError('Could not load the reference image preview.'); });
+        };
+
         if (isVessel) {
             finishVessel();
         } else if (isBag) {
@@ -398,6 +433,8 @@ export default function Product3DPreview({
             } else {
                 setLoadError('No shirt model configured.');
             }
+        } else if (isPin && !glbUrl) {
+            finishPin();
         } else if (glbUrl) {
             setLoading(true);
             new GLTFLoader().load(
