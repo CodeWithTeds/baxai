@@ -163,18 +163,17 @@ export default function ProductsIndex({
                     </div>
                 )}
 
-                {/* page heading — compact, not bold */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                        <Package size={15} />
-                    </div>
-                    <div>
-                        <h1 className="text-[15px] font-normal tracking-tight">
+                {/* page heading — Mailgun-style with top text */}
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="max-w-[640px]">
+                        <h1 className="text-[16px] font-normal tracking-tight text-[#1A1C1E]">
                             Products <span className="text-muted-foreground">({(products?.total ?? 0).toLocaleString()})</span>
                         </h1>
-                        <p className="text-xs text-muted-foreground">Manage your product catalog, pricing, and 3D previews</p>
+                        <p className="mt-1 max-w-[560px] text-[12px] leading-relaxed text-[#6B7280]">
+                            Easily manage your product catalog through centralized inventory, pricing and 3D preview controls. Track stock, organize by category and enable immersive previews for better targeting and improved shopping experience.
+                        </p>
                     </div>
-                    <div className="ml-auto">
+                    <div className="ml-auto shrink-0">
                         <Link href="/products/create">
                             <Button size="sm" className="h-8 px-3 text-xs font-normal">
                                 <Plus size={13} /> Add new product
@@ -239,12 +238,12 @@ export default function ProductsIndex({
                     </div>
                 )}
 
-                {/* table — compressed, more columns, not bold — strong border */}
-                <div className="overflow-hidden rounded-xl border-2 border-[#1A1C1E]/15 bg-card shadow-sm">
+                {/* table — Mailgun-style light border */}
+                <div className="overflow-hidden rounded-lg border border-[#E5E7EB] bg-white">
                     <div className="overflow-x-auto px-3">
                         <table className="w-full min-w-[1280px] text-left text-xs">
                             <thead>
-                                <tr className="border-b-2 border-[#1A1C1E]/10 bg-[#F8F9FC]">
+                                <tr className="border-b border-[#E5E7EB] bg-white">
                                     <th className="w-8 py-2 pr-2">
                                         <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
                                     </th>
@@ -265,7 +264,7 @@ export default function ProductsIndex({
                             </thead>
                             <tbody>
                                 {rows.map((p) => (
-                                    <tr key={p.id} className="border-b border-[#E9EBF3] last:border-0 hover:bg-muted/50">
+                                    <tr key={p.id} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB]">
                                         <td className="py-1.5 pr-2">
                                             <Checkbox checked={selected.includes(p.id)} onCheckedChange={() => toggleOne(p.id)} />
                                         </td>
@@ -374,7 +373,7 @@ export default function ProductsIndex({
                     </div>
 
                     {/* footer — compressed */}
-                    <div className="flex flex-wrap items-center gap-2 border-t-2 border-[#1A1C1E]/10 bg-[#F8F9FC] px-3 py-2 text-[11px] font-normal text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-2 border-t border-[#E5E7EB] bg-white px-3 py-2 text-[11px] font-normal text-muted-foreground">
                         <span>Rows per page</span>
                         <Select
                             value={String(products?.per_page ?? 10)}

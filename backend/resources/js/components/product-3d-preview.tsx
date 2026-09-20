@@ -312,14 +312,14 @@ export default function Product3DPreview({
     if (!showCanvas) {
         return (
             <div
-                className={`flex flex-col items-center justify-center gap-3 rounded-xl border border-[#1A1C1E]/10 bg-white px-4 py-6 text-center shadow-[0_8px_24px_-16px_rgba(26,28,30,0.2)] ${placeholderH}`}
+                className={`flex flex-col items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-4 py-8 text-center ${placeholderH}`}
             >
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1A1C1E] shadow-sm">
-                    <Cuboid size={24} className="text-white" />
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#F9FAFB] border border-[#E5E7EB]">
+                    <Cuboid size={18} className="text-[#6B7280]" />
                 </span>
                 <div>
-                    <p className="text-[15px] font-extrabold tracking-tight text-[#1A1C1E]">2D product — no 3D preview</p>
-                    <p className="mx-auto mt-1.5 max-w-[300px] text-[13px] font-medium leading-snug text-[#4A4E5A]">
+                    <p className="text-[13px] font-normal text-[#1A1C1E]">2D product — no 3D preview</p>
+                    <p className="mx-auto mt-1 max-w-[280px] text-[11px] font-normal leading-relaxed text-[#6B7280]">
                         Pick a vessel in the 3D preview controls to see the 3D model.
                     </p>
                 </div>
@@ -329,7 +329,7 @@ export default function Product3DPreview({
 
     return (
         <div>
-            <div className="relative overflow-hidden rounded-xl border border-[#E9EBF3] shadow-sm">
+            <div className="relative overflow-hidden rounded-lg border border-[#E5E7EB]">
                 <div
                     ref={mountRef}
                     className={`${canvasH} w-full cursor-grab touch-none bg-gradient-to-b from-[#F4F5F9] to-white active:cursor-grabbing`}
@@ -343,23 +343,21 @@ export default function Product3DPreview({
             {loadError && <p className="mt-2 text-[13px] text-red-600">{loadError}</p>}
             {canTint && (
                 <div className={`flex flex-wrap items-center gap-2 ${isHero ? 'mt-3' : 'mt-2'}`}>
-                    <span className="text-[12px] font-medium text-[#1A1C1E]">Preview color:</span>
+                    <span className="text-[11px] font-normal text-[#6B7280]">Preview color:</span>
                     {PALETTE.map((c) => (
                         <button
                             key={c}
                             type="button"
                             onClick={() => setColor(c)}
                             title={c}
-                            className={`h-7 w-7 rounded-full border-2 transition ${color === c ? 'scale-110 border-[#1A1C1E] ring-2 ring-[#1A1C1E]/20' : 'border-white shadow-sm'}`}
+                            className={`h-6 w-6 rounded-full border transition ${color === c ? 'scale-110 border-[#1A1C1E] ring-2 ring-[#1A1C1E]/20' : 'border-[#E5E7EB]'}`}
                             style={{ backgroundColor: c }}
                         />
                     ))}
                 </div>
             )}
-            <p className={`text-[#8A8FA3] ${isHero ? 'mt-2 text-[13px] font-medium text-[#1A1C1E]' : 'mt-2 text-[12px] text-[#B9BED1]'}`}>
-                Drag to rotate • auto-spins when idle.
-            </p>
-            {!isHero && <p className="mt-1 text-[11px] text-[#B9BED1]">Models: Kenney, Quaternius (CC0) • Tee: Poly by Google, Calendar: jeremy (CC-BY)</p>}
+            <p className={`font-normal text-[#6B7280] ${isHero ? 'mt-2 text-[11px]' : 'mt-2 text-[11px]'}`}>Drag to rotate • auto-spins when idle.</p>
+            {!isHero && <p className="mt-1 text-[10px] font-normal text-[#9CA3AF]">Models: Kenney, Quaternius (CC0) • Tee: Poly by Google, Calendar: jeremy (CC-BY)</p>}
         </div>
     );
 }

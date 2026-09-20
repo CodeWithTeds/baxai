@@ -78,12 +78,12 @@ function skuPreview(name: string, category: string): string {
 const prettyField = (field: string) => FIELD_LABELS[field] ?? field.replace(/_/g, ' ');
 
 const inputCls =
-    'h-10 rounded-lg border border-[#CBD0E0] bg-white px-3 text-[14px] font-medium text-[#1A1C1E] placeholder:text-[#8A8FA3] focus-visible:border-[#1A1C1E] focus-visible:ring-2 focus-visible:ring-[#1A1C1E]/10';
+    'h-8 rounded-lg border border-[#E5E7EB] bg-white px-2.5 text-[11px] font-normal text-[#1A1C1E] placeholder:text-[#8A8FA3] focus-visible:border-[#1A1C1E] focus-visible:ring-1 focus-visible:ring-[#1A1C1E]/10';
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
     return (
-        <div className="space-y-1.5">
-            <p className="text-[13px] font-semibold text-[#1A1C1E]">{label}</p>
+        <div className="space-y-1">
+            <p className="text-[11px] font-normal text-[#4A4E5A]">{label}</p>
             {children}
             {error && <InputError message={error} />}
         </div>
@@ -100,8 +100,8 @@ function Section({
     className?: string;
 }) {
     return (
-        <section className={`rounded-2xl border border-[#1A1C1E]/10 bg-white p-5 shadow-[0_10px_30px_-18px_rgba(26,28,30,0.25)] ${className}`}>
-            <h3 className="mb-4 border-b border-[#F1F2F7] pb-3 text-[15px] font-extrabold tracking-tight text-[#1A1C1E]">{title}</h3>
+        <section className={`rounded-lg border border-[#E5E7EB] bg-white p-4 ${className}`}>
+            <h3 className="mb-3 border-b border-[#E5E7EB] pb-2 text-[12px] font-normal tracking-wide text-[#1A1C1E]">{title}</h3>
             {children}
         </section>
     );
@@ -117,7 +117,7 @@ function Chip({
     onChange: (v: boolean) => void;
 }) {
     return (
-        <label className="flex cursor-pointer items-center gap-2 py-1 text-[13px] text-[#1A1C1E]">
+        <label className="flex cursor-pointer items-center gap-2 py-1 text-[11px] font-normal text-[#4A4E5A]">
             <Checkbox checked={checked} onCheckedChange={(v) => onChange(!!v)} />
             {title}
         </label>
@@ -202,15 +202,23 @@ any) {
 
     return (
         <form onSubmit={onSubmit}>
+            {/* top text — Mailgun-style, like Suppressions header */}
+            <div className="mb-3 max-w-[720px]">
+                <h2 className="text-[14px] font-bold text-[#1A1C1E]" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700 }}>Create product</h2>
+                <p className="mt-1 text-[12px] leading-relaxed text-[#6B7280]">
+                    Easily add new items to your catalog with pricing, inventory and 3D preview settings. Fill in the basic info and your product will be ready to publish and track.
+                </p>
+            </div>
+
             {errorEntries.length > 0 && (
-                <div ref={errorBoxRef} className="mb-3 scroll-mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
-                    <p className="text-sm font-medium text-red-800">
+                <div ref={errorBoxRef} className="mb-3 scroll-mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
+                    <p className="text-xs font-normal text-red-800">
                         Please fix {errorEntries.length} field{errorEntries.length > 1 ? 's' : ''} to continue:
                     </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[13px] text-red-700">
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[11px] font-normal text-red-700">
                         {errorEntries.map(([field, message]) => (
                             <li key={field}>
-                                <span className="font-medium">{prettyField(field)}:</span> {String(message)}
+                                <span className="font-normal">{prettyField(field)}:</span> {String(message)}
                             </li>
                         ))}
                     </ul>
@@ -225,11 +233,11 @@ any) {
                             type="button"
                             onClick={generateWithAi}
                             disabled={aiLoading}
-                            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1A1C1E] px-4 py-2.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-black disabled:opacity-50"
+                            className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#1A1C1E] px-3 py-2 text-[11px] font-normal text-white transition hover:bg-black disabled:opacity-50"
                         >
                             {aiLoading ? 'Generating…' : '✦ Generate details with AI'}
                         </button>
-                        {aiError && <p className="mb-2 text-[13px] font-medium text-red-600">{aiError}</p>}
+                        {aiError && <p className="mb-2 text-[11px] font-normal text-red-600">{aiError}</p>}
                         <div className="grid gap-2 sm:grid-cols-2">
                             <Field label="Name *" error={errors.name}>
                                 <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Custom Ceramic Mug 11oz" className={inputCls} />
@@ -240,22 +248,11 @@ any) {
                                         value={data.sku}
                                         onChange={(e) => setData('sku', e.target.value)}
                                         placeholder="Auto — e.g. MUG-CUSTOMCE-A1B2"
-                                        className={`${inputCls} flex-1 bg-[#F8F9FC] font-mono text-[12px]`}
+                                        className={`${inputCls} flex-1 bg-[#F8F9FC] font-mono text-[11px] font-normal`}
                                     />
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="shrink-0 rounded-lg px-3 text-[12px]"
-                                        onClick={() => {
-                                            const fallback = data.name?.trim() ? data.name : 'Product';
-                                            setData('sku', skuPreview(fallback, data.category) as never);
-                                        }}
-                                        title="Regenerate SKU"
-                                    >
-                                        ↻
-                                    </Button>
+                                    <Button type="button" variant="outline" className="h-8 shrink-0 rounded-lg px-2.5 text-[11px] font-normal" onClick={() => { const f = data.name?.trim() ? data.name : 'Product'; setData('sku', skuPreview(f, data.category) as never); }} title="Regenerate SKU">↻</Button>
                                 </div>
-                                <p className="text-[11px] text-[#8A8FA3]">Auto from name. You can still edit or leave empty — it will generate on save.</p>
+                                <p className="text-[10px] font-normal text-[#8A8FA3]">Auto from name. You can still edit or leave empty — it will generate on save.</p>
                             </Field>
                             <Field label="Category *" error={errors.category}>
                                 <Select value={data.category} onValueChange={(v) => setData('category', v)}>
@@ -297,7 +294,7 @@ any) {
                                         value={data.description ?? ''}
                                         onChange={(e) => setData('description', e.target.value)}
                                         rows={2}
-                                        className="w-full rounded-lg border border-[#E9EBF3] bg-white px-3 py-2 text-sm text-[#1A1C1E] outline-none placeholder:text-[#B9BED1] focus:border-[#1A1C1E]"
+                                        className="w-full rounded-lg border border-[#E5E7EB] bg-white px-2.5 py-2 text-[11px] font-normal text-[#1A1C1E] outline-none placeholder:text-[#8A8FA3] focus:border-[#1A1C1E]"
                                         placeholder="Materials, print method, use case…"
                                     />
                                 </Field>
