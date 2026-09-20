@@ -45,9 +45,9 @@ class ProductController extends Controller
 
     public function store(StoreProductRequest $request): RedirectResponse
     {
-        $product = $this->service->create($request->validated());
+        $this->service->create($request->validated());
 
-        return redirect()->route('products.show', $product)->with('success', 'Product created successfully.');
+        return redirect()->route('products.index')->with('success', 'Product created successfully.');
     }
 
     public function show(Product $product): Response
@@ -64,7 +64,7 @@ class ProductController extends Controller
     {
         $this->service->update($product, $request->validated());
 
-        return redirect()->route('products.show', $product)->with('success', 'Product updated successfully.');
+        return redirect()->route('products.index')->with('success', 'Product updated successfully.');
     }
 
     public function destroy(Product $product): RedirectResponse

@@ -17,7 +17,6 @@ trait ProductValidationMessages
             'base_price.numeric' => 'Base price must be a number.',
             'base_price.min' => 'Base price cannot be negative.',
             'compare_at_price.gt' => 'Compare-at price must be higher than the base price.',
-            'sku.required' => 'Please enter a SKU.',
             'sku.unique' => 'This SKU is already used by another product.',
             'slug.unique' => 'This slug is already taken.',
             'thumbnail.max' => 'Thumbnail URL is too long.',

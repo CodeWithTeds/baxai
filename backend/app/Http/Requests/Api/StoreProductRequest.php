@@ -35,7 +35,7 @@ class StoreProductRequest extends FormRequest
             'base_price' => 'required|numeric|min:0|max:999999.99',
             'compare_at_price' => 'nullable|numeric|min:0|max:999999.99|gt:base_price',
             'unit' => 'nullable|string|max:30',
-            'sku' => 'required|string|max:100|unique:products,sku',
+            'sku' => 'nullable|string|max:100|unique:products,sku',
             'stock_quantity' => 'nullable|integer|min:-1',
             'low_stock_alert_at' => 'nullable|integer|min:0',
             'track_inventory' => 'boolean',

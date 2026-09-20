@@ -35,12 +35,15 @@ export default function Product3DPreview({
     label,
     modelUrl,
     designImageUrl,
+    variant = 'compact',
 }: {
     viewerType: string;
     label: string;
     modelUrl?: string;
     /** Reference artwork (uploaded photo) projected onto the template as a print decal. */
     designImageUrl?: string;
+    /** Hero = big, impossible-to-miss canvas at the top of /products/create. */
+    variant?: 'compact' | 'hero';
 }) {
     const mountRef = useRef<HTMLDivElement>(null);
     const [color, setColor] = useState('#FFFFFF');
@@ -302,20 +305,35 @@ export default function Product3DPreview({
         };
     }, [showCanvas, viewerType, glbUrl, designUrl, color, label, canTint]);
 
+    const isHero = variant === 'hero';
+    const canvasH = isHero ? 'h-[360px] sm:h-[420px] lg:h-[380px]' : 'h-[220px]';
+    const placeholderH = isHero ? 'h-[360px] sm:h-[420px] lg:h-[380px]' : 'h-[200px]';
+
     if (!showCanvas) {
         return (
-            <div className="flex h-[200px] flex-col items-center justify-center gap-2 rounded-lg bg-[#F8F9FC] text-center">
-                <Cuboid size={24} className="text-[#B9BED1]" />
-                <p className="text-[13px] text-[#8A8FA3]">2D product — no 3D preview</p>
-                <p className="px-6 text-[12px] text-[#B9BED1]">Pick a 3D viewer below, upload a reference image, or generate with AI to enable it.</p>
+            <div
+                className={`flex flex-col items-center justify-center gap-3 rounded-xl border border-[#1A1C1E]/10 bg-white px-4 py-6 text-center shadow-[0_8px_24px_-16px_rgba(26,28,30,0.2)] ${placeholderH}`}
+            >
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#1A1C1E] shadow-sm">
+                    <Cuboid size={24} className="text-white" />
+                </span>
+                <div>
+                    <p className="text-[15px] font-extrabold tracking-tight text-[#1A1C1E]">2D product — no 3D preview</p>
+                    <p className="mx-auto mt-1.5 max-w-[300px] text-[13px] font-medium leading-snug text-[#4A4E5A]">
+                        Pick a vessel in the 3D preview controls to see the 3D model.
+                    </p>
+                </div>
             </div>
         );
     }
 
     return (
         <div>
-            <div className="relative">
-                <div ref={mountRef} className="h-[220px] w-full cursor-grab touch-none rounded-lg bg-[#F4F5F9] active:cursor-grabbing" />
+            <div className="relative overflow-hidden rounded-xl border border-[#E9EBF3] shadow-sm">
+                <div
+                    ref={mountRef}
+                    className={`${canvasH} w-full cursor-grab touch-none bg-gradient-to-b from-[#F4F5F9] to-white active:cursor-grabbing`}
+                />
                 {loading && (
                     <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#F8F9FC]/70">
                         <p className="text-[13px] text-[#8A8FA3]">Loading 3D model…</p>
@@ -324,22 +342,24 @@ export default function Product3DPreview({
             </div>
             {loadError && <p className="mt-2 text-[13px] text-red-600">{loadError}</p>}
             {canTint && (
-                <div className="mt-2 flex items-center gap-2">
-                    <span className="text-[12px] text-[#8A8FA3]">Preview color:</span>
+                <div className={`flex flex-wrap items-center gap-2 ${isHero ? 'mt-3' : 'mt-2'}`}>
+                    <span className="text-[12px] font-medium text-[#1A1C1E]">Preview color:</span>
                     {PALETTE.map((c) => (
                         <button
                             key={c}
                             type="button"
                             onClick={() => setColor(c)}
                             title={c}
-                            className={`h-6 w-6 rounded-full border transition ${color === c ? 'scale-110 border-[#1A1C1E] ring-2 ring-[#1A1C1E]/20' : 'border-[#E9EBF3]'}`}
+                            className={`h-7 w-7 rounded-full border-2 transition ${color === c ? 'scale-110 border-[#1A1C1E] ring-2 ring-[#1A1C1E]/20' : 'border-white shadow-sm'}`}
                             style={{ backgroundColor: c }}
                         />
                     ))}
                 </div>
             )}
-            <p className="mt-2 text-[12px] text-[#B9BED1]">Drag to rotate • auto-spins when idle.</p>
-            <p className="mt-1 text-[11px] text-[#B9BED1]">Models: Kenney, Quaternius (CC0) • Tee: Poly by Google, Calendar: jeremy (CC-BY)</p>
+            <p className={`text-[#8A8FA3] ${isHero ? 'mt-2 text-[13px] font-medium text-[#1A1C1E]' : 'mt-2 text-[12px] text-[#B9BED1]'}`}>
+                Drag to rotate • auto-spins when idle.
+            </p>
+            {!isHero && <p className="mt-1 text-[11px] text-[#B9BED1]">Models: Kenney, Quaternius (CC0) • Tee: Poly by Google, Calendar: jeremy (CC-BY)</p>}
         </div>
     );
 }

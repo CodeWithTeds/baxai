@@ -135,10 +135,26 @@ it('redirects back with friendly errors when required fields are missing', funct
     $response->assertRedirect('/products/create');
     $response->assertSessionHasErrors([
         'name' => 'Please enter a product name.',
-        'sku' => 'Please enter a SKU.',
         'base_price' => 'Please enter a base price.',
     ]);
+    // SKU is now auto-generated, so its absence must not block the error path
     expect(Product::count())->toBe(0);
+});
+
+it('auto-generates a SKU when none is provided', function (): void {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+
+    $response = $this->actingAs($user)->post('/products', [
+        'name' => 'Auto SKU Mug',
+        'category' => 'mugs',
+        'status' => 'draft',
+        'base_price' => 9.99,
+    ]);
+
+    $response->assertRedirect();
+
+    $product = Product::where('name', 'Auto SKU Mug')->firstOrFail();
+    expect($product->sku)->not->toBeEmpty()->toStartWith('MUG-');
 });
 
 it('rejects a compare-at price below the base price with a clear message', function (): void {

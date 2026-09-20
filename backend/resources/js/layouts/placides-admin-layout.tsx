@@ -1,5 +1,7 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { Bell, Search, Settings } from 'lucide-react';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
 import PlacidesSidebar from '@/components/placides-sidebar';
 import type { ReactNode } from 'react';
 
@@ -20,12 +22,18 @@ export default function PlacidesAdminLayout({
     title: string;
     children: ReactNode;
 }) {
+    const pageProps = usePage().props as unknown as { flash?: { success?: string; error?: string } };
+    const flash = pageProps.flash ?? {};
+
+    useEffect(() => {
+        if (flash.error) toast.error(flash.error);
+        if (flash.success) toast.success(flash.success);
+    }, [flash.error, flash.success]);
+
     return (
         <>
             <Head title={title} />
-            <div
-                className="flex min-h-screen w-full bg-[#ECEEF4] text-[#1A1C1E]"
-            >
+            <div className="flex min-h-screen w-full bg-[#ECEEF4] text-[#1A1C1E]">
                 <PlacidesSidebar />
 
                 <div className="min-w-0 flex-1 px-4 pt-5 pb-24 sm:px-7 md:pb-10">

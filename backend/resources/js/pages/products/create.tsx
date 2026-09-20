@@ -45,19 +45,6 @@ const VIEWERS = [
     { value: 'glb', label: 'Custom .glb model' },
 ];
 
-// Default 3D template per category so an uploaded reference shows immediately.
-const VIEWER_FOR_CATEGORY: Record<string, string> = {
-    mugs: 'mug',
-    pins: 'pin',
-    tshirts: 'shirt',
-    tote_bags: 'tote',
-    stickers: 'sticker',
-    calendars: 'calendar',
-};
-
-const REFERENCE_ACCEPT = 'image/jpeg,image/png,image/webp';
-const REFERENCE_MAX_BYTES = 5 * 1024 * 1024;
-
 const FIELD_LABELS: Record<string, string> = {
     name: 'Name',
     sku: 'SKU',
@@ -73,25 +60,48 @@ const FIELD_LABELS: Record<string, string> = {
     max_text_length: 'Max text length',
 };
 
+function skuPreview(name: string, category: string): string {
+    const base = name.toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 8) || 'PRODUCT';
+    const prefixMap: Record<string, string> = {
+        mugs: 'MUG',
+        pins: 'PIN',
+        stickers: 'STK',
+        tshirts: 'TEE',
+        tote_bags: 'TOTE',
+        calendars: 'CAL',
+    };
+    const prefix = prefixMap[category] ?? 'PRD';
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `${prefix}-${base}-${rand}`;
+}
+
 const prettyField = (field: string) => FIELD_LABELS[field] ?? field.replace(/_/g, ' ');
 
 const inputCls =
-    'h-9 rounded-lg border-[#E9EBF3] bg-white px-3 text-sm text-[#1A1C1E] placeholder:text-[#B9BED1] focus-visible:border-[#1A1C1E] focus-visible:ring-0';
+    'h-10 rounded-lg border border-[#CBD0E0] bg-white px-3 text-[14px] font-medium text-[#1A1C1E] placeholder:text-[#8A8FA3] focus-visible:border-[#1A1C1E] focus-visible:ring-2 focus-visible:ring-[#1A1C1E]/10';
 
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
     return (
-        <div className="space-y-1">
-            <p className="text-[13px] text-[#1A1C1E]">{label}</p>
+        <div className="space-y-1.5">
+            <p className="text-[13px] font-semibold text-[#1A1C1E]">{label}</p>
             {children}
             {error && <InputError message={error} />}
         </div>
     );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+    title,
+    children,
+    className = '',
+}: {
+    title: string;
+    children: React.ReactNode;
+    className?: string;
+}) {
     return (
-        <section className="rounded-xl bg-white p-4 shadow-[0_10px_30px_-24px_rgba(26,28,30,0.3)]">
-            <h3 className="mb-3 text-sm tracking-tight text-[#1A1C1E]">{title}</h3>
+        <section className={`rounded-2xl border border-[#1A1C1E]/10 bg-white p-5 shadow-[0_10px_30px_-18px_rgba(26,28,30,0.25)] ${className}`}>
+            <h3 className="mb-4 border-b border-[#F1F2F7] pb-3 text-[15px] font-extrabold tracking-tight text-[#1A1C1E]">{title}</h3>
             {children}
         </section>
     );
@@ -126,42 +136,6 @@ export function ProductForm({
 any) {
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState('');
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [refPreview, setRefPreview] = useState('');
-    const [refError, setRefError] = useState('');
-
-    const handleReferenceSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-            setRefError('Please choose a JPG, PNG or WebP image.');
-            return;
-        }
-        if (file.size > REFERENCE_MAX_BYTES) {
-            setRefError('Image must be 5 MB or smaller.');
-            return;
-        }
-        setRefError('');
-        if (refPreview.startsWith('blob:')) URL.revokeObjectURL(refPreview);
-        setRefPreview(URL.createObjectURL(file));
-        setData('reference_image', file as never);
-        // Default to the matching 3D template so the design shows immediately.
-        const mapped = VIEWER_FOR_CATEGORY[data.category];
-        if ((data.viewer_type ?? 'none') === 'none' && mapped) {
-            setData('viewer_type', mapped as never);
-            setData('has_3d_preview', true as never);
-        }
-    };
-
-    const clearReference = () => {
-        if (refPreview.startsWith('blob:')) URL.revokeObjectURL(refPreview);
-        setRefPreview('');
-        setRefError('');
-        setData('reference_image', null as never);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    const referenceUrl = refPreview || data.thumbnail || '';
 
     const errorBoxRef = useRef<HTMLDivElement>(null);
     const errorEntries = Object.entries((errors ?? {}) as Record<string, string>);
@@ -171,6 +145,16 @@ any) {
         // Scroll only when a fresh validation response arrives.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [errors]);
+
+    // Auto-generate SKU on create when name is typed and SKU is still empty
+    useEffect(() => {
+        if (initial) return;
+        if (data.sku?.trim()) return;
+        if (!data.name?.trim() || data.name.trim().length < 2) return;
+        const next = skuPreview(data.name, data.category);
+        setData('sku', next as never);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data.name, data.category]);
 
     const generateWithAi = async () => {
         if (!data.name?.trim()) {
@@ -232,6 +216,7 @@ any) {
                     </ul>
                 </div>
             )}
+
             <div className="grid items-start gap-3 xl:grid-cols-2">
                 {/* LEFT — basic + pricing */}
                 <div className="space-y-3">
@@ -240,17 +225,37 @@ any) {
                             type="button"
                             onClick={generateWithAi}
                             disabled={aiLoading}
-                            className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-[#E9EBF3] bg-white py-2 text-[13px] text-[#1A1C1E] transition hover:bg-[#F6F7FB] disabled:opacity-50"
+                            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1A1C1E] px-4 py-2.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-black disabled:opacity-50"
                         >
-                            {aiLoading ? 'Generating…' : 'Generate details with AI'}
+                            {aiLoading ? 'Generating…' : '✦ Generate details with AI'}
                         </button>
-                        {aiError && <p className="mb-2 text-[13px] text-red-600">{aiError}</p>}
+                        {aiError && <p className="mb-2 text-[13px] font-medium text-red-600">{aiError}</p>}
                         <div className="grid gap-2 sm:grid-cols-2">
                             <Field label="Name *" error={errors.name}>
                                 <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Custom Ceramic Mug 11oz" className={inputCls} />
                             </Field>
-                            <Field label="SKU *" error={errors.sku}>
-                                <Input value={data.sku} onChange={(e) => setData('sku', e.target.value)} placeholder="MUG-11OZ-WHT" className={inputCls} />
+                            <Field label="SKU — auto" error={errors.sku}>
+                                <div className="flex gap-1.5">
+                                    <Input
+                                        value={data.sku}
+                                        onChange={(e) => setData('sku', e.target.value)}
+                                        placeholder="Auto — e.g. MUG-CUSTOMCE-A1B2"
+                                        className={`${inputCls} flex-1 bg-[#F8F9FC] font-mono text-[12px]`}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="shrink-0 rounded-lg px-3 text-[12px]"
+                                        onClick={() => {
+                                            const fallback = data.name?.trim() ? data.name : 'Product';
+                                            setData('sku', skuPreview(fallback, data.category) as never);
+                                        }}
+                                        title="Regenerate SKU"
+                                    >
+                                        ↻
+                                    </Button>
+                                </div>
+                                <p className="text-[11px] text-[#8A8FA3]">Auto from name. You can still edit or leave empty — it will generate on save.</p>
                             </Field>
                             <Field label="Category *" error={errors.category}>
                                 <Select value={data.category} onValueChange={(v) => setData('category', v)}>
@@ -324,62 +329,29 @@ any) {
                     </Section>
                 </div>
 
-                {/* RIGHT — preview + customizable + visibility */}
+                {/* RIGHT — 3D preview (compact, right side only) + options */}
                 <div className="space-y-3">
                     <Section title="3D preview">
-                        <div className="mb-3 rounded-lg border border-dashed border-[#E9EBF3] bg-[#F8F9FC] p-3">
-                            <p className="text-[13px] font-medium text-[#1A1C1E]">Reference image → 3D model</p>
-                            <p className="mt-0.5 text-[12px] text-[#8A8FA3]">
-                                Upload a photo of the actual product — it is projected onto the 3D template below and saved as the thumbnail.
-                            </p>
-                            <div className="mt-2 flex items-center gap-3">
-                                {referenceUrl ? (
-                                    <img
-                                        src={referenceUrl}
-                                        alt="Reference preview"
-                                        className="h-16 w-16 rounded-lg border border-[#E9EBF3] object-cover"
-                                    />
-                                ) : (
-                                    <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-white text-[11px] text-[#B9BED1]">
-                                        No image
-                                    </div>
-                                )}
-                                <div className="flex flex-col items-start gap-1">
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept={REFERENCE_ACCEPT}
-                                        className="hidden"
-                                        onChange={handleReferenceSelect}
-                                    />
-                                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                                        {referenceUrl ? 'Change image' : 'Upload image'}
-                                    </Button>
-                                    {refPreview && (
-                                        <button
-                                            type="button"
-                                            onClick={clearReference}
-                                            className="text-[12px] text-red-600 hover:underline"
-                                        >
-                                            Remove
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                            {refError && <p className="mt-1.5 text-[13px] text-red-600">{refError}</p>}
-                            {errors.reference_image && <InputError message={errors.reference_image} />}
-                            {refPreview && (
-                                <p className="mt-1.5 text-[12px] text-[#8A8FA3]">
-                                    Will be saved as the product thumbnail on {initial ? 'save' : 'create'}.
-                                </p>
-                            )}
-                        </div>
                         <Product3DPreview
                             viewerType={data.viewer_type ?? 'none'}
                             label={data.name ?? ''}
                             modelUrl={data.model_3d_url ?? ''}
-                            designImageUrl={referenceUrl}
+                            designImageUrl={data.thumbnail ?? ''}
                         />
+                        <div className="mt-3">
+                            <Field label="3D vessel / template" error={errors.viewer_type}>
+                                <Select value={data.viewer_type ?? 'none'} onValueChange={(v) => setData('viewer_type', v)}>
+                                    <SelectTrigger className={cn(inputCls, 'w-full')}>
+                                        <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {VIEWERS.map((v) => (
+                                            <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </Field>
+                        </div>
                     </Section>
 
                     <Section title="Customizable & 3D">
@@ -398,30 +370,6 @@ any) {
                             )}
                         </div>
                         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                            <Field label="3D viewer" error={errors.viewer_type}>
-                                <Select value={data.viewer_type ?? 'none'} onValueChange={(v) => setData('viewer_type', v)}>
-                                    <SelectTrigger className={cn(inputCls, 'w-full')}>
-                                        <SelectValue placeholder="Select" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {VIEWERS.map((v) => (
-                                            <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </Field>
-                            <Field label="3D model URL" error={errors.model_3d_url}>
-                                <Input value={data.model_3d_url ?? ''} onChange={(e) => setData('model_3d_url', e.target.value)} placeholder="https://…/mug.glb" className={inputCls} />
-                            </Field>
-                            <Field label="Thumbnail" error={errors.thumbnail}>
-                                <Input value={data.thumbnail ?? ''} onChange={(e) => setData('thumbnail', e.target.value)} placeholder="/storage/products/mug.jpg" className={inputCls} />
-                            </Field>
-                            <Field label="Print method" error={errors.print_method}>
-                                <Input value={data.print_method ?? ''} onChange={(e) => setData('print_method', e.target.value)} placeholder="sublimation" className={inputCls} />
-                            </Field>
-                            <Field label="Print size" error={errors.print_size}>
-                                <Input value={data.print_size ?? ''} onChange={(e) => setData('print_size', e.target.value)} placeholder="8 × 3.5 cm" className={inputCls} />
-                            </Field>
                             <Field label="Add-on ₱" error={errors.customization_addon_price}>
                                 <Input type="number" step="0.01" min="0" value={data.customization_addon_price ?? ''} onChange={(e) => setData('customization_addon_price', e.target.value)} placeholder="0.00" className={inputCls} />
                             </Field>

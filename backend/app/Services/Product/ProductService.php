@@ -2,6 +2,7 @@
 
 namespace App\Services\Product;
 
+use App\Models\Product;
 use App\Repositories\ProductRepositoryInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -14,6 +15,7 @@ class ProductService
     public function create(array $attributes): mixed
     {
         $attributes['slug'] = $this->ensureSlug($attributes);
+        $attributes['sku'] = $this->ensureSku($attributes);
         $attributes = $this->storeReferenceImage($attributes);
         $attributes = $this->normalize($attributes);
 
@@ -22,8 +24,10 @@ class ProductService
 
     public function update(mixed $product, array $attributes): bool
     {
-        if (isset($attributes['name']) && empty($attributes['slug'])) {
-            $attributes['slug'] = Str::slug($attributes['name']);
+        if (array_key_exists('slug', $attributes) && ! empty($attributes['slug'])) {
+            $attributes['slug'] = $this->ensureSlug(['slug' => $attributes['slug']], $product instanceof Product ? $product : null);
+        } elseif (isset($attributes['name']) && empty($attributes['slug'] ?? null)) {
+            $attributes['slug'] = $this->ensureSlug(['name' => $attributes['name']], $product instanceof Product ? $product : null);
         }
         $attributes = $this->storeReferenceImage($attributes);
         $attributes = $this->normalize($attributes, $product);
@@ -46,13 +50,60 @@ class ProductService
         return $this->products->bulkUpdateStatus($ids, 'archived');
     }
 
-    private function ensureSlug(array $attributes): string
+    private function ensureSlug(array $attributes, ?Product $existing = null): string
     {
-        if (! empty($attributes['slug'])) {
-            return Str::slug($attributes['slug']);
+        $base = ! empty($attributes['slug'])
+            ? Str::slug($attributes['slug'])
+            : Str::slug($attributes['name'] ?? Str::random(8));
+
+        $base = $base !== '' ? $base : Str::random(8);
+        $candidate = $base;
+        $suffix = 0;
+
+        while (Product::where('slug', $candidate)->when($existing, fn ($q) => $q->where('id', '!=', $existing->id))->exists()) {
+            $suffix++;
+            $candidate = $base.'-'.$suffix;
+            if ($suffix > 100) {
+                $candidate = $base.'-'.Str::random(6);
+                break;
+            }
         }
 
-        return Str::slug($attributes['name'] ?? Str::random(8));
+        return $candidate;
+    }
+
+    private function ensureSku(array $attributes): string
+    {
+        if (! empty($attributes['sku'])) {
+            return strtoupper(trim((string) $attributes['sku']));
+        }
+
+        $name = (string) ($attributes['name'] ?? 'Product');
+        $base = Str::upper(Str::slug($name));
+        $base = $base !== '' ? $base : 'PRD';
+        $base = Str::limit(str_replace('-', '', $base), 12, '');
+        $prefix = match ($attributes['category'] ?? null) {
+            'mugs' => 'MUG',
+            'pins' => 'PIN',
+            'stickers' => 'STK',
+            'tshirts' => 'TEE',
+            'tote_bags' => 'TOTE',
+            'calendars' => 'CAL',
+            default => 'PRD',
+        };
+        $candidate = $prefix.'-'.$base.'-'.Str::upper(Str::random(4));
+        $attempts = 0;
+        while (Product::where('sku', $candidate)->exists() && $attempts < 5) {
+            $candidate = $prefix.'-'.$base.'-'.Str::upper(Str::random(4));
+            $attempts++;
+        }
+
+        // Fallback to timestamp suffix if still colliding
+        if (Product::where('sku', $candidate)->exists()) {
+            $candidate = $prefix.'-'.$base.'-'.time();
+        }
+
+        return $candidate;
     }
 
     /**
