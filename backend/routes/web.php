@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\PrintCategoryController;
+use App\Http\Controllers\PrintItemController;
 use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -23,6 +25,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('customers/bulk-archive', [CustomerController::class, 'bulkArchive'])->name('customers.bulk-archive');
     Route::post('customers/bulk-destroy', [CustomerController::class, 'bulkDestroy'])->name('customers.bulk-destroy');
     Route::resource('customers', CustomerController::class);
+
+    Route::post('print-items/bulk-activate', [PrintItemController::class, 'bulkActivate'])->name('print-items.bulk-activate');
+    Route::post('print-items/bulk-archive', [PrintItemController::class, 'bulkArchive'])->name('print-items.bulk-archive');
+    Route::post('print-items/bulk-destroy', [PrintItemController::class, 'bulkDestroy'])->name('print-items.bulk-destroy');
+    Route::resource('print-items', PrintItemController::class);
+    Route::resource('print-categories', PrintCategoryController::class);
 
     Route::get('design-studio/{type?}', fn (string $type = 'mug') => Inertia::render('design-studio/show', [
         'initialType' => $type,

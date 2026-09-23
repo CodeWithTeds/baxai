@@ -7,6 +7,8 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\GroqController;
+use App\Http\Controllers\Api\PrintCategoryController;
+use App\Http\Controllers\Api\PrintItemController;
 use App\Http\Controllers\Api\ProductAiController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\TaskController;
@@ -35,6 +37,9 @@ Route::apiResource('customers', CustomerController::class);
 Route::post('customers/bulk-activate', [CustomerController::class, 'bulkActivate']);
 Route::post('customers/bulk-archive', [CustomerController::class, 'bulkArchive']);
 Route::post('customers/bulk-destroy', [CustomerController::class, 'bulkDestroy']);
+
+Route::apiResource('print-items', PrintItemController::class);
+Route::apiResource('print-categories', PrintCategoryController::class);
 
 // ─── Groq AI proxy (no auth required — key is server-side only) ───────────────
 Route::prefix('groq')->group(function () {

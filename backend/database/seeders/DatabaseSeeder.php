@@ -32,6 +32,10 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
-        $this->call(CustomerSeeder::class);
+        $this->call([
+            CustomerSeeder::class,
+            PrintCategorySeeder::class,
+            PrintItemSeeder::class,
+        ]);
     }
 }

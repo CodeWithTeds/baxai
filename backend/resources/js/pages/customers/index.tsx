@@ -311,7 +311,7 @@ export default function CustomersIndex({
                 {/* HEADING SECTION */}
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E5E7EB] pb-2.5">
                     <div className="max-w-[640px]">
-                        <h1 className="text-[15px] font-bold tracking-tight text-[#1A1C1E]">
+                        <h1 className="text-[15px] font-normal tracking-tight text-[#1A1C1E]">
                             Customers <span className="font-mono text-xs font-normal text-muted-foreground">({(customers?.total ?? 0).toLocaleString()})</span>
                         </h1>
                         <p className="mt-0.5 text-[11px] leading-relaxed text-[#6B7280]">
@@ -334,6 +334,39 @@ export default function CustomersIndex({
                             </Button>
                         </Link>
                     </div>
+                </div>
+
+                {/* NAVIGATION TABS */}
+                <div className="flex items-center gap-2 border-b border-[#E5E7EB] pb-2 font-mono text-xs">
+                    <button
+                        type="button"
+                        onClick={resetFilters}
+                        className={`pb-1 ${status === 'all' && type === 'all' ? 'border-b-2 border-[#1A1C1E] font-bold text-[#1A1C1E]' : 'text-[#6B7280] hover:text-[#1A1C1E]'}`}
+                    >
+                        All Customers ({(customers?.total ?? 0).toLocaleString()})
+                    </button>
+                    <span className="text-[#D1D5DB]">|</span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setStatus('active');
+                            applyFilters();
+                        }}
+                        className={`pb-1 ${status === 'active' ? 'border-b-2 border-[#1A1C1E] font-bold text-[#1A1C1E]' : 'text-[#6B7280] hover:text-[#1A1C1E]'}`}
+                    >
+                        Active Accounts
+                    </button>
+                    <span className="text-[#D1D5DB]">|</span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setType('vip');
+                            applyFilters();
+                        }}
+                        className={`pb-1 ${type === 'vip' ? 'border-b-2 border-[#1A1C1E] font-bold text-[#1A1C1E]' : 'text-[#6B7280] hover:text-[#1A1C1E]'}`}
+                    >
+                        VIP Tier
+                    </button>
                 </div>
 
                 {/* HEAVY DETAILED LINEAR FILTER BAR */}

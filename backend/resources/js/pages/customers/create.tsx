@@ -123,7 +123,7 @@ any) {
             {/* HEADING SECTION MATCHING /CUSTOMERS */}
             <div className="mb-3 border-b border-[#E5E7EB] pb-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-[15px] font-bold text-[#1A1C1E]">
+                    <h2 className="text-[15px] font-normal text-[#1A1C1E]">
                         {initial ? `Edit Customer` : 'Create Customer'}
                         {initial?.customer_code && (
                             <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">

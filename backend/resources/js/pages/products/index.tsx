@@ -10,12 +10,16 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
+    ArrowUpDown,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
+    Download,
     Package,
     Plus,
+    RotateCcw,
     Search,
+    SlidersHorizontal,
 } from 'lucide-react';
 import { dashboard } from '@/routes';
 import Product3DPreview from '@/components/product-3d-preview';
@@ -48,14 +52,6 @@ interface ProductRow {
     allow_color_change: boolean;
     available_colors: string[] | null;
     allow_custom_text: boolean;
-    max_text_length: number | null;
-    allow_image_upload: boolean;
-    print_method: string | null;
-    print_size: string | null;
-    customization_addon_price: string | null;
-    is_featured_home: boolean;
-    is_featured_services: boolean;
-    updated_at: string;
 }
 
 interface Paginated {
@@ -70,10 +66,41 @@ interface Paginated {
 
 const STATUS_OPTIONS = [
     { value: 'all', label: 'All Statuses' },
-    { value: 'draft', label: 'Draft' },
     { value: 'active', label: 'Active' },
+    { value: 'draft', label: 'Draft' },
     { value: 'inactive', label: 'Inactive' },
     { value: 'archived', label: 'Archived' },
+];
+
+const CATEGORY_OPTIONS = [
+    { value: 'all', label: 'All Categories' },
+    { value: 'Mugs & Drinkware', label: 'Mugs & Drinkware' },
+    { value: 'Apparel & Uniforms', label: 'Apparel & Uniforms' },
+    { value: 'Corporate Gifts', label: 'Corporate Gifts' },
+    { value: 'Print Media', label: 'Print Media' },
+    { value: 'Packaging', label: 'Packaging' },
+    { value: 'Accessories', label: 'Accessories' },
+];
+
+const CUSTOMIZABLE_OPTIONS = [
+    { value: 'all', label: 'All Items' },
+    { value: '1', label: 'Customizable Only' },
+    { value: '0', label: 'Standard Non-Customizable' },
+];
+
+const PREVIEW_3D_OPTIONS = [
+    { value: 'all', label: 'All Media Types' },
+    { value: '1', label: '3D Preview Available' },
+    { value: '0', label: '2D Image Only' },
+];
+
+const SORT_OPTIONS = [
+    { value: '-created_at', label: 'Newest First' },
+    { value: 'created_at', label: 'Oldest First' },
+    { value: 'name', label: 'Name (A-Z)' },
+    { value: '-base_price', label: 'Price (High to Low)' },
+    { value: 'base_price', label: 'Price (Low to High)' },
+    { value: '-stock_quantity', label: 'Stock (High to Low)' },
 ];
 
 export default function ProductsIndex({
@@ -82,7 +109,7 @@ export default function ProductsIndex({
     stats = { total: 0, active: 0, customizable: 0 },
 }: {
     products?: Paginated;
-    filters?: Record<string, unknown>;
+    filters?: Record<string, any>;
     stats?: { total: number; active: number; customizable: number };
 }) {
     const pageProps = usePage().props as unknown as {
@@ -90,14 +117,60 @@ export default function ProductsIndex({
     };
     const flash = pageProps.flash ?? {};
     const rows = products?.data ?? [];
-    const initialFilter = (filters?.filter ?? {}) as { name?: string; status?: string };
-    const [search, setSearch] = useState(initialFilter.name ?? '');
-    const [status, setStatus] = useState(initialFilter.status ?? 'all');
+
+    const safeFilters = filters || {};
+    const rawFilter = (safeFilters.filter && typeof safeFilters.filter === 'object' ? safeFilters.filter : {}) as Record<string, string>;
+
+    const [search, setSearch] = useState<string>(rawFilter.name ?? rawFilter.sku ?? '');
+    const [status, setStatus] = useState<string>(rawFilter.status ?? 'all');
+    const [category, setCategory] = useState<string>(rawFilter.category ?? 'all');
+    const [isCustomizable, setIsCustomizable] = useState<string>(rawFilter.is_customizable ?? 'all');
+    const [has3dPreview, setHas3dPreview] = useState<string>(rawFilter.has_3d_preview ?? 'all');
+    const [sort, setSort] = useState<string>(typeof safeFilters.sort === 'string' ? safeFilters.sort : '-created_at');
+    const [perPage, setPerPage] = useState<string>(String(safeFilters.per_page ?? 10));
+
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const [viewId, setViewId] = useState<number | null>(null);
     const [archiving, setArchiving] = useState(false);
+
     const viewing = rows.find((p) => p.id === viewId) ?? null;
 
     const closeView = () => setViewId(null);
+
+    const handleFilterChange = (updates: Record<string, string>) => {
+        const nextFilter: Record<string, string> = {
+            name: updates.search ?? search,
+            status: (updates.status ?? status) === 'all' ? '' : (updates.status ?? status),
+            category: (updates.category ?? category) === 'all' ? '' : (updates.category ?? category),
+            is_customizable: (updates.is_customizable ?? isCustomizable) === 'all' ? '' : (updates.is_customizable ?? isCustomizable),
+            has_3d_preview: (updates.has_3d_preview ?? has3dPreview) === 'all' ? '' : (updates.has_3d_preview ?? has3dPreview),
+        };
+
+        // Clean empty values
+        Object.keys(nextFilter).forEach((k) => {
+            if (!nextFilter[k]) delete nextFilter[k];
+        });
+
+        router.get(
+            '/products',
+            {
+                filter: nextFilter,
+                sort: updates.sort ?? sort,
+                per_page: updates.per_page ?? perPage,
+            } as never,
+            { preserveState: true, replace: true }
+        );
+    };
+
+    const resetFilters = () => {
+        setSearch('');
+        setStatus('all');
+        setCategory('all');
+        setIsCustomizable('all');
+        setHas3dPreview('all');
+        setSort('-created_at');
+        router.get('/products', {}, { preserveState: true, replace: true });
+    };
 
     const archiveViewed = () => {
         if (!viewing) return;
@@ -112,19 +185,27 @@ export default function ProductsIndex({
         });
     };
 
-    const applyFilters = () => {
-        const filter: Record<string, string> = {};
-        if (search.trim()) {
-            filter.name = search.trim();
-        }
-        if (status !== 'all') {
-            filter.status = status;
-        }
-        router.get(
-            '/products',
-            { filter, per_page: products?.per_page ?? 10 },
-            { preserveState: true },
-        );
+    const exportCsv = () => {
+        const headers = ['ID', 'SKU', 'Name', 'Category', 'Status', 'Price', 'Stock', 'Customizable', '3D Preview'];
+        const csvRows = rows.map((p) => [
+            p.id,
+            p.sku,
+            `"${p.name.replace(/"/g, '""')}"`,
+            `"${p.category || ''}"`,
+            p.status,
+            p.base_price,
+            p.stock_quantity,
+            p.is_customizable ? 'Yes' : 'No',
+            p.has_3d_preview ? 'Yes' : 'No',
+        ]);
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...csvRows.map((r) => r.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `products_catalog_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const statusColor = (s: string) =>
@@ -134,68 +215,245 @@ export default function ProductsIndex({
         <>
             <Head title="Products" />
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 font-sans text-[#1A1C1E]">
                 {flash.success && (
-                    <div className="flex items-center gap-2 rounded-lg border bg-card px-4 py-3 text-sm">
-                        <CheckCircle2 size={16} className="text-emerald-600" /> {flash.success}
+                    <div className="flex items-center gap-2 rounded-none border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-mono text-emerald-800">
+                        <CheckCircle2 size={15} className="text-emerald-600" /> {flash.success}
                     </div>
                 )}
 
-                {/* page heading — Mailgun-style with top text */}
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                {/* HEADING SECTION */}
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E5E7EB] pb-2.5">
                     <div className="max-w-[640px]">
-                        <h1 className="text-[16px] font-normal tracking-tight text-[#1A1C1E]">
-                            Products <span className="text-muted-foreground">({(products?.total ?? 0).toLocaleString()})</span>
+                        <h1 className="text-[15px] font-normal tracking-tight text-[#1A1C1E]">
+                            Products <span className="font-mono text-xs font-normal text-muted-foreground">({(products?.total ?? 0).toLocaleString()})</span>
                         </h1>
-                        <p className="mt-1 max-w-[560px] text-[12px] leading-relaxed text-[#6B7280]">
-                            Easily manage your product catalog through centralized inventory, pricing and 3D preview controls. Track stock, organize by category and enable immersive previews for better targeting and improved shopping experience.
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-[#6B7280]">
+                            Easily manage product catalog inventory, pricing rules, categories, and 3D preview controls for retail and custom print fulfillment.
                         </p>
                     </div>
-                    <div className="ml-auto shrink-0">
+                    <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={exportCsv}
+                            size="sm"
+                            className="h-7 rounded-none border-[#D1D5DB] px-2.5 text-[11px] font-normal text-[#1A1C1E] bg-white hover:bg-[#F9FAFB]"
+                        >
+                            <Download size={12} className="mr-1" /> Export CSV
+                        </Button>
                         <Link href="/products/create">
-                            <Button size="sm" className="h-8 px-3 text-xs font-normal">
-                                <Plus size={13} /> Add new product
+                            <Button size="sm" className="h-7 rounded-none bg-[#1A1C1E] px-2.5 text-[11px] font-normal text-white hover:bg-black">
+                                <Plus size={12} className="mr-1" /> Add Product
                             </Button>
                         </Link>
                     </div>
                 </div>
 
-                {/* filter row — compressed */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                    <div className="relative">
-                        <Search size={12} className="absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') applyFilters();
-                            }}
-                            placeholder="Search name or SKU..."
-                            className="h-7 w-52 pl-8 text-xs"
-                        />
-                    </div>
-                    <Select value={status} onValueChange={setStatus}>
-                        <SelectTrigger className="h-7 w-36 text-xs">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {STATUS_OPTIONS.map((o) => (
-                                <SelectItem key={o.value} value={o.value}>
-                                    {o.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button onClick={applyFilters} size="sm" className="h-7 px-3 text-xs font-normal">
-                        Filter
-                    </Button>
+                {/* NAVIGATION TABS */}
+                <div className="flex items-center gap-2 border-b border-[#E5E7EB] pb-2 font-mono text-xs">
+                    <button
+                        type="button"
+                        onClick={resetFilters}
+                        className={`pb-1 ${status === 'all' && isCustomizable === 'all' ? 'border-b-2 border-[#1A1C1E] font-bold text-[#1A1C1E]' : 'text-[#6B7280] hover:text-[#1A1C1E]'}`}
+                    >
+                        All Products ({(products?.total ?? 0).toLocaleString()})
+                    </button>
+                    <span className="text-[#D1D5DB]">|</span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setStatus('active');
+                            handleFilterChange({ status: 'active' });
+                        }}
+                        className={`pb-1 ${status === 'active' ? 'border-b-2 border-[#1A1C1E] font-bold text-[#1A1C1E]' : 'text-[#6B7280] hover:text-[#1A1C1E]'}`}
+                    >
+                        Active Catalog ({stats.active})
+                    </button>
                 </div>
 
-                {/* cards — 4 per row, live 3D model on every card */}
+                {/* HEAVY DETAILED LINEAR FILTER TOOLBAR */}
+                <div className="rounded-none border border-[#E5E7EB] bg-white p-2.5 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2 justify-between">
+                        <div className="flex flex-1 flex-wrap items-center gap-2">
+                            {/* SEARCH INPUT */}
+                            <div className="relative flex-1 min-w-[200px] max-w-sm">
+                                <Search size={12} className="absolute top-1/2 left-2.5 -translate-y-1/2 text-[#8A8FA3]" />
+                                <Input
+                                    value={search}
+                                    onChange={(e) => {
+                                        setSearch(e.target.value);
+                                        handleFilterChange({ search: e.target.value });
+                                    }}
+                                    placeholder="Search product name or SKU..."
+                                    className="h-8 rounded-none border-[#D1D5DB] pl-8 text-xs placeholder:text-[#8A8FA3] focus-visible:border-[#1A1C1E] focus-visible:ring-0"
+                                />
+                            </div>
+
+                            {/* CATEGORY SELECT */}
+                            <Select
+                                value={category}
+                                onValueChange={(v) => {
+                                    setCategory(v);
+                                    handleFilterChange({ category: v });
+                                }}
+                            >
+                                <SelectTrigger className="h-8 w-[150px] rounded-none border-[#D1D5DB] text-xs font-mono">
+                                    <SelectValue placeholder="Category" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-none">
+                                    {CATEGORY_OPTIONS.map((c) => (
+                                        <SelectItem key={c.value} value={c.value} className="text-xs">
+                                            {c.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            {/* STATUS SELECT */}
+                            <Select
+                                value={status}
+                                onValueChange={(v) => {
+                                    setStatus(v);
+                                    handleFilterChange({ status: v });
+                                }}
+                            >
+                                <SelectTrigger className="h-8 w-[130px] rounded-none border-[#D1D5DB] text-xs font-mono">
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-none">
+                                    {STATUS_OPTIONS.map((o) => (
+                                        <SelectItem key={o.value} value={o.value} className="text-xs">
+                                            {o.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            {/* MORE FILTERS BUTTON */}
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowAdvanced(!showAdvanced)}
+                                className={`h-8 rounded-none border-[#D1D5DB] px-2.5 text-xs font-mono ${
+                                    showAdvanced || isCustomizable !== 'all' || has3dPreview !== 'all' ? 'bg-[#F3F4F6] font-bold text-[#1A1C1E]' : 'text-[#4A4E5A]'
+                                }`}
+                            >
+                                <SlidersHorizontal size={12} className="mr-1.5" />
+                                Detailed Filters
+                            </Button>
+
+                            {(search || status !== 'all' || category !== 'all' || isCustomizable !== 'all' || has3dPreview !== 'all') && (
+                                <Button
+                                    variant="ghost"
+                                    onClick={resetFilters}
+                                    className="h-8 rounded-none px-2 text-xs font-mono text-red-600 hover:bg-red-50 hover:text-red-700"
+                                >
+                                    <RotateCcw size={12} className="mr-1" />
+                                    Reset
+                                </Button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {/* SORT BY SELECT */}
+                            <Select
+                                value={sort}
+                                onValueChange={(v) => {
+                                    setSort(v);
+                                    handleFilterChange({ sort: v });
+                                }}
+                            >
+                                <SelectTrigger className="h-8 w-[160px] rounded-none border-[#D1D5DB] text-xs font-mono">
+                                    <ArrowUpDown size={12} className="mr-1" />
+                                    <SelectValue placeholder="Sort by" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-none">
+                                    {SORT_OPTIONS.map((so) => (
+                                        <SelectItem key={so.value} value={so.value} className="text-xs">
+                                            {so.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    {/* EXPANDABLE ADVANCED FILTER PANEL */}
+                    {showAdvanced && (
+                        <div className="mt-2 border-t border-[#E5E7EB] pt-2 grid gap-2 sm:grid-cols-3 font-mono text-xs">
+                            <div>
+                                <p className="mb-1 text-[10px] text-[#4A4E5A]">Customization Capability</p>
+                                <Select
+                                    value={isCustomizable}
+                                    onValueChange={(v) => {
+                                        setIsCustomizable(v);
+                                        handleFilterChange({ is_customizable: v });
+                                    }}
+                                >
+                                    <SelectTrigger className="h-8 w-full rounded-none border-[#D1D5DB] text-xs">
+                                        <SelectValue placeholder="Customization" />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-none">
+                                        {CUSTOMIZABLE_OPTIONS.map((co) => (
+                                            <SelectItem key={co.value} value={co.value} className="text-xs">
+                                                {co.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <p className="mb-1 text-[10px] text-[#4A4E5A]">3D Preview Capability</p>
+                                <Select
+                                    value={has3dPreview}
+                                    onValueChange={(v) => {
+                                        setHas3dPreview(v);
+                                        handleFilterChange({ has_3d_preview: v });
+                                    }}
+                                >
+                                    <SelectTrigger className="h-8 w-full rounded-none border-[#D1D5DB] text-xs">
+                                        <SelectValue placeholder="3D Preview" />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-none">
+                                        {PREVIEW_3D_OPTIONS.map((po) => (
+                                            <SelectItem key={po.value} value={po.value} className="text-xs">
+                                                {po.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <p className="mb-1 text-[10px] text-[#4A4E5A]">Items Per Page</p>
+                                <Select
+                                    value={perPage}
+                                    onValueChange={(v) => {
+                                        setPerPage(v);
+                                        handleFilterChange({ per_page: v });
+                                    }}
+                                >
+                                    <SelectTrigger className="h-8 w-full rounded-none border-[#D1D5DB] text-xs">
+                                        <SelectValue placeholder="Per page" />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-none">
+                                        <SelectItem value="10" className="text-xs">10 per page</SelectItem>
+                                        <SelectItem value="25" className="text-xs">25 per page</SelectItem>
+                                        <SelectItem value="50" className="text-xs">50 per page</SelectItem>
+                                        <SelectItem value="100" className="text-xs">100 per page</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* PRODUCT CARDS GRID */}
                 {rows.length > 0 ? (
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {rows.map((p) => (
-                            <div key={p.id}>
+                            <div key={p.id} className="rounded-none border border-[#E5E7EB] bg-white p-2">
                                 <div className="relative">
                                     <span
                                         title={p.status}
@@ -217,190 +475,155 @@ export default function ProductsIndex({
                                             aria-label={`View ${p.name}`}
                                             className="block w-full cursor-pointer"
                                         >
-                                            <img src={p.thumbnail} alt={p.name} className="h-[220px] w-full bg-gray-50 object-cover" />
+                                            <img src={p.thumbnail} alt={p.name} className="h-[220px] w-full bg-gray-50 object-cover rounded-none" />
                                         </button>
                                     ) : (
                                         <button
                                             type="button"
                                             onClick={() => setViewId(p.id)}
                                             aria-label={`View ${p.name}`}
-                                            className="flex h-[220px] w-full cursor-pointer flex-col items-center justify-center gap-2 bg-transparent"
+                                            className="flex h-[220px] w-full cursor-pointer flex-col items-center justify-center gap-2 bg-gray-50 rounded-none border border-dashed border-[#D1D5DB]"
                                         >
-                                            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-sm">
+                                            <span className="flex h-10 w-10 items-center justify-center rounded-none bg-white border border-[#E5E7EB]">
                                                 <Package size={18} className="text-[#6B7280]" />
                                             </span>
-                                            <p className="text-[11px] font-normal text-[#6B7280]">2D product — no 3D preview</p>
+                                            <p className="text-[11px] font-mono text-[#6B7280]">2D product — no 3D preview</p>
                                         </button>
                                     )}
                                 </div>
-                                <div className="space-y-1 px-1 pt-2 text-center">
+                                <div className="space-y-1 px-1 pt-2">
                                     <button
                                         type="button"
                                         onClick={() => setViewId(p.id)}
-                                        className="block w-full truncate text-center text-[13px] font-normal hover:underline"
+                                        className="block w-full truncate text-left text-[12px] font-semibold text-[#1A1C1E] hover:underline"
                                     >
                                         {p.name}
                                     </button>
-                                    <div className="flex items-center justify-center gap-2">
-                                        <span className="text-[13px] font-normal">₱{p.base_price}</span>
-                                        <span className="text-[11px] font-normal text-muted-foreground">Stock {p.stock_quantity}</span>
+                                    <div className="flex items-center justify-between font-mono text-[11px]">
+                                        <span className="font-bold text-[#1A1C1E]">₱{p.base_price}</span>
+                                        <span className="text-[#6B7280]">Stock {p.stock_quantity}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-1 border-t border-[#E5E7EB] text-[10px] font-mono text-[#6B7280]">
+                                        <span>{p.category || 'General'}</span>
+                                        <span>{p.sku}</span>
                                     </div>
                                 </div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <div className="rounded-lg border border-[#E5E7EB] bg-white px-4 py-12 text-center">
-                        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                            <Package size={18} className="text-muted-foreground" />
-                        </div>
-                        <p className="mt-2 text-xs font-normal">No products found</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Try a different search, or create your first product.</p>
+                    <div className="rounded-none border border-[#E5E7EB] bg-white p-8 text-center font-mono text-xs text-[#8A8FA3]">
+                        No products match the selected criteria.
                     </div>
                 )}
 
-                {/* quick-view modal — same two-column layout as create, 3D on the right */}
-                <Dialog open={viewing !== null} onOpenChange={(open) => { if (!open) closeView(); }}>
-                    <DialogContent className="max-h-[90vh] w-full overflow-y-auto sm:max-w-[95vw] md:left-[calc(50%+104px)] md:max-w-[min(1380px,calc(95vw-240px))]">
-                        {viewing && (
-                            <>
-                                <DialogHeader>
-                                    <DialogTitle className="flex flex-wrap items-center gap-2 text-[15px] font-bold text-[#1A1C1E]">
-                                        {viewing.name}
-                                        <span className={`h-2 w-2 rounded-full ${statusColor(viewing.status)}`} title={viewing.status} />
-                                        <span className="text-[11px] font-normal text-[#6B7280]">{viewing.category} · {viewing.status}</span>
-                                    </DialogTitle>
-                                </DialogHeader>
-
-                                <div className="grid items-start gap-3 xl:grid-cols-2">
-                                    {/* LEFT — basic + pricing */}
-                                    <div className="space-y-3">
-                                        <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
-                                            <h3 className="mb-3 border-b border-[#E5E7EB] pb-2 text-[12px] font-normal tracking-wide text-[#1A1C1E]">Basic info</h3>
-                                            <dl className="grid gap-2 text-[12px] sm:grid-cols-2">
-                                                <div><dt className="text-[#8A8FA3]">Name</dt><dd className="font-normal text-[#1A1C1E]">{viewing.name}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">SKU</dt><dd className="font-mono text-[11px] font-normal text-[#1A1C1E]">{viewing.sku}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Category</dt><dd className="font-normal text-[#1A1C1E]">{viewing.category}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Status</dt><dd className="font-normal text-[#1A1C1E]">{viewing.status}</dd></div>
-                                                <div className="sm:col-span-2"><dt className="text-[#8A8FA3]">Short description</dt><dd className="font-normal text-[#1A1C1E]">{viewing.short_description || '—'}</dd></div>
-                                                <div className="sm:col-span-2"><dt className="text-[#8A8FA3]">Description</dt><dd className="font-normal leading-relaxed text-[#1A1C1E]">{viewing.description || '—'}</dd></div>
-                                            </dl>
-                                        </section>
-
-                                        <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
-                                            <h3 className="mb-3 border-b border-[#E5E7EB] pb-2 text-[12px] font-normal tracking-wide text-[#1A1C1E]">Pricing & inventory</h3>
-                                            <dl className="grid gap-2 text-[12px] sm:grid-cols-3">
-                                                <div><dt className="text-[#8A8FA3]">Base ₱</dt><dd className="font-normal text-[#1A1C1E]">{viewing.base_price}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Compare ₱</dt><dd className="font-normal text-[#1A1C1E]">{viewing.compare_at_price ?? '—'}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Unit</dt><dd className="font-normal text-[#1A1C1E]">{viewing.unit ?? 'piece'}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Stock</dt><dd className="font-normal text-[#1A1C1E]">{viewing.stock_quantity}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Badge</dt><dd className="font-normal text-[#1A1C1E]">{viewing.badge || '—'}</dd></div>
-                                            </dl>
-                                        </section>
-                                    </div>
-
-                                    {/* RIGHT — 3D preview + options */}
-                                    <div className="space-y-3">
-                                        <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
-                                            <h3 className="mb-3 border-b border-[#E5E7EB] pb-2 text-[12px] font-normal tracking-wide text-[#1A1C1E]">3D preview</h3>
-                                            {viewing.has_3d_preview && viewing.viewer_type !== 'none' ? (
-                                                <Product3DPreview
-                                                    viewerType={viewing.viewer_type}
-                                                    label={viewing.name}
-                                                    modelUrl={viewing.model_3d_url ?? ''}
-                                                    designImageUrl={viewing.thumbnail ?? ''}
-                                                />
-                                            ) : viewing.thumbnail ? (
-                                                <img src={viewing.thumbnail} alt={viewing.name} className="max-h-64 w-full rounded-lg border border-[#E5E7EB] bg-gray-50 object-contain" />
-                                            ) : (
-                                                <p className="text-[12px] font-normal text-[#8A8FA3]">2D product — no 3D preview.</p>
-                                            )}
-                                        </section>
-
-                                        <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
-                                            <h3 className="mb-3 border-b border-[#E5E7EB] pb-2 text-[12px] font-normal tracking-wide text-[#1A1C1E]">Customizable & 3D</h3>
-                                            <dl className="grid grid-cols-2 gap-2 text-[12px]">
-                                                <div><dt className="text-[#8A8FA3]">Customizable</dt><dd className="font-normal text-[#1A1C1E]">{viewing.is_customizable ? 'Yes' : 'No'}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">3D preview</dt><dd className="font-normal text-[#1A1C1E]">{viewing.has_3d_preview ? `Yes (${viewing.viewer_type})` : 'No'}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Color choices</dt><dd className="font-normal text-[#1A1C1E]">{viewing.allow_color_change ? 'Yes' : 'No'}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Custom text</dt><dd className="font-normal text-[#1A1C1E]">{viewing.allow_custom_text ? `Yes (${viewing.max_text_length ?? ''})` : 'No'}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Image upload</dt><dd className="font-normal text-[#1A1C1E]">{viewing.allow_image_upload ? 'Yes' : 'No'}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Add-on ₱</dt><dd className="font-normal text-[#1A1C1E]">{viewing.customization_addon_price ?? '—'}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Print</dt><dd className="font-normal text-[#1A1C1E]">{[viewing.print_method, viewing.print_size].filter(Boolean).join(' · ') || '—'}</dd></div>
-                                                <div><dt className="text-[#8A8FA3]">Featured</dt><dd className="font-normal text-[#1A1C1E]">{[viewing.is_featured_home && 'Home', viewing.is_featured_services && 'Services'].filter(Boolean).join(', ') || 'No'}</dd></div>
-                                            </dl>
-                                            {viewing.allow_color_change && (viewing.available_colors?.length ?? 0) > 0 && (
-                                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                                    {(viewing.available_colors ?? []).map((c) => (
-                                                        <span key={c} title={c} className="h-5 w-5 rounded-full border border-[#E5E7EB]" style={{ backgroundColor: c }} />
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </section>
-                                    </div>
-                                </div>
-
-                                <DialogFooter className="gap-2">
-                                    <Button variant="ghost" type="button" onClick={closeView}>
-                                        Close
-                                    </Button>
-                                    <Button variant="outline" type="button" className="text-red-600" disabled={archiving} onClick={archiveViewed}>
-                                        {archiving ? 'Archiving…' : 'Archive'}
-                                    </Button>
-                                    <Link href={`/products/${viewing.id}/edit`}>
-                                        <Button type="button">Edit</Button>
-                                    </Link>
-                                </DialogFooter>
-                            </>
-                        )}
-                    </DialogContent>
-                </Dialog>
-
-                    {/* footer — compressed */}
-                    <div className="rounded-lg border border-[#E5E7EB] bg-white px-3 py-2">
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-normal text-muted-foreground">
-                        <span>Rows per page</span>
-                        <Select
-                            value={String(products?.per_page ?? 10)}
-                            onValueChange={(v) => router.get('/products', { ...(filters ?? {}), per_page: v }, { preserveState: true })}
-                        >
-                            <SelectTrigger className="h-7 w-[64px] text-xs">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="10">10</SelectItem>
-                                <SelectItem value="25">25</SelectItem>
-                                <SelectItem value="50">50</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <span>
-                            {products?.from ?? 0}-{products?.to ?? 0} of {products?.total ?? 0}
-                        </span>
-                        <div className="ml-auto flex items-center gap-1">
+                {/* PAGINATION FOOTER */}
+                {products && products.last_page > 1 && (
+                    <div className="mt-2 flex items-center justify-between border-t border-[#E5E7EB] pt-2.5 font-mono text-xs text-[#6B7280]">
+                        <div>
+                            Showing <strong>{products.from ?? 0}</strong> to <strong>{products.to ?? 0}</strong> of <strong>{products.total}</strong> products
+                        </div>
+                        <div className="flex items-center gap-1">
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-7 w-7 p-0"
-                                disabled={(products?.current_page ?? 1) <= 1}
-                                onClick={() => router.get('/products', { ...(filters ?? {}), page: (products?.current_page ?? 1) - 1 })}
+                                disabled={products.current_page <= 1}
+                                onClick={() => router.get('/products', { ...safeFilters, page: products.current_page - 1 } as never)}
+                                className="h-7 rounded-none border-[#D1D5DB] px-2 text-xs font-mono"
                             >
-                                <ChevronLeft size={13} />
+                                <ChevronLeft size={13} className="mr-1" /> Prev
                             </Button>
-                            <span className="px-1.5 text-xs font-normal text-foreground">
-                                {products?.current_page ?? 1} / {products?.last_page ?? 1}
+                            <span className="px-2 font-bold text-[#1A1C1E]">
+                                Page {products.current_page} of {products.last_page}
                             </span>
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-7 w-7 p-0"
-                                disabled={(products?.current_page ?? 1) >= (products?.last_page ?? 1)}
-                                onClick={() => router.get('/products', { ...(filters ?? {}), page: (products?.current_page ?? 1) + 1 })}
+                                disabled={products.current_page >= products.last_page}
+                                onClick={() => router.get('/products', { ...safeFilters, page: products.current_page + 1 } as never)}
+                                className="h-7 rounded-none border-[#D1D5DB] px-2 text-xs font-mono"
                             >
-                                <ChevronRight size={13} />
+                                Next <ChevronRight size={13} className="ml-1" />
                             </Button>
                         </div>
                     </div>
-                </div>
+                )}
+
+                {/* QUICK DETAIL MODAL */}
+                {viewing && (
+                    <Dialog open={!!viewing} onOpenChange={closeView}>
+                        <DialogContent className="rounded-none border-[#1A1C1E] sm:max-w-lg">
+                            <DialogHeader>
+                                <DialogTitle className="font-mono text-base text-[#1A1C1E] flex items-center justify-between">
+                                    <span>{viewing.name}</span>
+                                    <span className="text-xs font-normal text-muted-foreground">[{viewing.sku}]</span>
+                                </DialogTitle>
+                            </DialogHeader>
+
+                            <div className="space-y-3 font-sans text-xs">
+                                <div className="grid grid-cols-2 gap-2 border-b border-[#E5E7EB] pb-2 font-mono text-[11px]">
+                                    <div>
+                                        <span className="text-[#6B7280]">Category:</span>{' '}
+                                        <strong className="text-[#1A1C1E]">{viewing.category || 'General'}</strong>
+                                    </div>
+                                    <div>
+                                        <span className="text-[#6B7280]">Status:</span>{' '}
+                                        <strong className="uppercase text-[#1A1C1E]">{viewing.status}</strong>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 className="font-mono text-[11px] uppercase tracking-wider text-[#4A4E5A]">Description</h4>
+                                    <p className="mt-0.5 text-xs text-[#374151] leading-relaxed">
+                                        {viewing.description || viewing.short_description || 'No detailed description provided.'}
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 border-t border-b border-[#E5E7EB] py-2 font-mono text-[11px]">
+                                    <div>
+                                        <p className="text-[#6B7280]">Price:</p>
+                                        <p className="font-bold text-[#1A1C1E]">₱{viewing.base_price}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[#6B7280]">Inventory Stock:</p>
+                                        <p className="font-bold text-[#1A1C1E]">{viewing.stock_quantity} units</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[#6B7280]">3D Preview:</p>
+                                        <p className="font-semibold text-[#1A1C1E]">{viewing.has_3d_preview ? 'Enabled' : 'Disabled'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[#6B7280]">Customizable:</p>
+                                        <p className="font-semibold text-[#1A1C1E]">{viewing.is_customizable ? 'Yes' : 'No'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <DialogFooter className="mt-2 border-t border-[#E5E7EB] pt-2">
+                                <Link href={`/products/${viewing.id}/edit`}>
+                                    <Button className="h-8 rounded-none bg-[#1A1C1E] text-xs font-normal text-white hover:bg-black">
+                                        Edit Product
+                                    </Button>
+                                </Link>
+                                <Button
+                                    variant="outline"
+                                    onClick={archiveViewed}
+                                    disabled={archiving}
+                                    className="h-8 rounded-none border-red-300 text-xs font-normal text-red-700 hover:bg-red-50"
+                                >
+                                    Archive Product
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={closeView}
+                                    className="h-8 rounded-none border-[#D1D5DB] text-xs font-normal text-[#1A1C1E]"
+                                >
+                                    Close
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
             </div>
         </>
     );

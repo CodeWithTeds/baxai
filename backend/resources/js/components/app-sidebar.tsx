@@ -1,16 +1,19 @@
 import { Link } from '@inertiajs/react';
 import {
-    BarChart3,
     BookOpen,
     Boxes,
     FileCheck,
     FolderGit2,
+    FolderKanban,
     LayoutGrid,
     Package,
     Printer,
     Settings,
     ShoppingBag,
+    Sparkles,
+    Tag,
     Users,
+    Warehouse,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -57,28 +60,53 @@ const sellNavItems: NavItem[] = [
 
 const printNavItems: NavItem[] = [
     {
-        title: 'Printing',
-        href: '#',
+        title: 'Printing Services',
+        href: '/print-items',
         icon: Printer,
+        items: [
+            { title: 'Services List', href: '/print-items' },
+            { title: 'Print Categories', href: '/print-categories' },
+        ],
     },
     {
-        title: 'Proofs',
+        title: 'Proof Approvals',
         href: '#',
         icon: FileCheck,
     },
     {
-        title: 'Materials',
+        title: 'Production Queue',
+        href: '#',
+        icon: FolderKanban,
+    },
+];
+
+const inventoryNavItems: NavItem[] = [
+    {
+        title: 'Paper & Stock',
+        href: '#',
+        icon: Warehouse,
+    },
+    {
+        title: 'Equipment & Inks',
         href: '#',
         icon: Boxes,
     },
 ];
 
-const manageNavItems: NavItem[] = [
+const marketingNavItems: NavItem[] = [
     {
-        title: 'Reports',
+        title: 'Discounts & Coupons',
         href: '#',
-        icon: BarChart3,
+        icon: Tag,
     },
+    {
+        title: 'VIP & Rewards',
+        href: '#',
+        icon: Sparkles,
+    },
+];
+
+const manageNavItems: NavItem[] = [
     {
         title: 'Settings',
         href: profileEdit(),
@@ -116,9 +144,11 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <NavMain label="Overview" items={overviewNavItems} />
-                <NavMain label="Sell" items={sellNavItems} />
-                <NavMain label="Print" items={printNavItems} />
-                <NavMain label="Manage" items={manageNavItems} />
+                <NavMain label="Sales & Catalog" items={sellNavItems} />
+                <NavMain label="Printing Operations" items={printNavItems} />
+                <NavMain label="Inventory & Stock" items={inventoryNavItems} />
+                <NavMain label="Marketing & Deals" items={marketingNavItems} />
+                <NavMain label="System & Control" items={manageNavItems} />
             </SidebarContent>
 
             <SidebarFooter>
