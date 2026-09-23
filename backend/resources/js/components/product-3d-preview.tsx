@@ -39,6 +39,7 @@ export default function Product3DPreview({
     modelUrl,
     designImageUrl,
     variant = 'compact',
+    minimal = false,
 }: {
     viewerType: string;
     label: string;
@@ -47,6 +48,8 @@ export default function Product3DPreview({
     designImageUrl?: string;
     /** Hero = big, impossible-to-miss canvas at the top of /products/create. */
     variant?: 'compact' | 'hero';
+    /** Minimal = bare canvas for card grids (hides palette + captions). */
+    minimal?: boolean;
 }) {
     const mountRef = useRef<HTMLDivElement>(null);
     const [color, setColor] = useState('#FFFFFF');
@@ -82,8 +85,10 @@ export default function Product3DPreview({
         mount.appendChild(renderer.domElement);
 
         const scene = new THREE.Scene();
-        // clean minimal background like the mockup — isolated on white
-        scene.background = new THREE.Color(isShirt ? 0xffffff : 0xf9fafb);
+        // clean minimal background like the mockup — isolated on white.
+        // Minimal (card grid) stays fully transparent so the page flows through
+        // with no box or tint behind the product.
+        if (!minimal) scene.background = new THREE.Color(isShirt ? 0xffffff : 0xf9fafb);
         const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
         if (isShirt) {
             // front three-quarter view, eye-level like studio mockup — pulled back to avoid clipping spouts
@@ -548,10 +553,10 @@ export default function Product3DPreview({
 
     return (
         <div>
-            <div className={`relative overflow-hidden rounded-lg border border-[#E5E7EB] ${isShirt ? 'bg-white' : ''}`}>
+            <div className={minimal ? 'relative overflow-hidden bg-transparent' : `relative overflow-hidden rounded-lg border border-[#E5E7EB] ${isShirt ? 'bg-white' : ''}`}>
                 <div
                     ref={mountRef}
-                    className={`${canvasH} w-full cursor-grab touch-none ${isShirt ? 'bg-white' : 'bg-gradient-to-b from-[#F4F5F9] to-white'} active:cursor-grabbing`}
+                    className={`${canvasH} w-full cursor-grab touch-none ${minimal ? 'bg-transparent' : isShirt ? 'bg-white' : 'bg-gradient-to-b from-[#F4F5F9] to-white'} active:cursor-grabbing`}
                 />
                 {loading && (
                     <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-[#F8F9FC]/70">
@@ -560,7 +565,7 @@ export default function Product3DPreview({
                 )}
             </div>
             {loadError && <p className="mt-2 text-[13px] text-red-600">{loadError}</p>}
-            {canTint && (
+            {canTint && !minimal && (
                 <div className={`flex flex-wrap items-center gap-2 ${isHero ? 'mt-3' : 'mt-2'}`}>
                     <span className="text-[11px] font-normal text-[#6B7280]">Preview color:</span>
                     {PALETTE.map((c) => (
@@ -575,8 +580,8 @@ export default function Product3DPreview({
                     ))}
                 </div>
             )}
-            <p className={`font-normal text-[#6B7280] ${isHero ? 'mt-2 text-[11px]' : 'mt-2 text-[11px]'}`}>Drag to rotate.</p>
-            {!isHero && <p className="mt-1 text-[10px] font-normal text-[#9CA3AF]">Models: Kenney, Quaternius (CC0) • Tee: Poly by Google, Calendar: jeremy (CC-BY)</p>}
+            {!minimal && <p className={`font-normal text-[#6B7280] ${isHero ? 'mt-2 text-[11px]' : 'mt-2 text-[11px]'}`}>Drag to rotate.</p>}
+            {!isHero && !minimal && <p className="mt-1 text-[10px] font-normal text-[#9CA3AF]">Models: Kenney, Quaternius (CC0) • Tee: Poly by Google, Calendar: jeremy (CC-BY)</p>}
         </div>
     );
 }

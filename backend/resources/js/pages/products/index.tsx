@@ -1,14 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -18,21 +10,22 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
-    Archive,
-    Box,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
-    Cuboid,
-    Eye,
-    MoreHorizontal,
     Package,
-    Pencil,
     Plus,
     Search,
-    Trash2,
 } from 'lucide-react';
 import { dashboard } from '@/routes';
+import Product3DPreview from '@/components/product-3d-preview';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 interface ProductRow {
     id: number;
@@ -42,11 +35,24 @@ interface ProductRow {
     status: string;
     badge: string | null;
     base_price: string;
+    compare_at_price: string | null;
+    unit: string | null;
     stock_quantity: number;
     thumbnail: string | null;
+    short_description: string | null;
+    description: string | null;
     is_customizable: boolean;
     has_3d_preview: boolean;
     viewer_type: string;
+    model_3d_url: string | null;
+    allow_color_change: boolean;
+    available_colors: string[] | null;
+    allow_custom_text: boolean;
+    max_text_length: number | null;
+    allow_image_upload: boolean;
+    print_method: string | null;
+    print_size: string | null;
+    customization_addon_price: string | null;
     is_featured_home: boolean;
     is_featured_services: boolean;
     updated_at: string;
@@ -87,22 +93,23 @@ export default function ProductsIndex({
     const initialFilter = (filters?.filter ?? {}) as { name?: string; status?: string };
     const [search, setSearch] = useState(initialFilter.name ?? '');
     const [status, setStatus] = useState(initialFilter.status ?? 'all');
-    const [selected, setSelected] = useState<number[]>([]);
-    const [processing, setProcessing] = useState(false);
+    const [viewId, setViewId] = useState<number | null>(null);
+    const [archiving, setArchiving] = useState(false);
+    const viewing = rows.find((p) => p.id === viewId) ?? null;
 
-    const allSelected =
-        rows.length > 0 && selected.length === rows.length;
+    const closeView = () => setViewId(null);
 
-    const toggleAll = () => {
-        setSelected(allSelected ? [] : rows.map((p) => p.id));
-    };
-
-    const toggleOne = (id: number) => {
-        setSelected((prev) =>
-            prev.includes(id)
-                ? prev.filter((x) => x !== id)
-                : [...prev, id],
-        );
+    const archiveViewed = () => {
+        if (!viewing) return;
+        if (!confirm(`Archive ${viewing.name}?`)) return;
+        setArchiving(true);
+        router.delete(`/products/${viewing.id}`, {
+            onFinish: () => {
+                setArchiving(false);
+                setViewId(null);
+                router.reload({ only: ['products', 'stats'] });
+            },
+        });
     };
 
     const applyFilters = () => {
@@ -120,37 +127,8 @@ export default function ProductsIndex({
         );
     };
 
-    const bulk = (action: 'bulk-activate' | 'bulk-archive' | 'bulk-destroy') => {
-        if (selected.length === 0) return;
-        if (!confirm(`Apply ${action} to ${selected.length} products?`)) return;
-        setProcessing(true);
-        router.post(
-            `/products/${action}`,
-            { ids: selected },
-            {
-                onFinish: () => {
-                    setProcessing(false);
-                    setSelected([]);
-                    router.reload({ only: ['products', 'stats'] });
-                },
-            },
-        );
-    };
-
-    const statusDot = (s: string) =>
-        s === 'active' ? (
-            <span className="flex items-center gap-1.5 text-xs font-normal">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
-            </span>
-        ) : s === 'archived' ? (
-            <span className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-gray-400" /> Archived
-            </span>
-        ) : (
-            <span className="flex items-center gap-1.5 text-xs font-normal">
-                <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> {s}
-            </span>
-        );
+    const statusColor = (s: string) =>
+        s === 'active' ? 'bg-emerald-500' : s === 'archived' ? 'bg-gray-400' : s === 'draft' ? 'bg-amber-400' : 'bg-red-500';
 
     return (
         <>
@@ -213,167 +191,161 @@ export default function ProductsIndex({
                     </Button>
                 </div>
 
-                {/* bulk bar — compressed */}
-                {selected.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                        <span className="font-normal">{selected.length} selected</span>
-                        <Button variant="outline" size="sm" className="h-7 text-xs font-normal" disabled={processing} onClick={() => bulk('bulk-activate')}>
-                            Activate all
-                        </Button>
-                        <Button variant="outline" size="sm" className="h-7 text-xs font-normal" disabled={processing} onClick={() => bulk('bulk-archive')}>
-                            <Archive size={12} /> Archive all
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs font-normal text-red-600 hover:text-red-700"
-                            disabled={processing}
-                            onClick={() => bulk('bulk-destroy')}
-                        >
-                            <Trash2 size={12} /> Delete all
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs font-normal" onClick={() => setSelected([])}>
-                            Clear
-                        </Button>
+                {/* cards — 4 per row, live 3D model on every card */}
+                {rows.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {rows.map((p) => (
+                            <div key={p.id}>
+                                <div className="relative">
+                                    <span
+                                        title={p.status}
+                                        className={`absolute top-2 right-2 z-10 h-2.5 w-2.5 rounded-full ${statusColor(p.status)}`}
+                                    />
+                                    {p.has_3d_preview && p.viewer_type !== 'none' ? (
+                                        <Product3DPreview
+                                            viewerType={p.viewer_type}
+                                            label={p.name}
+                                            modelUrl={p.model_3d_url ?? ''}
+                                            designImageUrl={p.thumbnail ?? ''}
+                                            minimal
+                                        />
+                                    ) : p.thumbnail ? (
+                                        <img src={p.thumbnail} alt={p.name} className="h-[220px] w-full bg-gray-50 object-cover" />
+                                    ) : (
+                                        <div className="flex h-[220px] w-full flex-col items-center justify-center gap-2 bg-transparent">
+                                            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-sm">
+                                                <Package size={18} className="text-[#6B7280]" />
+                                            </span>
+                                            <p className="text-[11px] font-normal text-[#6B7280]">2D product — no 3D preview</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="space-y-1 px-1 pt-2 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewId(p.id)}
+                                        className="block w-full truncate text-center text-[13px] font-normal hover:underline"
+                                    >
+                                        {p.name}
+                                    </button>
+                                    <div className="flex items-center justify-center gap-2">
+                                        <span className="text-[13px] font-normal">₱{p.base_price}</span>
+                                        <span className="text-[11px] font-normal text-muted-foreground">Stock {p.stock_quantity}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="rounded-lg border border-[#E5E7EB] bg-white px-4 py-12 text-center">
+                        <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                            <Package size={18} className="text-muted-foreground" />
+                        </div>
+                        <p className="mt-2 text-xs font-normal">No products found</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Try a different search, or create your first product.</p>
                     </div>
                 )}
 
-                {/* table — Mailgun-style light border */}
-                <div className="overflow-hidden rounded-lg border border-[#E5E7EB] bg-white">
-                    <div className="overflow-x-auto px-3">
-                        <table className="w-full min-w-[1280px] text-left text-xs">
-                            <thead>
-                                <tr className="border-b border-[#E5E7EB] bg-white">
-                                    <th className="w-8 py-2 pr-2">
-                                        <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
-                                    </th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">#</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">Product</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">SKU</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">Category</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">Status</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">Price</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">Stock</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">Customize</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">3D</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">Badge</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">Featured</th>
-                                    <th className="px-1.5 py-2 font-normal text-muted-foreground">Updated</th>
-                                    <th className="w-8 py-2 pl-2" />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rows.map((p) => (
-                                    <tr key={p.id} className="border-b border-[#E5E7EB] last:border-0 hover:bg-[#F9FAFB]">
-                                        <td className="py-1.5 pr-2">
-                                            <Checkbox checked={selected.includes(p.id)} onCheckedChange={() => toggleOne(p.id)} />
-                                        </td>
-                                        <td className="px-1.5 py-1.5 text-[11px] text-muted-foreground">{p.id}</td>
-                                        <td className="px-1.5 py-1.5">
-                                            <div className="flex items-center gap-2">
-                                                {p.thumbnail ? (
-                                                    <img src={p.thumbnail} alt="" className="h-6 w-6 rounded-full object-cover" />
-                                                ) : (
-                                                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                                                        <Box size={12} />
-                                                    </span>
-                                                )}
-                                                <span className="max-w-[160px] truncate text-xs font-normal">{p.name}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-1.5 py-1.5 font-mono text-[11px] font-normal text-muted-foreground">{p.sku}</td>
-                                        <td className="px-1.5 py-1.5">
-                                            <Badge variant="secondary" className="px-1.5 py-0 text-[11px] font-normal">
-                                                {p.category}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-1.5 py-1.5">{statusDot(p.status)}</td>
-                                        <td className="px-1.5 py-1.5 font-normal">₱{p.base_price}</td>
-                                        <td className="px-1.5 py-1.5 font-normal">{p.stock_quantity}</td>
-                                        <td className="px-1.5 py-1.5">
-                                            {p.is_customizable ? (
-                                                <span className="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[11px] font-normal text-emerald-700">Yes</span>
+                {/* quick-view modal — same two-column layout as create, 3D on the right */}
+                <Dialog open={viewing !== null} onOpenChange={(open) => { if (!open) closeView(); }}>
+                    <DialogContent className="max-h-[90vh] w-full overflow-y-auto sm:max-w-[95vw] md:left-[calc(50%+104px)] md:max-w-[min(1380px,calc(95vw-240px))]">
+                        {viewing && (
+                            <>
+                                <DialogHeader>
+                                    <DialogTitle className="flex flex-wrap items-center gap-2 text-[15px] font-bold text-[#1A1C1E]">
+                                        {viewing.name}
+                                        <span className={`h-2 w-2 rounded-full ${statusColor(viewing.status)}`} title={viewing.status} />
+                                        <span className="text-[11px] font-normal text-[#6B7280]">{viewing.category} · {viewing.status}</span>
+                                    </DialogTitle>
+                                </DialogHeader>
+
+                                <div className="grid items-start gap-3 xl:grid-cols-2">
+                                    {/* LEFT — basic + pricing */}
+                                    <div className="space-y-3">
+                                        <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
+                                            <h3 className="mb-3 border-b border-[#E5E7EB] pb-2 text-[12px] font-normal tracking-wide text-[#1A1C1E]">Basic info</h3>
+                                            <dl className="grid gap-2 text-[12px] sm:grid-cols-2">
+                                                <div><dt className="text-[#8A8FA3]">Name</dt><dd className="font-normal text-[#1A1C1E]">{viewing.name}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">SKU</dt><dd className="font-mono text-[11px] font-normal text-[#1A1C1E]">{viewing.sku}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Category</dt><dd className="font-normal text-[#1A1C1E]">{viewing.category}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Status</dt><dd className="font-normal text-[#1A1C1E]">{viewing.status}</dd></div>
+                                                <div className="sm:col-span-2"><dt className="text-[#8A8FA3]">Short description</dt><dd className="font-normal text-[#1A1C1E]">{viewing.short_description || '—'}</dd></div>
+                                                <div className="sm:col-span-2"><dt className="text-[#8A8FA3]">Description</dt><dd className="font-normal leading-relaxed text-[#1A1C1E]">{viewing.description || '—'}</dd></div>
+                                            </dl>
+                                        </section>
+
+                                        <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
+                                            <h3 className="mb-3 border-b border-[#E5E7EB] pb-2 text-[12px] font-normal tracking-wide text-[#1A1C1E]">Pricing & inventory</h3>
+                                            <dl className="grid gap-2 text-[12px] sm:grid-cols-3">
+                                                <div><dt className="text-[#8A8FA3]">Base ₱</dt><dd className="font-normal text-[#1A1C1E]">{viewing.base_price}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Compare ₱</dt><dd className="font-normal text-[#1A1C1E]">{viewing.compare_at_price ?? '—'}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Unit</dt><dd className="font-normal text-[#1A1C1E]">{viewing.unit ?? 'piece'}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Stock</dt><dd className="font-normal text-[#1A1C1E]">{viewing.stock_quantity}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Badge</dt><dd className="font-normal text-[#1A1C1E]">{viewing.badge || '—'}</dd></div>
+                                            </dl>
+                                        </section>
+                                    </div>
+
+                                    {/* RIGHT — 3D preview + options */}
+                                    <div className="space-y-3">
+                                        <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
+                                            <h3 className="mb-3 border-b border-[#E5E7EB] pb-2 text-[12px] font-normal tracking-wide text-[#1A1C1E]">3D preview</h3>
+                                            {viewing.has_3d_preview && viewing.viewer_type !== 'none' ? (
+                                                <Product3DPreview
+                                                    viewerType={viewing.viewer_type}
+                                                    label={viewing.name}
+                                                    modelUrl={viewing.model_3d_url ?? ''}
+                                                    designImageUrl={viewing.thumbnail ?? ''}
+                                                />
+                                            ) : viewing.thumbnail ? (
+                                                <img src={viewing.thumbnail} alt={viewing.name} className="max-h-64 w-full rounded-lg border border-[#E5E7EB] bg-gray-50 object-contain" />
                                             ) : (
-                                                <span className="text-[11px] font-normal text-muted-foreground">No</span>
+                                                <p className="text-[12px] font-normal text-[#8A8FA3]">2D product — no 3D preview.</p>
                                             )}
-                                        </td>
-                                        <td className="px-1.5 py-1.5">
-                                            {p.has_3d_preview ? (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[11px] font-normal text-blue-700">
-                                                    <Cuboid size={10} />
-                                                    {p.viewer_type}
-                                                </span>
-                                            ) : (
-                                                <span className="text-[11px] font-normal text-muted-foreground">—</span>
+                                        </section>
+
+                                        <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
+                                            <h3 className="mb-3 border-b border-[#E5E7EB] pb-2 text-[12px] font-normal tracking-wide text-[#1A1C1E]">Customizable & 3D</h3>
+                                            <dl className="grid grid-cols-2 gap-2 text-[12px]">
+                                                <div><dt className="text-[#8A8FA3]">Customizable</dt><dd className="font-normal text-[#1A1C1E]">{viewing.is_customizable ? 'Yes' : 'No'}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">3D preview</dt><dd className="font-normal text-[#1A1C1E]">{viewing.has_3d_preview ? `Yes (${viewing.viewer_type})` : 'No'}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Color choices</dt><dd className="font-normal text-[#1A1C1E]">{viewing.allow_color_change ? 'Yes' : 'No'}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Custom text</dt><dd className="font-normal text-[#1A1C1E]">{viewing.allow_custom_text ? `Yes (${viewing.max_text_length ?? ''})` : 'No'}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Image upload</dt><dd className="font-normal text-[#1A1C1E]">{viewing.allow_image_upload ? 'Yes' : 'No'}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Add-on ₱</dt><dd className="font-normal text-[#1A1C1E]">{viewing.customization_addon_price ?? '—'}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Print</dt><dd className="font-normal text-[#1A1C1E]">{[viewing.print_method, viewing.print_size].filter(Boolean).join(' · ') || '—'}</dd></div>
+                                                <div><dt className="text-[#8A8FA3]">Featured</dt><dd className="font-normal text-[#1A1C1E]">{[viewing.is_featured_home && 'Home', viewing.is_featured_services && 'Services'].filter(Boolean).join(', ') || 'No'}</dd></div>
+                                            </dl>
+                                            {viewing.allow_color_change && (viewing.available_colors?.length ?? 0) > 0 && (
+                                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                                    {(viewing.available_colors ?? []).map((c) => (
+                                                        <span key={c} title={c} className="h-5 w-5 rounded-full border border-[#E5E7EB]" style={{ backgroundColor: c }} />
+                                                    ))}
+                                                </div>
                                             )}
-                                        </td>
-                                        <td className="px-1.5 py-1.5">
-                                            {p.badge ? (
-                                                <Badge variant="secondary" className="px-1.5 py-0 text-[11px] font-normal">
-                                                    {p.badge}
-                                                </Badge>
-                                            ) : (
-                                                <span className="text-[11px] font-normal text-muted-foreground">—</span>
-                                            )}
-                                        </td>
-                                        <td className="px-1.5 py-1.5">
-                                            <span className="flex items-center gap-1 text-[11px] font-normal">
-                                                {p.is_featured_home && <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-amber-700">Home</span>}
-                                                {p.is_featured_services && <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-violet-700">Services</span>}
-                                                {!p.is_featured_home && !p.is_featured_services && <span className="text-muted-foreground">—</span>}
-                                            </span>
-                                        </td>
-                                        <td className="px-1.5 py-1.5 text-[11px] font-normal text-muted-foreground">
-                                            {new Date(p.updated_at).toLocaleDateString()}
-                                        </td>
-                                        <td className="py-1.5 pl-2">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <button className="rounded-md px-1 py-0.5 text-muted-foreground hover:bg-muted">
-                                                        <MoreHorizontal size={14} />
-                                                    </button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={`/products/${p.id}`}>
-                                                            <Eye size={14} /> View
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem asChild>
-                                                        <Link href={`/products/${p.id}/edit`}>
-                                                            <Pencil size={14} /> Edit
-                                                        </Link>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        className="text-red-600"
-                                                        onClick={() => {
-                                                            if (confirm(`Archive ${p.name}?`)) router.delete(`/products/${p.id}`);
-                                                        }}
-                                                    >
-                                                        <Trash2 size={14} /> Archive
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {rows.length === 0 && (
-                                    <tr>
-                                        <td colSpan={14} className="px-4 py-12 text-center">
-                                            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted">
-                                                <Package size={18} className="text-muted-foreground" />
-                                            </div>
-                                            <p className="mt-2 text-xs font-normal">No products found</p>
-                                            <p className="mt-1 text-xs text-muted-foreground">Try a different search, or create your first product.</p>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                        </section>
+                                    </div>
+                                </div>
+
+                                <DialogFooter className="gap-2">
+                                    <Button variant="ghost" type="button" onClick={closeView}>
+                                        Close
+                                    </Button>
+                                    <Button variant="outline" type="button" className="text-red-600" disabled={archiving} onClick={archiveViewed}>
+                                        {archiving ? 'Archiving…' : 'Archive'}
+                                    </Button>
+                                    <Link href={`/products/${viewing.id}/edit`}>
+                                        <Button type="button">Edit</Button>
+                                    </Link>
+                                </DialogFooter>
+                            </>
+                        )}
+                    </DialogContent>
+                </Dialog>
 
                     {/* footer — compressed */}
-                    <div className="flex flex-wrap items-center gap-2 border-t border-[#E5E7EB] bg-white px-3 py-2 text-[11px] font-normal text-muted-foreground">
+                    <div className="rounded-lg border border-[#E5E7EB] bg-white px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-normal text-muted-foreground">
                         <span>Rows per page</span>
                         <Select
                             value={String(products?.per_page ?? 10)}
