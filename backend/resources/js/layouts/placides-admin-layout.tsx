@@ -33,7 +33,7 @@ export default function PlacidesAdminLayout({
     return (
         <>
             <Head title={title} />
-            <div className="flex min-h-screen w-full bg-[#ECEEF4] text-[#1A1C1E]">
+            <div className="flex min-h-screen w-full bg-white text-[#1A1C1E]">
                 <PlacidesSidebar />
 
                 <div className="min-w-0 flex-1 px-4 pt-5 pb-24 sm:px-7 md:pb-10">

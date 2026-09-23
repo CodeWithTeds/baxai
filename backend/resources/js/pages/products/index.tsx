@@ -199,7 +199,7 @@ export default function ProductsIndex({
                                 <div className="relative">
                                     <span
                                         title={p.status}
-                                        className={`absolute top-2 right-2 z-10 h-2.5 w-2.5 rounded-full ${statusColor(p.status)}`}
+                                        className={`pointer-events-none absolute top-2 right-2 z-10 h-2.5 w-2.5 rounded-full ${statusColor(p.status)}`}
                                     />
                                     {p.has_3d_preview && p.viewer_type !== 'none' ? (
                                         <Product3DPreview
@@ -208,16 +208,29 @@ export default function ProductsIndex({
                                             modelUrl={p.model_3d_url ?? ''}
                                             designImageUrl={p.thumbnail ?? ''}
                                             minimal
+                                            onPreviewClick={() => setViewId(p.id)}
                                         />
                                     ) : p.thumbnail ? (
-                                        <img src={p.thumbnail} alt={p.name} className="h-[220px] w-full bg-gray-50 object-cover" />
+                                        <button
+                                            type="button"
+                                            onClick={() => setViewId(p.id)}
+                                            aria-label={`View ${p.name}`}
+                                            className="block w-full cursor-pointer"
+                                        >
+                                            <img src={p.thumbnail} alt={p.name} className="h-[220px] w-full bg-gray-50 object-cover" />
+                                        </button>
                                     ) : (
-                                        <div className="flex h-[220px] w-full flex-col items-center justify-center gap-2 bg-transparent">
+                                        <button
+                                            type="button"
+                                            onClick={() => setViewId(p.id)}
+                                            aria-label={`View ${p.name}`}
+                                            className="flex h-[220px] w-full cursor-pointer flex-col items-center justify-center gap-2 bg-transparent"
+                                        >
                                             <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-sm">
                                                 <Package size={18} className="text-[#6B7280]" />
                                             </span>
                                             <p className="text-[11px] font-normal text-[#6B7280]">2D product — no 3D preview</p>
-                                        </div>
+                                        </button>
                                     )}
                                 </div>
                                 <div className="space-y-1 px-1 pt-2 text-center">

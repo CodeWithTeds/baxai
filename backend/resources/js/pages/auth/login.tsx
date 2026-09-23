@@ -84,7 +84,7 @@ export default function Login({
 
                             <Button
                                 type="submit"
-                                className="mt-4 w-full"
+                                className="mt-4 h-10 w-full rounded-xl bg-[#0052CC] text-sm font-bold hover:bg-[#003D9B]"
                                 tabIndex={4}
                                 disabled={processing}
                                 data-test="login-button"

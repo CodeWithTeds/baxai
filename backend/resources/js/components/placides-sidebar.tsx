@@ -71,11 +71,11 @@ export default function PlacidesSidebar() {
         <aside className="sticky top-0 hidden h-screen w-52 shrink-0 flex-col bg-[#0052CC] md:flex" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             <div className="flex h-14 shrink-0 items-center gap-2 px-4">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[15px] font-extrabold text-[#0052CC]">
-                    P
+                    N
                 </span>
-                <span>
-                    <span className="block text-[13px] leading-tight font-extrabold text-white">
-                        Placides
+                <span className="min-w-0">
+                    <span className="block truncate text-[13px] leading-tight font-extrabold text-white">
+                        NUYDA ENTERPRISE
                     </span>
                     <span className="block text-[10px] leading-tight text-white/70">
                         Admin panel

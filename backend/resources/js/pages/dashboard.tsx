@@ -25,7 +25,7 @@ import { useState } from 'react';
 import { dashboard } from '@/routes';
 
 /* --------------------------------- theme ---------------------------------- */
-/* Palette: primary #0052CC · deep #003D9B · navy #1A1C1E · bg #ECEEF4 */
+/* Palette: primary #0052CC · deep #003D9B · navy #1A1C1E */
 
 /* ------------------------------- components ------------------------------- */
 
@@ -192,7 +192,7 @@ export default function Dashboard() {
     return (
         <>
             <Head title="Dashboard" />
-            <div className="bg-[#ECEEF4] pt-1 pb-24 text-[#1A1C1E] md:pb-10">
+            <div className="pt-1 pb-24 text-[#1A1C1E] md:pb-10">
                 <div className="mx-auto w-full max-w-[1380px]">
                         {/* top nav */}
                         <header className="flex flex-wrap items-center gap-3">

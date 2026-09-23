@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -17,6 +18,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('products/bulk-archive', [ProductController::class, 'bulkArchive'])->name('products.bulk-archive');
     Route::post('products/bulk-destroy', [ProductController::class, 'bulkDestroy'])->name('products.bulk-destroy');
     Route::resource('products', ProductController::class);
+
+    Route::post('customers/bulk-activate', [CustomerController::class, 'bulkActivate'])->name('customers.bulk-activate');
+    Route::post('customers/bulk-archive', [CustomerController::class, 'bulkArchive'])->name('customers.bulk-archive');
+    Route::post('customers/bulk-destroy', [CustomerController::class, 'bulkDestroy'])->name('customers.bulk-destroy');
+    Route::resource('customers', CustomerController::class);
+
     Route::get('design-studio/{type?}', fn (string $type = 'mug') => Inertia::render('design-studio/show', [
         'initialType' => $type,
     ]))->name('design-studio');

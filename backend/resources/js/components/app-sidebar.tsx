@@ -50,7 +50,7 @@ const sellNavItems: NavItem[] = [
     },
     {
         title: 'Customers',
-        href: '#',
+        href: '/customers',
         icon: Users,
     },
 ];
