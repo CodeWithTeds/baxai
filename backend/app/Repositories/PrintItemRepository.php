@@ -14,13 +14,30 @@ class PrintItemRepository implements PrintItemRepositoryInterface
         return QueryBuilder::for(PrintItem::class)
             ->with('category')
             ->allowedFilters(
-                AllowedFilter::partial('search', 'name'),
+                AllowedFilter::callback('search', function ($query, $value) {
+                    $term = "%{$value}%";
+                    $query->where(function ($q) use ($term) {
+                        $q->where('name', 'like', $term)
+                          ->orWhere('item_code', 'like', $term)
+                          ->orWhere('paper_type', 'like', $term)
+                          ->orWhere('brand', 'like', $term)
+                          ->orWhere('model', 'like', $term)
+                          ->orWhere('compatibility', 'like', $term);
+                    });
+                }),
                 AllowedFilter::exact('status'),
                 AllowedFilter::exact('category_id'),
+                AllowedFilter::callback('category_code', function ($query, $value) {
+                    $query->whereHas('category', function ($q) use ($value) {
+                        $q->where('code', $value)->orWhere('slug', $value);
+                    });
+                }),
                 AllowedFilter::exact('print_sides'),
                 AllowedFilter::exact('color_mode'),
                 AllowedFilter::partial('item_code'),
                 AllowedFilter::partial('paper_type'),
+                AllowedFilter::partial('brand'),
+                AllowedFilter::partial('model'),
                 AllowedFilter::callback('min_price', function ($query, $value) {
                     $query->where('base_price', '>=', (float) $value);
                 }),

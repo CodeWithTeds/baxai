@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/select';
 import InputError from '@/components/input-error';
 import { cn } from '@/lib/utils';
-import { RotateCcw } from 'lucide-react';
 
 interface PrintCategoryOption {
     id: number;
@@ -40,17 +39,22 @@ const COLOR_MODES = [
 ];
 
 const FIELD_LABELS: Record<string, string> = {
-    name: 'Item Name',
+    name: 'Item / Resource Name',
     item_code: 'Item Code',
     category_id: 'Category',
     description: 'Description',
     paper_type: 'Paper Stock',
     paper_size: 'Paper Size',
+    brand: 'Brand',
+    model: 'Model',
+    available_quantity: 'Available Quantity',
+    unit: 'Unit of Measure',
+    compatibility: 'Compatibility',
     print_sides: 'Print Sides',
     color_mode: 'Color Mode',
     turnaround_time: 'Turnaround Time',
     base_price: 'Base Price',
-    min_quantity: 'Minimum Quantity',
+    min_quantity: 'Minimum Order Quantity',
     status: 'Status',
     notes: 'Notes',
 };
@@ -94,14 +98,12 @@ export function PrintItemForm({
     setData,
     data,
     submitLabel,
-}: // eslint-disable-next-line @typescript-eslint/no-explicit-any
-any) {
+}: any) {
     const errorBoxRef = useRef<HTMLDivElement>(null);
     const errorEntries = Object.entries((errors ?? {}) as Record<string, string>);
 
     useEffect(() => {
         if (errorEntries.length > 0) errorBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [errors]);
 
     const prettyField = (field: string) => FIELD_LABELS[field] ?? field.replace(/_/g, ' ');
@@ -112,7 +114,7 @@ any) {
             <div className="mb-3 border-b border-[#E5E7EB] pb-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-[15px] font-bold text-[#1A1C1E]">
-                        {initial ? `Edit Print Service` : 'Add Print Service'}
+                        {initial ? `Edit Resource / Service` : 'Add Resource / Service'}
                         {initial?.item_code && (
                             <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
                                 [{initial.item_code}]
@@ -121,7 +123,7 @@ any) {
                     </h2>
                 </div>
                 <p className="mt-0.5 text-[11px] leading-relaxed text-[#6B7280]">
-                    Configure commercial printing specifications, paper stock materials, turnarounds, and pricing tiers.
+                    Configure printing stock, equipment specifications, available quantity, ink compatibility, and pricing rules.
                 </p>
             </div>
 
@@ -141,12 +143,12 @@ any) {
             )}
 
             <div className="grid items-start gap-3 xl:grid-cols-2">
-                {/* LEFT — Service Info & Specifications */}
+                {/* LEFT — Basic Info & Equipment/Stock Specs */}
                 <div className="space-y-3">
-                    <Section title="Basic Service Info">
+                    <Section title="Basic Resource Info">
                         <div className="grid gap-2 sm:grid-cols-2">
-                            <Field label="Print Service Name *" error={errors.name}>
-                                <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. Standard Document Printing" className={inputCls} />
+                            <Field label="Resource / Service Name *" error={errors.name}>
+                                <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. 70gsm Premium Bond Paper Reams" className={inputCls} />
                             </Field>
 
                             <Field label="Category *" error={errors.category_id}>
@@ -168,7 +170,7 @@ any) {
                                 <Input
                                     value={data.item_code}
                                     onChange={(e) => setData('item_code', e.target.value)}
-                                    placeholder="Auto — e.g. PRT-DOCS-0001"
+                                    placeholder="Auto — e.g. STK-BOND-0001"
                                     className={`${inputCls} bg-[#F9FAFB] font-mono text-[11px]`}
                                 />
                             </Field>
@@ -195,23 +197,107 @@ any) {
                                         onChange={(e) => setData('description', e.target.value)}
                                         rows={2}
                                         className="w-full rounded-none border border-[#D1D5DB] bg-white px-2.5 py-1.5 text-xs font-normal text-[#1A1C1E] outline-none placeholder:text-[#8A8FA3] focus:border-[#1A1C1E]"
-                                        placeholder="Detailed description of print service, paper material, and ideal use cases…"
+                                        placeholder="Detailed description of stock, equipment usage, or print service..."
                                     />
                                 </Field>
                             </div>
                         </div>
                     </Section>
 
-                    <Section title="Paper & Print Specifications">
+                    <Section title="Paper Stock & Equipment Details">
                         <div className="grid gap-2 sm:grid-cols-2">
-                            <Field label="Paper Stock Material" error={errors.paper_type}>
-                                <Input value={data.paper_type ?? ''} onChange={(e) => setData('paper_type', e.target.value)} placeholder="e.g. 200gsm Glossy C2S Cardstock" className={inputCls} />
+                            <Field label="Brand / Manufacturer" error={errors.brand}>
+                                <Input value={data.brand ?? ''} onChange={(e) => setData('brand', e.target.value)} placeholder="e.g. Epson, HP, Advance, Orajet" className={inputCls} />
+                            </Field>
+
+                            <Field label="Model / Part Number" error={errors.model}>
+                                <Input value={data.model ?? ''} onChange={(e) => setData('model', e.target.value)} placeholder="e.g. L3210, CE285A, AP-70A4" className={inputCls} />
+                            </Field>
+
+                            <Field label="Paper Stock Type" error={errors.paper_type}>
+                                <Input value={data.paper_type ?? ''} onChange={(e) => setData('paper_type', e.target.value)} placeholder="e.g. 70gsm Bond, 260gsm Photo Paper" className={inputCls} />
                             </Field>
 
                             <Field label="Paper / Trim Size" error={errors.paper_size}>
-                                <Input value={data.paper_size ?? ''} onChange={(e) => setData('paper_size', e.target.value)} placeholder="e.g. A4 (8.27 x 11.69 in)" className={inputCls} />
+                                <Input value={data.paper_size ?? ''} onChange={(e) => setData('paper_size', e.target.value)} placeholder="e.g. A4, 4R, Letter, 1.2m Roll" className={inputCls} />
                             </Field>
 
+                            <div className="sm:col-span-2">
+                                <Field label="Printer / Machine Compatibility" error={errors.compatibility}>
+                                    <Input
+                                        value={data.compatibility ?? ''}
+                                        onChange={(e) => setData('compatibility', e.target.value)}
+                                        placeholder="e.g. Compatible with Epson EcoTank L3210 / HP LaserJet Pro P1102"
+                                        className={inputCls}
+                                    />
+                                </Field>
+                            </div>
+                        </div>
+                    </Section>
+                </div>
+
+                {/* RIGHT — Inventory, Pricing & Specifications */}
+                <div className="space-y-3">
+                    <Section title="Inventory & Stock Quantity">
+                        <div className="grid gap-2 sm:grid-cols-2">
+                            <Field label="Available Quantity *" error={errors.available_quantity}>
+                                <Input
+                                    type="number"
+                                    min="0"
+                                    value={data.available_quantity ?? 0}
+                                    onChange={(e) => setData('available_quantity', Number(e.target.value))}
+                                    placeholder="0"
+                                    className={`${inputCls} font-mono font-bold text-emerald-700`}
+                                />
+                            </Field>
+
+                            <Field label="Unit of Measure" error={errors.unit}>
+                                <Input
+                                    value={data.unit ?? ''}
+                                    onChange={(e) => setData('unit', e.target.value)}
+                                    placeholder="e.g. reams, packs, rolls, cartridges, units"
+                                    className={inputCls}
+                                />
+                            </Field>
+
+                            <Field label="Base Price (₱) *" error={errors.base_price}>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={data.base_price ?? ''}
+                                    onChange={(e) => setData('base_price', e.target.value)}
+                                    placeholder="220.00"
+                                    className={`${inputCls} font-mono`}
+                                />
+                            </Field>
+
+                            <Field label="Minimum Quantity *" error={errors.min_quantity}>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    value={data.min_quantity ?? 1}
+                                    onChange={(e) => setData('min_quantity', Number(e.target.value))}
+                                    placeholder="1"
+                                    className={`${inputCls} font-mono`}
+                                />
+                            </Field>
+
+                            <div className="sm:col-span-2">
+                                <Field label="Turnaround / Lead Time" error={errors.turnaround_time}>
+                                    <Input
+                                        value={data.turnaround_time ?? ''}
+                                        onChange={(e) => setData('turnaround_time', e.target.value)}
+                                        placeholder="e.g. In Stock, In Service, or 1-2 Business Days"
+                                        className={inputCls}
+                                    />
+                                </Field>
+                            </div>
+                        </div>
+                    </Section>
+
+                    <Section title="Print Modes & Technical Notes">
+                        <div className="grid gap-2 sm:grid-cols-2 mb-2">
                             <Field label="Print Sides *" error={errors.print_sides}>
                                 <Select value={data.print_sides} onValueChange={(v) => setData('print_sides', v)}>
                                     <SelectTrigger className={cn(inputCls, 'w-full')}>
@@ -242,57 +328,14 @@ any) {
                                 </Select>
                             </Field>
                         </div>
-                    </Section>
-                </div>
 
-                {/* RIGHT — Pricing & Turnaround */}
-                <div className="space-y-3">
-                    <Section title="Pricing & Turnaround Time">
-                        <div className="grid gap-2 sm:grid-cols-2">
-                            <Field label="Base Price (₱) *" error={errors.base_price}>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={data.base_price ?? ''}
-                                    onChange={(e) => setData('base_price', e.target.value)}
-                                    placeholder="150.00"
-                                    className={`${inputCls} font-mono`}
-                                />
-                            </Field>
-
-                            <Field label="Minimum Quantity *" error={errors.min_quantity}>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    value={data.min_quantity ?? 1}
-                                    onChange={(e) => setData('min_quantity', Number(e.target.value))}
-                                    placeholder="1"
-                                    className={`${inputCls} font-mono`}
-                                />
-                            </Field>
-
-                            <div className="sm:col-span-2">
-                                <Field label="Turnaround Time" error={errors.turnaround_time}>
-                                    <Input
-                                        value={data.turnaround_time ?? ''}
-                                        onChange={(e) => setData('turnaround_time', e.target.value)}
-                                        placeholder="e.g. Same Day Express or 1-2 Business Days"
-                                        className={inputCls}
-                                    />
-                                </Field>
-                            </div>
-                        </div>
-                    </Section>
-
-                    <Section title="Notes & Save Actions">
-                        <Field label="Special Finishing Notes & Guidelines" error={errors.notes}>
+                        <Field label="Notes & Specifications" error={errors.notes}>
                             <textarea
                                 value={data.notes ?? ''}
                                 onChange={(e) => setData('notes', e.target.value)}
-                                rows={3}
-                                className="w-full rounded-none border border-[#D1D5DB] bg-white px-2.5 py-2 text-xs font-normal text-[#1A1C1E] outline-none placeholder:text-[#8A8FA3] focus:border-[#1A1C1E]"
-                                placeholder="Lamination finish, binding style, cutting options, UV spot coating notes…"
+                                rows={2}
+                                className="w-full rounded-none border border-[#D1D5DB] bg-white px-2.5 py-1.5 text-xs font-normal text-[#1A1C1E] outline-none placeholder:text-[#8A8FA3] focus:border-[#1A1C1E]"
+                                placeholder="Page yield, storage conditions, cutting instructions, warranty..."
                             />
                         </Field>
 
@@ -321,9 +364,14 @@ export default function CreatePrintItem({ categories = [] }: { categories: Print
         description: '',
         paper_type: '70gsm Premium Bond Paper',
         paper_size: 'A4 (8.27 x 11.69 in)',
+        brand: '',
+        model: '',
+        available_quantity: 100,
+        unit: 'reams',
+        compatibility: '',
         print_sides: 'single_sided',
         color_mode: 'full_color',
-        turnaround_time: '1-2 Business Days',
+        turnaround_time: 'In Stock',
         base_price: '0.00',
         min_quantity: 1,
         status: 'active',
@@ -337,7 +385,7 @@ export default function CreatePrintItem({ categories = [] }: { categories: Print
 
     return (
         <>
-            <Head title="Add Print Service — Admin" />
+            <Head title="Add Resource / Service — Admin" />
             <PrintItemForm
                 data={data}
                 setData={setData}
@@ -345,7 +393,7 @@ export default function CreatePrintItem({ categories = [] }: { categories: Print
                 onSubmit={submit}
                 processing={processing}
                 errors={errors}
-                submitLabel="Create Print Service"
+                submitLabel="Create Printing Resource"
             />
         </>
     );
@@ -362,7 +410,7 @@ CreatePrintItem.layout = {
             href: '/print-items',
         },
         {
-            title: 'Add Print Service',
+            title: 'Add Resource',
             href: '/print-items/create',
         },
     ],

@@ -212,10 +212,10 @@ export default function PlacidesSidebar() {
                 </Group>
 
                 <Group label="Inventory & Stock">
-                    <Item label="Paper & Stock">
+                    <Item label="Paper & Stock" href="/print-items?filter[category_code]=STOCK">
                         <Warehouse size={18} />
                     </Item>
-                    <Item label="Equipment & Inks">
+                    <Item label="Equipment & Inks" href="/print-items?filter[category_code]=EQUIPMENT">
                         <Boxes size={18} />
                     </Item>
                 </Group>

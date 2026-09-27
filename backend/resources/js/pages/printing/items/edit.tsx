@@ -11,6 +11,11 @@ interface PrintItemData {
     description: string | null;
     paper_type: string | null;
     paper_size: string | null;
+    brand: string | null;
+    model: string | null;
+    available_quantity: number;
+    unit: string | null;
+    compatibility: string | null;
     print_sides: string;
     color_mode: string;
     turnaround_time: string;
@@ -35,6 +40,11 @@ export default function EditPrintItem({ item, categories = [] }: { item: PrintIt
         description: item.description ?? '',
         paper_type: item.paper_type ?? '',
         paper_size: item.paper_size ?? '',
+        brand: item.brand ?? '',
+        model: item.model ?? '',
+        available_quantity: item.available_quantity ?? 0,
+        unit: item.unit ?? '',
+        compatibility: item.compatibility ?? '',
         print_sides: item.print_sides ?? 'single_sided',
         color_mode: item.color_mode ?? 'full_color',
         turnaround_time: item.turnaround_time ?? '1-2 Business Days',
@@ -77,7 +87,7 @@ EditPrintItem.layout = {
             href: '/print-items',
         },
         {
-            title: 'Edit Print Service',
+            title: 'Edit Resource',
             href: '/print-items',
         },
     ],

@@ -12,12 +12,28 @@ class PrintCategorySeeder extends Seeder
     {
         $categories = [
             [
+                'name' => 'Paper & Stock',
+                'code' => 'STOCK',
+                'description' => 'Different types of paper and printing stock, such as bond paper, photo paper, cardstock, specialty paper, and available materials.',
+                'icon' => 'Layers',
+                'status' => 'active',
+                'sort_order' => 1,
+            ],
+            [
+                'name' => 'Equipment & Inks',
+                'code' => 'EQUIPMENT',
+                'description' => 'Printing equipment, commercial printers, ink cartridges, toner, and essential printing supplies.',
+                'icon' => 'Printer',
+                'status' => 'active',
+                'sort_order' => 2,
+            ],
+            [
                 'name' => 'Standard Documents & Office',
                 'code' => 'DOCS',
                 'description' => 'General document printing, reports, resumes, contracts, worksheets, and office collateral.',
                 'icon' => 'FileText',
                 'status' => 'active',
-                'sort_order' => 1,
+                'sort_order' => 3,
             ],
             [
                 'name' => 'Marketing & Promotional',
@@ -25,7 +41,7 @@ class PrintCategorySeeder extends Seeder
                 'description' => 'Flyers, brochures, posters, banners, and promotional print media.',
                 'icon' => 'Megaphone',
                 'status' => 'active',
-                'sort_order' => 2,
+                'sort_order' => 4,
             ],
             [
                 'name' => 'Photo & Fine Art',
@@ -33,7 +49,7 @@ class PrintCategorySeeder extends Seeder
                 'description' => 'High-resolution photo prints, portraits, canvas gallery wraps, and art reproductions.',
                 'icon' => 'Image',
                 'status' => 'active',
-                'sort_order' => 3,
+                'sort_order' => 5,
             ],
             [
                 'name' => 'Stationery & Cards',
@@ -41,7 +57,7 @@ class PrintCategorySeeder extends Seeder
                 'description' => 'Business cards, invitation cards, greeting cards, certificates, and official receipts.',
                 'icon' => 'CreditCard',
                 'status' => 'active',
-                'sort_order' => 4,
+                'sort_order' => 6,
             ],
             [
                 'name' => 'Labels & Packaging',
@@ -49,7 +65,7 @@ class PrintCategorySeeder extends Seeder
                 'description' => 'Custom vinyl stickers, product labels, roll stickers, and custom die-cut tags.',
                 'icon' => 'Tag',
                 'status' => 'active',
-                'sort_order' => 5,
+                'sort_order' => 7,
             ],
             [
                 'name' => 'Publications & Media',
@@ -57,7 +73,7 @@ class PrintCategorySeeder extends Seeder
                 'description' => 'Bound books, magazines, newsletters, newspapers, calendars, and booklets.',
                 'icon' => 'BookOpen',
                 'status' => 'active',
-                'sort_order' => 6,
+                'sort_order' => 8,
             ],
             [
                 'name' => 'Hospitality & Dining',
@@ -65,7 +81,7 @@ class PrintCategorySeeder extends Seeder
                 'description' => 'Restaurant menus, laminated table cards, takeaway menus, and place cards.',
                 'icon' => 'Utensils',
                 'status' => 'active',
-                'sort_order' => 7,
+                'sort_order' => 9,
             ],
         ];
 

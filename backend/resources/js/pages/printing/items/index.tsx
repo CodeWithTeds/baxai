@@ -12,22 +12,18 @@ import {
 import {
     ArrowUpDown,
     Boxes,
-    Calendar,
-    CheckCircle2,
     ChevronLeft,
     ChevronRight,
     Download,
     Eye,
-    FileText,
-    Layer,
+    Layers,
     Pencil,
     Printer,
     Plus,
     RotateCcw,
     Search,
     SlidersHorizontal,
-    Tag,
-    Trash2,
+    Wrench,
 } from 'lucide-react';
 import { dashboard } from '@/routes';
 import {
@@ -58,10 +54,15 @@ interface PrintItemRow {
     description: string | null;
     paper_type: string | null;
     paper_size: string | null;
+    brand: string | null;
+    model: string | null;
     print_sides: string;
     color_mode: string;
     turnaround_time: string;
     base_price: string | number;
+    available_quantity: number;
+    unit: string | null;
+    compatibility: string | null;
     min_quantity: number;
     status: string;
     notes: string | null;
@@ -108,6 +109,8 @@ const SORT_OPTIONS = [
     { value: 'name', label: 'Name (A-Z)' },
     { value: '-base_price', label: 'Price (High to Low)' },
     { value: 'base_price', label: 'Price (Low to High)' },
+    { value: '-available_quantity', label: 'Stock (High to Low)' },
+    { value: 'available_quantity', label: 'Stock (Low to High)' },
 ];
 
 export default function PrintItemsIndex({
@@ -124,9 +127,15 @@ export default function PrintItemsIndex({
     const safeFilters = filters || {};
     const rawFilter = (safeFilters.filter && typeof safeFilters.filter === 'object' ? safeFilters.filter : {}) as Record<string, string>;
 
+    const initialCatId = rawFilter.category_id ?? (
+        rawFilter.category_code && categories.length > 0
+            ? String(categories.find((c) => c.code === rawFilter.category_code || c.slug === rawFilter.category_code)?.id ?? 'all')
+            : 'all'
+    );
+
     const [search, setSearch] = useState<string>(rawFilter.search ?? '');
     const [status, setStatus] = useState<string>(rawFilter.status ?? 'all');
-    const [categoryId, setCategoryId] = useState<string>(rawFilter.category_id ?? 'all');
+    const [categoryId, setCategoryId] = useState<string>(initialCatId);
     const [printSides, setPrintSides] = useState<string>(rawFilter.print_sides ?? 'all');
     const [colorMode, setColorMode] = useState<string>(rawFilter.color_mode ?? 'all');
     const [sort, setSort] = useState<string>(typeof safeFilters.sort === 'string' ? safeFilters.sort : '-created_at');
@@ -197,7 +206,7 @@ export default function PrintItemsIndex({
     };
 
     const exportCsv = () => {
-        const headers = ['ID', 'Name', 'Item Code', 'Category', 'Paper Type', 'Size', 'Print Sides', 'Color Mode', 'Price', 'Min Qty', 'Status'];
+        const headers = ['ID', 'Name', 'Item Code', 'Category', 'Paper Type', 'Size', 'Brand', 'Model', 'Avail Qty', 'Unit', 'Compatibility', 'Print Sides', 'Color Mode', 'Price', 'Min Qty', 'Status'];
         const rows = safeData.map((i) => [
             i.id,
             `"${i.name.replace(/"/g, '""')}"`,
@@ -205,6 +214,11 @@ export default function PrintItemsIndex({
             `"${i.category?.name ?? 'Uncategorized'}"`,
             `"${i.paper_type ?? ''}"`,
             `"${i.paper_size ?? ''}"`,
+            `"${i.brand ?? ''}"`,
+            `"${i.model ?? ''}"`,
+            i.available_quantity ?? 0,
+            `"${i.unit ?? 'pcs'}"`,
+            `"${i.compatibility ?? ''}"`,
             i.print_sides,
             i.color_mode,
             i.base_price,
@@ -248,7 +262,7 @@ export default function PrintItemsIndex({
                             </h1>
                         </div>
                         <p className="mt-0.5 text-[11px] text-[#6B7280]">
-                            Manage commercial print products, paper stock specifications, pricing rules, and printing categories.
+                            Organize and manage paper stock, commercial printing supplies, ink cartridges, printers, and equipment.
                         </p>
                     </div>
 
@@ -262,27 +276,47 @@ export default function PrintItemsIndex({
                         <Link href="/print-items/create">
                             <Button className="h-7 rounded-none bg-[#1A1C1E] px-2.5 text-[11px] font-normal text-white hover:bg-black">
                                 <Plus size={13} className="mr-1" />
-                                Add Print Service
+                                Add Resource / Service
                             </Button>
                         </Link>
                     </div>
                 </div>
 
-                {/* NAVIGATION TABS */}
-                <div className="mt-2 flex items-center gap-2 border-t border-[#E5E7EB] pt-1.5 font-mono text-xs">
-                    <Link
-                        href="/print-items"
-                        className="border-b-2 border-[#1A1C1E] pb-0.5 font-bold text-[#1A1C1E]"
+                {/* CATEGORIES / SECTIONS TAB BAR */}
+                <div className="mt-2.5 flex items-center gap-3 border-t border-[#E5E7EB] pt-1.5 font-mono text-xs overflow-x-auto">
+                    <button
+                        onClick={() => {
+                            setCategoryId('all');
+                            handleFilterChange({ category_id: 'all' });
+                        }}
+                        className={`pb-0.5 whitespace-nowrap transition-colors ${
+                            categoryId === 'all'
+                                ? 'border-b-2 border-[#1A1C1E] font-bold text-[#1A1C1E]'
+                                : 'text-[#6B7280] hover:text-[#1A1C1E]'
+                        }`}
                     >
-                        Print Items ({stats.total})
-                    </Link>
-                    <span className="text-[#D1D5DB]">|</span>
-                    <Link
-                        href="/print-categories"
-                        className="pb-0.5 text-[#6B7280] hover:text-[#1A1C1E]"
-                    >
-                        Print Categories ({stats.categories})
-                    </Link>
+                        All Resources ({stats.total})
+                    </button>
+                    {categories
+                        .filter((c) => ['STOCK', 'EQUIPMENT'].includes(c.code))
+                        .map((c) => (
+                            <button
+                                key={c.id}
+                                onClick={() => {
+                                    setCategoryId(String(c.id));
+                                    handleFilterChange({ category_id: String(c.id) });
+                                }}
+                                className={`pb-0.5 whitespace-nowrap transition-colors flex items-center gap-1 ${
+                                    categoryId === String(c.id)
+                                        ? 'border-b-2 border-[#1A1C1E] font-bold text-[#1A1C1E]'
+                                        : 'text-[#6B7280] hover:text-[#1A1C1E]'
+                                }`}
+                            >
+                                {c.code === 'STOCK' && <Layers size={11} />}
+                                {c.code === 'EQUIPMENT' && <Wrench size={11} />}
+                                {c.name}
+                            </button>
+                        ))}
                 </div>
             </div>
 
@@ -299,7 +333,7 @@ export default function PrintItemsIndex({
                                     setSearch(e.target.value);
                                     handleFilterChange({ search: e.target.value });
                                 }}
-                                placeholder="Search print item name, code, paper type..."
+                                placeholder="Search name, code, paper stock, brand, model..."
                                 className="h-7 rounded-none border-[#D1D5DB] pl-8 text-[11px] placeholder:text-[#8A8FA3] focus-visible:border-[#1A1C1E] focus-visible:ring-0"
                             />
                         </div>
@@ -312,7 +346,7 @@ export default function PrintItemsIndex({
                                 handleFilterChange({ category_id: v });
                             }}
                         >
-                            <SelectTrigger className="h-7 w-[150px] rounded-none border-[#D1D5DB] text-[11px] font-mono">
+                            <SelectTrigger className="h-7 w-[160px] rounded-none border-[#D1D5DB] text-[11px] font-mono">
                                 <SelectValue placeholder="All Categories" />
                             </SelectTrigger>
                             <SelectContent className="rounded-none">
@@ -377,7 +411,7 @@ export default function PrintItemsIndex({
                                 handleFilterChange({ sort: v });
                             }}
                         >
-                            <SelectTrigger className="h-7 w-[150px] rounded-none border-[#D1D5DB] text-[11px] font-mono">
+                            <SelectTrigger className="h-7 w-[160px] rounded-none border-[#D1D5DB] text-[11px] font-mono">
                                 <ArrowUpDown size={11} className="mr-1" />
                                 <SelectValue placeholder="Sort by" />
                             </SelectTrigger>
@@ -395,9 +429,9 @@ export default function PrintItemsIndex({
                             variant="outline"
                             onClick={exportCsv}
                             title="Export CSV"
-                            className="h-8 rounded-none border-[#D1D5DB] px-2 text-xs font-mono text-[#1A1C1E] bg-white hover:bg-[#F9FAFB]"
+                            className="h-7 rounded-none border-[#D1D5DB] px-2 text-[11px] font-mono text-[#1A1C1E] bg-white hover:bg-[#F9FAFB]"
                         >
-                            <Download size={13} className="mr-1" />
+                            <Download size={12} className="mr-1" />
                             CSV
                         </Button>
                     </div>
@@ -478,7 +512,7 @@ export default function PrintItemsIndex({
             {selectedIds.length > 0 && (
                 <div className="mb-3 flex items-center justify-between rounded-none border border-[#1A1C1E] bg-[#F9FAFB] px-3 py-2 text-xs">
                     <span className="font-mono text-[#1A1C1E]">
-                        Selected <strong>{selectedIds.length}</strong> print item(s)
+                        Selected <strong>{selectedIds.length}</strong> item(s)
                     </span>
                     <div className="flex items-center gap-2">
                         <Button
@@ -521,13 +555,12 @@ export default function PrintItemsIndex({
                                     className="rounded-none border-[#D1D5DB]"
                                 />
                             </th>
-                            <th className="px-2 py-2 border-r border-[#E5E7EB]">Print Service & Code</th>
+                            <th className="px-2 py-2 border-r border-[#E5E7EB]">Item / Resource & Code</th>
                             <th className="px-2 py-2 border-r border-[#E5E7EB]">Category</th>
-                            <th className="px-2 py-2 border-r border-[#E5E7EB]">Paper Stock & Size</th>
-                            <th className="px-2 py-2 border-r border-[#E5E7EB]">Sides & Color</th>
-                            <th className="px-2 py-2 border-r border-[#E5E7EB]">Turnaround</th>
+                            <th className="px-2 py-2 border-r border-[#E5E7EB]">Stock Specs / Brand & Model</th>
+                            <th className="px-2 py-2 border-r border-[#E5E7EB]">Compatibility / Print Mode</th>
+                            <th className="px-2 py-2 border-r border-[#E5E7EB] text-center">In Stock</th>
                             <th className="px-2 py-2 border-r border-[#E5E7EB] text-right">Base Price</th>
-                            <th className="px-2 py-2 border-r border-[#E5E7EB] text-center">Min Qty</th>
                             <th className="px-2 py-2 border-r border-[#E5E7EB] text-center">Status</th>
                             <th className="px-2 py-2 text-center">Actions</th>
                         </tr>
@@ -535,8 +568,8 @@ export default function PrintItemsIndex({
                     <tbody className="divide-y divide-[#E5E7EB] text-[11px]">
                         {safeData.length === 0 ? (
                             <tr>
-                                <td colSpan={10} className="p-8 text-center text-xs font-mono text-[#8A8FA3]">
-                                    No print services found matching your criteria.
+                                <td colSpan={9} className="p-8 text-center text-xs font-mono text-[#8A8FA3]">
+                                    No printing resources found matching your criteria.
                                 </td>
                             </tr>
                         ) : (
@@ -559,25 +592,40 @@ export default function PrintItemsIndex({
                                         </span>
                                     </td>
                                     <td className="px-2 py-1.5 border-r border-[#E5E7EB]">
-                                        <div className="text-[11px] text-[#1A1C1E]">{item.paper_type || 'Standard Stock'}</div>
-                                        <div className="font-mono text-[10px] text-[#6B7280]">{item.paper_size || 'Custom Size'}</div>
+                                        {item.brand || item.model ? (
+                                            <>
+                                                <div className="text-[11px] font-semibold text-[#1A1C1E]">{item.brand || 'Generic Brand'}</div>
+                                                <div className="font-mono text-[10px] text-[#6B7280]">{item.model || 'Standard Model'}</div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="text-[11px] text-[#1A1C1E]">{item.paper_type || 'Standard Stock'}</div>
+                                                <div className="font-mono text-[10px] text-[#6B7280]">{item.paper_size || 'Custom Size'}</div>
+                                            </>
+                                        )}
                                     </td>
                                     <td className="px-2 py-1.5 border-r border-[#E5E7EB]">
-                                        <div className="font-mono text-[10px] text-[#1A1C1E]">
-                                            {prettySides(item.print_sides)}
-                                        </div>
+                                        {item.compatibility ? (
+                                            <div className="text-[10px] text-[#374151] max-w-[200px] truncate" title={item.compatibility}>
+                                                {item.compatibility}
+                                            </div>
+                                        ) : (
+                                            <div className="font-mono text-[10px] text-[#1A1C1E]">
+                                                {prettySides(item.print_sides)}
+                                            </div>
+                                        )}
                                         <div className="font-mono text-[10px] text-[#6B7280]">
                                             {prettyColor(item.color_mode)}
                                         </div>
                                     </td>
-                                    <td className="px-2 py-1.5 border-r border-[#E5E7EB] font-mono text-[11px] text-[#4A4E5A]">
-                                        {item.turnaround_time}
+                                    <td className="px-2 py-1.5 border-r border-[#E5E7EB] text-center font-mono text-xs">
+                                        <span className={`font-bold ${ (item.available_quantity ?? 0) > 0 ? 'text-emerald-700' : 'text-red-600' }`}>
+                                            {item.available_quantity ?? 0}
+                                        </span>{' '}
+                                        <span className="text-[10px] text-[#6B7280]">{item.unit || 'pcs'}</span>
                                     </td>
                                     <td className="px-2 py-1.5 border-r border-[#E5E7EB] text-right font-mono font-bold text-[#1A1C1E]">
                                         ₱{Number(item.base_price).toFixed(2)}
-                                    </td>
-                                    <td className="px-2 py-1.5 border-r border-[#E5E7EB] text-center font-mono text-xs text-[#1A1C1E]">
-                                        {item.min_quantity} {item.min_quantity === 1 ? 'pc' : 'pcs'}
                                     </td>
                                     <td className="px-2 py-1.5 border-r border-[#E5E7EB] text-center">
                                         <span className={`inline-block rounded-none border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
@@ -623,7 +671,7 @@ export default function PrintItemsIndex({
             {/* PAGINATION FOOTER */}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#E5E7EB] pt-2.5 font-mono text-xs text-[#6B7280]">
                 <div>
-                    Showing <strong>{items.from ?? 0}</strong> to <strong>{items.to ?? 0}</strong> of <strong>{items.total ?? 0}</strong> print items
+                    Showing <strong>{items.from ?? 0}</strong> to <strong>{items.to ?? 0}</strong> of <strong>{items.total ?? 0}</strong> items
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -682,14 +730,44 @@ export default function PrintItemsIndex({
                             </div>
 
                             <div className="grid grid-cols-2 gap-2 border-t border-b border-[#E5E7EB] py-2 font-mono text-[11px]">
+                                {quickViewItem.brand && (
+                                    <div>
+                                        <p className="text-[#6B7280]">Brand:</p>
+                                        <p className="font-semibold text-[#1A1C1E]">{quickViewItem.brand}</p>
+                                    </div>
+                                )}
+                                {quickViewItem.model && (
+                                    <div>
+                                        <p className="text-[#6B7280]">Model:</p>
+                                        <p className="font-semibold text-[#1A1C1E]">{quickViewItem.model}</p>
+                                    </div>
+                                )}
                                 <div>
-                                    <p className="text-[#6B7280]">Paper Stock:</p>
-                                    <p className="font-semibold text-[#1A1C1E]">{quickViewItem.paper_type || 'N/A'}</p>
+                                    <p className="text-[#6B7280]">Available Stock:</p>
+                                    <p className="font-bold text-emerald-700">{quickViewItem.available_quantity ?? 0} {quickViewItem.unit || 'pcs'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-[#6B7280]">Paper Size:</p>
-                                    <p className="font-semibold text-[#1A1C1E]">{quickViewItem.paper_size || 'N/A'}</p>
+                                    <p className="text-[#6B7280]">Base Price:</p>
+                                    <p className="font-bold text-[#1A1C1E]">₱{Number(quickViewItem.base_price).toFixed(2)}</p>
                                 </div>
+                                {quickViewItem.paper_type && (
+                                    <div>
+                                        <p className="text-[#6B7280]">Paper Stock:</p>
+                                        <p className="font-semibold text-[#1A1C1E]">{quickViewItem.paper_type}</p>
+                                    </div>
+                                )}
+                                {quickViewItem.paper_size && (
+                                    <div>
+                                        <p className="text-[#6B7280]">Paper / Trim Size:</p>
+                                        <p className="font-semibold text-[#1A1C1E]">{quickViewItem.paper_size}</p>
+                                    </div>
+                                )}
+                                {quickViewItem.compatibility && (
+                                    <div className="col-span-2">
+                                        <p className="text-[#6B7280]">Compatibility / Machine Use:</p>
+                                        <p className="font-semibold text-[#1A1C1E]">{quickViewItem.compatibility}</p>
+                                    </div>
+                                )}
                                 <div>
                                     <p className="text-[#6B7280]">Print Sides:</p>
                                     <p className="font-semibold text-[#1A1C1E]">{prettySides(quickViewItem.print_sides)}</p>
@@ -698,19 +776,11 @@ export default function PrintItemsIndex({
                                     <p className="text-[#6B7280]">Color Mode:</p>
                                     <p className="font-semibold text-[#1A1C1E]">{prettyColor(quickViewItem.color_mode)}</p>
                                 </div>
-                                <div>
-                                    <p className="text-[#6B7280]">Turnaround:</p>
-                                    <p className="font-semibold text-[#1A1C1E]">{quickViewItem.turnaround_time}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[#6B7280]">Base Price:</p>
-                                    <p className="font-bold text-[#1A1C1E]">₱{Number(quickViewItem.base_price).toFixed(2)} / {quickViewItem.min_quantity} pcs</p>
-                                </div>
                             </div>
 
                             {quickViewItem.notes && (
                                 <div>
-                                    <h4 className="font-mono text-[11px] uppercase tracking-wider text-[#4A4E5A]">Notes & Special Rules</h4>
+                                    <h4 className="font-mono text-[11px] uppercase tracking-wider text-[#4A4E5A]">Notes & Technical Details</h4>
                                     <p className="mt-0.5 text-xs text-[#4B5563] italic">{quickViewItem.notes}</p>
                                 </div>
                             )}
@@ -719,7 +789,7 @@ export default function PrintItemsIndex({
                         <DialogFooter className="mt-2 border-t border-[#E5E7EB] pt-2">
                             <Link href={`/print-items/${quickViewItem.id}/edit`}>
                                 <Button className="h-8 rounded-none bg-[#1A1C1E] text-xs font-normal text-white hover:bg-black">
-                                    Edit Print Item
+                                    Edit Resource
                                 </Button>
                             </Link>
                             <Button

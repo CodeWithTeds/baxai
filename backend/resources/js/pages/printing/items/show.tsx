@@ -1,7 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes';
-import { ArrowLeft, Boxes, Calendar, Edit, FileText, Layer, Printer, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
 
 interface PrintItemDetail {
     id: number;
@@ -12,6 +12,11 @@ interface PrintItemDetail {
     description: string | null;
     paper_type: string | null;
     paper_size: string | null;
+    brand: string | null;
+    model: string | null;
+    available_quantity: number;
+    unit: string | null;
+    compatibility: string | null;
     print_sides: string;
     color_mode: string;
     turnaround_time: string;
@@ -44,7 +49,7 @@ export default function ShowPrintItem({ item }: { item: PrintItemDetail }) {
 
     return (
         <div className="font-sans text-[#1A1C1E]">
-            <Head title={`Print Service — ${item.name}`} />
+            <Head title={`Printing Service — ${item.name}`} />
 
             {/* HEADER */}
             <div className="mb-4 border-b border-[#E5E7EB] pb-3 flex flex-wrap items-center justify-between gap-2">
@@ -72,7 +77,7 @@ export default function ShowPrintItem({ item }: { item: PrintItemDetail }) {
                     <Link href={`/print-items/${item.id}/edit`}>
                         <Button className="h-8 rounded-none bg-[#1A1C1E] px-3 text-xs font-normal text-white hover:bg-black">
                             <Edit size={13} className="mr-1.5" />
-                            Edit Service
+                            Edit Resource
                         </Button>
                     </Link>
                     <Button variant="destructive" onClick={handleDelete} className="h-8 rounded-none px-3 text-xs font-normal">
@@ -87,7 +92,7 @@ export default function ShowPrintItem({ item }: { item: PrintItemDetail }) {
                 <div className="xl:col-span-2 space-y-3">
                     <section className="rounded-none border border-[#E5E7EB] bg-white p-4">
                         <h3 className="mb-2 font-mono text-xs uppercase tracking-wider text-[#1A1C1E] border-b border-[#E5E7EB] pb-1">
-                            Service Description
+                            Resource Description
                         </h3>
                         <p className="text-xs text-[#374151] leading-relaxed">
                             {item.description || 'No description provided.'}
@@ -96,12 +101,24 @@ export default function ShowPrintItem({ item }: { item: PrintItemDetail }) {
 
                     <section className="rounded-none border border-[#E5E7EB] bg-white p-4">
                         <h3 className="mb-3 font-mono text-xs uppercase tracking-wider text-[#1A1C1E] border-b border-[#E5E7EB] pb-1">
-                            Print Specifications & Materials
+                            Printing Specifications & Stock Info
                         </h3>
                         <div className="grid gap-3 sm:grid-cols-2 font-mono text-xs">
+                            {item.brand && (
+                                <div className="border border-[#E5E7EB] p-2.5 bg-[#F9FAFB]">
+                                    <span className="block text-[10px] text-[#6B7280] uppercase">Brand</span>
+                                    <strong className="text-[#1A1C1E]">{item.brand}</strong>
+                                </div>
+                            )}
+                            {item.model && (
+                                <div className="border border-[#E5E7EB] p-2.5 bg-[#F9FAFB]">
+                                    <span className="block text-[10px] text-[#6B7280] uppercase">Model / Part No.</span>
+                                    <strong className="text-[#1A1C1E]">{item.model}</strong>
+                                </div>
+                            )}
                             <div className="border border-[#E5E7EB] p-2.5 bg-[#F9FAFB]">
                                 <span className="block text-[10px] text-[#6B7280] uppercase">Paper Stock</span>
-                                <strong className="text-[#1A1C1E]">{item.paper_type || 'Standard Bond'}</strong>
+                                <strong className="text-[#1A1C1E]">{item.paper_type || 'Standard Stock'}</strong>
                             </div>
                             <div className="border border-[#E5E7EB] p-2.5 bg-[#F9FAFB]">
                                 <span className="block text-[10px] text-[#6B7280] uppercase">Paper / Trim Size</span>
@@ -115,6 +132,12 @@ export default function ShowPrintItem({ item }: { item: PrintItemDetail }) {
                                 <span className="block text-[10px] text-[#6B7280] uppercase">Color Mode</span>
                                 <strong className="text-[#1A1C1E]">{prettyColor(item.color_mode)}</strong>
                             </div>
+                            {item.compatibility && (
+                                <div className="sm:col-span-2 border border-[#E5E7EB] p-2.5 bg-[#F9FAFB]">
+                                    <span className="block text-[10px] text-[#6B7280] uppercase">Printer / Machine Compatibility</span>
+                                    <strong className="text-[#1A1C1E]">{item.compatibility}</strong>
+                                </div>
+                            )}
                         </div>
                     </section>
                 </div>
@@ -122,19 +145,25 @@ export default function ShowPrintItem({ item }: { item: PrintItemDetail }) {
                 <div className="space-y-3">
                     <section className="rounded-none border border-[#E5E7EB] bg-white p-4 font-mono text-xs">
                         <h3 className="mb-3 uppercase tracking-wider text-[#1A1C1E] border-b border-[#E5E7EB] pb-1 font-bold">
-                            Pricing & Turnaround
+                            Inventory & Pricing
                         </h3>
                         <div className="space-y-2">
                             <div>
+                                <span className="text-[#6B7280]">Available Stock Quantity:</span>
+                                <div className="text-xl font-bold text-emerald-700">
+                                    {item.available_quantity ?? 0} {item.unit || 'pcs'}
+                                </div>
+                            </div>
+                            <div className="border-t border-[#E5E7EB] pt-2">
                                 <span className="text-[#6B7280]">Base Price:</span>
                                 <div className="text-lg font-bold text-[#1A1C1E]">₱{Number(item.base_price).toFixed(2)}</div>
                             </div>
                             <div className="border-t border-[#E5E7EB] pt-2">
                                 <span className="text-[#6B7280]">Minimum Order Quantity:</span>
-                                <div className="text-sm font-semibold text-[#1A1C1E]">{item.min_quantity} {item.min_quantity === 1 ? 'piece' : 'pieces'}</div>
+                                <div className="text-sm font-semibold text-[#1A1C1E]">{item.min_quantity} {item.unit || 'pcs'}</div>
                             </div>
                             <div className="border-t border-[#E5E7EB] pt-2">
-                                <span className="text-[#6B7280]">Production Turnaround:</span>
+                                <span className="text-[#6B7280]">Turnaround / Availability:</span>
                                 <div className="text-xs font-semibold text-[#1A1C1E]">{item.turnaround_time}</div>
                             </div>
                         </div>
@@ -143,7 +172,7 @@ export default function ShowPrintItem({ item }: { item: PrintItemDetail }) {
                     {item.notes && (
                         <section className="rounded-none border border-[#E5E7EB] bg-white p-4 text-xs font-mono">
                             <h3 className="mb-1 uppercase tracking-wider text-[#1A1C1E] font-bold border-b border-[#E5E7EB] pb-1">
-                                Finishing Notes
+                                Technical & Finishing Notes
                             </h3>
                             <p className="text-[#4B5563] mt-1 italic">{item.notes}</p>
                         </section>

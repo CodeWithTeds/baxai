@@ -83,12 +83,12 @@ const printNavItems: NavItem[] = [
 const inventoryNavItems: NavItem[] = [
     {
         title: 'Paper & Stock',
-        href: '#',
+        href: '/print-items?filter[category_code]=STOCK',
         icon: Warehouse,
     },
     {
         title: 'Equipment & Inks',
-        href: '#',
+        href: '/print-items?filter[category_code]=EQUIPMENT',
         icon: Boxes,
     },
 ];
