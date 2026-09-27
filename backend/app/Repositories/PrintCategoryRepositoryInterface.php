@@ -20,5 +20,7 @@ interface PrintCategoryRepositoryInterface
 
     public function delete(PrintCategory $category): bool;
 
+    public function bulkUpdateStatus(array $ids, string $status): int;
+
     public function getStats(): array;
 }

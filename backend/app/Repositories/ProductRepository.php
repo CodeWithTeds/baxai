@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Models\Product;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -17,9 +18,6 @@ class ProductRepository extends BaseRepository implements ProductRepositoryInter
 
     public function paginated(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
-        // NOTE: do NOT Cache::remember() a LengthAwarePaginator here.
-        // Serialized paginators unserialize to __PHP_Incomplete_Class after
-        // deploys / model changes, causing the exact TypeError you hit.
         return QueryBuilder::for(Product::class)
             ->allowedFilters(
                 'name',
@@ -63,19 +61,21 @@ class ProductRepository extends BaseRepository implements ProductRepositoryInter
 
     public function bulkUpdateStatus(array $ids, string $status): int
     {
-        return Product::whereIn('id', $ids)->update(['status' => $status]);
+        return DB::transaction(fn () => Product::whereIn('id', $ids)->update(['status' => $status]));
     }
 
     public function bulkDelete(array $ids): int
     {
-        $count = 0;
-        Product::whereIn('id', $ids)->chunkById(100, function ($products) use (&$count): void {
-            foreach ($products as $product) {
-                $product->delete();
-                $count++;
-            }
-        });
+        return DB::transaction(function () {
+            $count = 0;
+            Product::whereIn('id', $ids)->chunkById(100, function ($products) use (&$count): void {
+                foreach ($products as $product) {
+                    $product->delete();
+                    $count++;
+                }
+            });
 
-        return $count;
+            return $count;
+        });
     }
 }

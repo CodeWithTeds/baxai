@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Models\Customer;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -72,20 +73,22 @@ class CustomerRepository extends BaseRepository implements CustomerRepositoryInt
 
     public function bulkUpdateStatus(array $ids, string $status): int
     {
-        return Customer::whereIn('id', $ids)->update(['status' => $status]);
+        return DB::transaction(fn () => Customer::whereIn('id', $ids)->update(['status' => $status]));
     }
 
     public function bulkDelete(array $ids): int
     {
-        $count = 0;
-        Customer::whereIn('id', $ids)->chunkById(100, function ($customers) use (&$count): void {
-            foreach ($customers as $customer) {
-                $customer->delete();
-                $count++;
-            }
-        });
+        return DB::transaction(function () {
+            $count = 0;
+            Customer::whereIn('id', $ids)->chunkById(100, function ($customers) use (&$count): void {
+                foreach ($customers as $customer) {
+                    $customer->delete();
+                    $count++;
+                }
+            });
 
-        return $count;
+            return $count;
+        });
     }
 
     public function getStats(): array

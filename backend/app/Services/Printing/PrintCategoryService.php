@@ -33,28 +33,4 @@ class PrintCategoryService
 
         return $this->repository->update($category, $data);
     }
-
-    public function activate(array $ids): int
-    {
-        $count = 0;
-        foreach ($ids as $id) {
-            $category = $this->repository->findById($id);
-            if ($category && $this->repository->update($category, ['status' => 'active'])) {
-                $count++;
-            }
-        }
-        return $count;
-    }
-
-    public function deactivate(array $ids): int
-    {
-        $count = 0;
-        foreach ($ids as $id) {
-            $category = $this->repository->findById($id);
-            if ($category && $this->repository->update($category, ['status' => 'inactive'])) {
-                $count++;
-            }
-        }
-        return $count;
-    }
 }

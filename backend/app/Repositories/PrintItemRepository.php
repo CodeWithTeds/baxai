@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\PrintItem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -58,22 +59,27 @@ class PrintItemRepository implements PrintItemRepositoryInterface
 
     public function create(array $data): PrintItem
     {
-        return PrintItem::create($data);
+        return DB::transaction(fn () => PrintItem::create($data));
     }
 
     public function update(PrintItem $item, array $data): bool
     {
-        return $item->update($data);
+        return DB::transaction(fn () => $item->update($data));
     }
 
     public function delete(PrintItem $item): bool
     {
-        return (bool) $item->delete();
+        return DB::transaction(fn () => (bool) $item->delete());
+    }
+
+    public function bulkUpdateStatus(array $ids, string $status): int
+    {
+        return DB::transaction(fn () => PrintItem::whereIn('id', $ids)->update(['status' => $status]));
     }
 
     public function bulkDelete(array $ids): int
     {
-        return PrintItem::whereIn('id', $ids)->delete();
+        return DB::transaction(fn () => PrintItem::whereIn('id', $ids)->delete());
     }
 
     public function getStats(): array

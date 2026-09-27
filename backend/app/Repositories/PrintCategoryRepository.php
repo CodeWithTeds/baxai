@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Models\PrintCategory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -40,17 +41,22 @@ class PrintCategoryRepository implements PrintCategoryRepositoryInterface
 
     public function create(array $data): PrintCategory
     {
-        return PrintCategory::create($data);
+        return DB::transaction(fn () => PrintCategory::create($data));
     }
 
     public function update(PrintCategory $category, array $data): bool
     {
-        return $category->update($data);
+        return DB::transaction(fn () => $category->update($data));
     }
 
     public function delete(PrintCategory $category): bool
     {
-        return (bool) $category->delete();
+        return DB::transaction(fn () => (bool) $category->delete());
+    }
+
+    public function bulkUpdateStatus(array $ids, string $status): int
+    {
+        return DB::transaction(fn () => PrintCategory::whereIn('id', $ids)->update(['status' => $status]));
     }
 
     public function getStats(): array

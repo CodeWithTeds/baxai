@@ -23,74 +23,20 @@ class CustomerController extends Controller
         protected CustomerService $service,
     ) {}
 
-    public function index(Request $request): JsonResponse
-    {
-        $paginated = $this->customers->paginated(
-            $request->only('filter', 'sort'),
-            (int) $request->get('per_page', 10)
-        );
+    public function index(Request $request): JsonResponse { 
+        return $this->successResponse(CustomerResource::collection($this->customers->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 10)))->response()->getData(true), 'Customers retrieved successfully'); }
 
-        return $this->successResponse(
-            CustomerResource::collection($paginated)->response()->getData(true),
-            'Customers retrieved successfully'
-        );
-    }
+    public function store(StoreCustomerRequest $request): JsonResponse { return $this->successResponse(new CustomerResource($this->service->create($request->validated())), 'Customer created successfully', 201); }
 
-    public function store(StoreCustomerRequest $request): JsonResponse
-    {
-        $customer = $this->service->create($request->validated());
+    public function show(Customer $customer): JsonResponse { return $this->successResponse(new CustomerResource($customer), 'Customer retrieved successfully'); }
 
-        return $this->successResponse(
-            new CustomerResource($customer),
-            'Customer created successfully',
-            201
-        );
-    }
+    public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse { $this->service->update($customer, $request->validated()); return $this->successResponse(new CustomerResource($this->customers->find($customer->id)), 'Customer updated successfully'); }
 
-    public function show(Customer $customer): JsonResponse
-    {
-        return $this->successResponse(
-            new CustomerResource($customer),
-            'Customer retrieved successfully'
-        );
-    }
+    public function destroy(Customer $customer): JsonResponse { $this->customers->delete($customer); return $this->successResponse(null, 'Customer deleted successfully'); }
 
-    public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse
-    {
-        $this->service->update($customer, $request->validated());
-        $updated = $this->customers->find($customer->id);
+    public function bulkActivate(BulkCustomerRequest $request): JsonResponse { return $this->successResponse(['count' => $this->customers->bulkUpdateStatus($request->validated()['ids'], 'active')], 'Customers activated successfully'); }
 
-        return $this->successResponse(
-            new CustomerResource($updated),
-            'Customer updated successfully'
-        );
-    }
+    public function bulkArchive(BulkCustomerRequest $request): JsonResponse { return $this->successResponse(['count' => $this->customers->bulkUpdateStatus($request->validated()['ids'], 'archived')], 'Customers archived successfully'); }
 
-    public function destroy(Customer $customer): JsonResponse
-    {
-        $this->customers->delete($customer);
-
-        return $this->successResponse(null, 'Customer deleted successfully');
-    }
-
-    public function bulkActivate(BulkCustomerRequest $request): JsonResponse
-    {
-        $count = $this->service->activate($request->validated()['ids']);
-
-        return $this->successResponse(['count' => $count], "{$count} customers activated.");
-    }
-
-    public function bulkArchive(BulkCustomerRequest $request): JsonResponse
-    {
-        $count = $this->service->archive($request->validated()['ids']);
-
-        return $this->successResponse(['count' => $count], "{$count} customers archived.");
-    }
-
-    public function bulkDestroy(BulkCustomerRequest $request): JsonResponse
-    {
-        $count = $this->customers->bulkDelete($request->validated()['ids']);
-
-        return $this->successResponse(['count' => $count], "{$count} customers deleted.");
-    }
+    public function bulkDestroy(BulkCustomerRequest $request): JsonResponse { return $this->successResponse(['count' => $this->customers->bulkDelete($request->validated()['ids'])], 'Customers deleted successfully'); }
 }

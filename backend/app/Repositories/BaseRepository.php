@@ -5,6 +5,7 @@ namespace App\Repositories;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 abstract class BaseRepository implements BaseRepositoryInterface
 {
@@ -27,16 +28,16 @@ abstract class BaseRepository implements BaseRepositoryInterface
 
     public function create(array $attributes): Model
     {
-        return $this->model->create($attributes);
+        return DB::transaction(fn () => $this->model->create($attributes));
     }
 
     public function update(Model $model, array $attributes): bool
     {
-        return $model->update($attributes);
+        return DB::transaction(fn () => $model->update($attributes));
     }
 
     public function delete(Model $model): bool
     {
-        return $model->delete();
+        return DB::transaction(fn () => $model->delete());
     }
 }

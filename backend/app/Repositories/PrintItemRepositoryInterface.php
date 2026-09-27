@@ -17,6 +17,8 @@ interface PrintItemRepositoryInterface
 
     public function delete(PrintItem $item): bool;
 
+    public function bulkUpdateStatus(array $ids, string $status): int;
+
     public function bulkDelete(array $ids): int;
 
     public function getStats(): array;

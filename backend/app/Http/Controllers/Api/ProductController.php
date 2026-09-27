@@ -19,69 +19,24 @@ class ProductController extends Controller
 {
     use ApiResponse;
 
-    public function __construct(protected ProductService $service) {}
+    public function __construct(
+        protected ProductRepositoryInterface $products,
+        protected ProductService $service,
+    ) {}
 
-    public function index(Request $request): JsonResponse
-    {
-        Gate::authorize('viewAny', Product::class);
-        $products = app(ProductRepositoryInterface::class)
-            ->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 10));
+    public function index(Request $request): JsonResponse { Gate::authorize('viewAny', Product::class); return $this->successResponse(ProductResource::collection($this->products->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 10))), 'Products retrieved successfully'); }
 
-        return $this->successResponse(ProductResource::collection($products), 'Products retrieved successfully');
-    }
+    public function store(StoreProductRequest $request): JsonResponse { Gate::authorize('create', Product::class); return $this->successResponse(new ProductResource($this->service->create($request->validated())), 'Product created successfully', 201); }
 
-    public function store(StoreProductRequest $request): JsonResponse
-    {
-        Gate::authorize('create', Product::class);
-        $product = $this->service->create($request->validated());
+    public function show(Product $product): JsonResponse { Gate::authorize('view', $product); return $this->successResponse(new ProductResource($product), 'Product retrieved successfully'); }
 
-        return $this->successResponse(new ProductResource($product), 'Product created successfully', 201);
-    }
+    public function update(UpdateProductRequest $request, Product $product): JsonResponse { Gate::authorize('update', $product); $this->service->update($product, $request->validated()); return $this->successResponse(new ProductResource($product->refresh()), 'Product updated successfully'); }
 
-    public function show(Product $product): JsonResponse
-    {
-        Gate::authorize('view', $product);
+    public function destroy(Product $product): JsonResponse { Gate::authorize('delete', $product); $this->products->delete($product); return $this->successResponse(null, 'Product archived successfully'); }
 
-        return $this->successResponse(new ProductResource($product), 'Product retrieved successfully');
-    }
+    public function bulkActivate(BulkProductRequest $request): JsonResponse { Gate::authorize('viewAny', Product::class); return $this->successResponse(['count' => $this->products->bulkUpdateStatus($request->validated()['ids'], 'active')], 'Products activated successfully'); }
 
-    public function update(UpdateProductRequest $request, Product $product): JsonResponse
-    {
-        Gate::authorize('update', $product);
-        $this->service->update($product, $request->validated());
+    public function bulkArchive(BulkProductRequest $request): JsonResponse { Gate::authorize('viewAny', Product::class); return $this->successResponse(['count' => $this->products->bulkUpdateStatus($request->validated()['ids'], 'archived')], 'Products archived successfully'); }
 
-        return $this->successResponse(new ProductResource($product->refresh()), 'Product updated successfully');
-    }
-
-    public function destroy(Product $product): JsonResponse
-    {
-        Gate::authorize('delete', $product);
-        $product->delete();
-
-        return $this->successResponse(null, 'Product archived successfully');
-    }
-
-    public function bulkActivate(BulkProductRequest $request): JsonResponse
-    {
-        Gate::authorize('viewAny', Product::class);
-        $count = $this->service->activate($request->validated()['ids']);
-
-        return $this->successResponse(['count' => $count], "{$count} products activated");
-    }
-
-    public function bulkArchive(BulkProductRequest $request): JsonResponse
-    {
-        Gate::authorize('viewAny', Product::class);
-        $count = $this->service->archive($request->validated()['ids']);
-
-        return $this->successResponse(['count' => $count], "{$count} products archived");
-    }
-
-    public function bulkDestroy(BulkProductRequest $request): JsonResponse
-    {
-        Gate::authorize('viewAny', Product::class);
-        $count = app(ProductRepositoryInterface::class)->bulkDelete($request->validated()['ids']);
-
-        return $this->successResponse(['count' => $count], "{$count} products deleted");
-    }
+    public function bulkDestroy(BulkProductRequest $request): JsonResponse { Gate::authorize('viewAny', Product::class); return $this->successResponse(['count' => $this->products->bulkDelete($request->validated()['ids'])], 'Products deleted successfully'); }
 }

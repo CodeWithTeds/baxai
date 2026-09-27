@@ -28,21 +28,6 @@ class CustomerService
         return $this->customers->update($customer, $attributes);
     }
 
-    public function activate(array $ids): int
-    {
-        return $this->customers->bulkUpdateStatus($ids, 'active');
-    }
-
-    public function deactivate(array $ids): int
-    {
-        return $this->customers->bulkUpdateStatus($ids, 'inactive');
-    }
-
-    public function archive(array $ids): int
-    {
-        return $this->customers->bulkUpdateStatus($ids, 'archived');
-    }
-
     private function ensureCustomerCode(array $attributes): string
     {
         if (! empty($attributes['customer_code'])) {

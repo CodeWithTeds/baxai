@@ -22,35 +22,6 @@ class PrintItemService
         return $this->repository->create($data);
     }
 
-    public function update(PrintItem $item, array $data): bool
-    {
-        return $this->repository->update($item, $data);
-    }
-
-    public function activate(array $ids): int
-    {
-        $count = 0;
-        foreach ($ids as $id) {
-            $item = $this->repository->findById($id);
-            if ($item && $this->repository->update($item, ['status' => 'active'])) {
-                $count++;
-            }
-        }
-        return $count;
-    }
-
-    public function archive(array $ids): int
-    {
-        $count = 0;
-        foreach ($ids as $id) {
-            $item = $this->repository->findById($id);
-            if ($item && $this->repository->update($item, ['status' => 'archived'])) {
-                $count++;
-            }
-        }
-        return $count;
-    }
-
     protected function generateItemCode(array $data): string
     {
         $prefix = 'PRT';
