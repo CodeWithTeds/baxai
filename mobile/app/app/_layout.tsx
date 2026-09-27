@@ -8,6 +8,7 @@ import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-goog
 import { useEffect } from 'react';
 import { LogBox } from 'react-native';
 
+import { AuthProvider } from '@/contexts/auth-context';
 import { LanguageProvider } from '@/contexts/language-context';
 
 // Silence noisy but harmless warnings:
@@ -75,18 +76,22 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <LanguageProvider>
-        <Stack>
-          <Stack.Screen name="index" options={{ headerShown: false, animation: 'fade' }} />
-          <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="order/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
-          <Stack.Screen name="mug-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
-          <Stack.Screen name="pin-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-        </Stack>
-        <StatusBar style="auto" />
-      </LanguageProvider>
+      <AuthProvider>
+        <LanguageProvider>
+          <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false, animation: 'fade' }} />
+            <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
+            <Stack.Screen name="register" options={{ headerShown: false, animation: 'slide_from_right' }} />
+            <Stack.Screen name="login" options={{ headerShown: false, animation: 'slide_from_right' }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="order/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+            <Stack.Screen name="mug-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
+            <Stack.Screen name="pin-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          </Stack>
+          <StatusBar style="auto" />
+        </LanguageProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

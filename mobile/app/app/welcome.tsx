@@ -24,12 +24,12 @@ export default function WelcomeScreen() {
 
   const handleGetStarted = async () => {
     await triggerHaptic();
-    router.push('/(tabs)');
+    router.push('/register');
   };
 
   const handleLogin = async () => {
     await triggerHaptic();
-    router.push('/(tabs)');
+    router.push('/login');
   };
 
   return (

@@ -107,6 +107,14 @@ type Translations = {
   voiceSpeaking: string;
   voiceError: string;
   owlGreeting: string;
+  // Auth
+  createAccount: string;
+  welcomeBack: string;
+  registerSubtitle: string;
+  loginSubtitle: string;
+  continueWithGoogle: string;
+  alreadyHaveAccountLink: string;
+  dontHaveAccountLink: string;
   // 3D Viewers
   dragToRotate: string;
   addToCart: string;
@@ -219,6 +227,15 @@ const TRANSLATIONS: Record<Language, Translations> = {
     voiceError: 'Tap to try again',
     owlGreeting: 'Hello! I am your AI assistant. Tap the mascot below or type a message to get started.',
     // 3D Viewers
+    // Auth
+    createAccount: 'Create Account',
+    welcomeBack: 'Welcome Back',
+    registerSubtitle: 'Sign up to manage your custom printing orders with ease.',
+    loginSubtitle: 'Sign in to access your printing account and track orders.',
+    continueWithGoogle: 'Continue with Google',
+    alreadyHaveAccountLink: 'I already have an account',
+    dontHaveAccountLink: "Don't have an account? Register",
+    // 3D Viewers
     dragToRotate: 'Drag to rotate 3D model',
     addToCart: 'Add to Cart',
     customize: 'Customize',
@@ -238,6 +255,14 @@ const TRANSLATIONS: Record<Language, Translations> = {
     termsOfService: 'Mga Tuntunin ng Serbisyo',
     termsMiddle: ' at ',
     privacyPolicy: 'Patakaran sa Privacy',
+    // Auth
+    createAccount: 'Lumikha ng Account',
+    welcomeBack: 'Maligayang Pagbabalik',
+    registerSubtitle: 'Mag-rehistro upang pamahalaan ang iyong mga order sa pag-print nang madali.',
+    loginSubtitle: 'Mag-sign in upang ma-access ang iyong account at masubaybayan ang mga order.',
+    continueWithGoogle: 'Magpatuloy gamit ang Google',
+    alreadyHaveAccountLink: 'Mayroon na akong account',
+    dontHaveAccountLink: 'Wala pang account? Mag-rehistro',
     // Navigation / Tabs
     navHome: 'Tahanan',
     navServices: 'Mga Serbisyo',

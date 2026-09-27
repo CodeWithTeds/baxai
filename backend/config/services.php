@@ -39,4 +39,10 @@ return [
         'api_key' => env('GROQ_API'),
     ],
 
+    'google' => [
+        'client_id' => env('CLIENT_ID'),
+        'client_secret' => env('CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI', 'http://localhost:8000/auth/google/callback'),
+    ],
+
 ];

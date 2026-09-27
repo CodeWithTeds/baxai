@@ -3,6 +3,7 @@ import { Image, type ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import {
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -10,16 +11,35 @@ import {
   Text,
   View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import ProfileModal from '@/components/profile-modal';
 import ScreenHeader from '@/components/screen-header';
 import { BrandColors } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
+import { syncCustomerToBackend } from '@/utils/customer-sync';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ authSuccess?: string; email?: string }>();
+  const { user } = useAuth();
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const { t } = useLanguage();
+
+  const activeEmail = params.email || user?.email;
+
+  useEffect(() => {
+    if (params.authSuccess === '1') {
+      setShowSuccessModal(true);
+      if (activeEmail) {
+        syncCustomerToBackend(activeEmail);
+      }
+    }
+  }, [params.authSuccess, activeEmail]);
 
   const categories = [
     { id: 'mugs', label: t.catMugs, icon: 'cafe-outline' as const },
@@ -85,7 +105,7 @@ export default function HomeScreen() {
       <StatusBar style="dark" />
 
       {/* ── Header + Search ──────────────────────────────────── */}
-      <ScreenHeader />
+      <ScreenHeader onAvatarPress={() => setShowProfileModal(true)} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -238,9 +258,127 @@ export default function HomeScreen() {
         {/* Bottom spacing */}
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* ── macOS Auth Success Alert ───────────────────────────── */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}>
+        <Pressable style={modalStyles.overlay} onPress={() => setShowSuccessModal(false)}>
+          <Animated.View entering={FadeInUp.duration(300)} style={modalStyles.macWindow}>
+            {/* macOS Title Bar */}
+            <View style={modalStyles.macTitleBar}>
+              <View style={modalStyles.macControls}>
+                <View style={[modalStyles.macDot, { backgroundColor: '#FF5F56' }]} />
+                <View style={[modalStyles.macDot, { backgroundColor: '#FFBD2E' }]} />
+                <View style={[modalStyles.macDot, { backgroundColor: '#27C93F' }]} />
+              </View>
+              <Text style={modalStyles.macTitle}>System Notice</Text>
+              <View style={{ width: 44 }} />
+            </View>
+
+            {/* Content */}
+            <View style={modalStyles.macBody}>
+              <Text style={modalStyles.macHeading}>Authenticated Successfully!</Text>
+              <Text style={modalStyles.macMessage}>
+                Welcome to NUYDA ENTERPRISE! You are now logged in
+                {activeEmail ? (
+                  <> as <Text style={{ fontWeight: '700', color: '#111827' }}>{activeEmail}</Text></>
+                ) : null}.
+              </Text>
+              <Text style={modalStyles.macHint}>Tap anywhere to close</Text>
+            </View>
+          </Animated.View>
+        </Pressable>
+      </Modal>
+
+      {/* ── Profile & Logout Modal ────────────────────────────── */}
+      <ProfileModal
+        visible={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        email={activeEmail}
+      />
     </View>
   );
 }
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  macWindow: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.22,
+        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 8 },
+      },
+      android: { elevation: 12 },
+    }),
+  },
+  macTitleBar: {
+    height: 36,
+    backgroundColor: '#F3F4F6',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+  },
+  macControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  macDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+  },
+  macTitle: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#4B5563',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  macBody: {
+    padding: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
+  macHeading: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    fontFamily: 'Manrope_700Bold',
+    textAlign: 'center',
+  },
+  macMessage: {
+    fontSize: 13.5,
+    color: '#4B5563',
+    textAlign: 'center',
+    lineHeight: 19,
+    fontFamily: 'Inter_400Regular',
+  },
+  macHint: {
+    fontSize: 11.5,
+    color: '#9CA3AF',
+    fontFamily: 'Inter_400Regular',
+    marginTop: 4,
+  },
+});
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 

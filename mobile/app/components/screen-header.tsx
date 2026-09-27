@@ -1,9 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { BrandColors } from '@/constants/theme';
+import { useLanguage } from '@/contexts/language-context';
+import ProfileModal from '@/components/profile-modal';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -28,8 +31,6 @@ interface ScreenHeaderProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-import { useLanguage } from '@/contexts/language-context';
-
 export default function ScreenHeader({
   title = 'NUYDA ENTERPRISE',
   hideSearch = false,
@@ -41,7 +42,17 @@ export default function ScreenHeader({
   onAvatarPress,
 }: ScreenHeaderProps) {
   const { t } = useLanguage();
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const effectivePlaceholder = searchPlaceholder ?? t.searchPlaceholder;
+
+  const handleAvatarPress = () => {
+    if (onAvatarPress) {
+      onAvatarPress();
+    } else {
+      setShowProfileModal(true);
+    }
+  };
+
   return (
     <>
       {/* ── Top bar ──────────────────────────────────────────── */}
@@ -53,8 +64,8 @@ export default function ScreenHeader({
 
           <Text style={styles.brandName}>{title}</Text>
 
-          <Pressable hitSlop={8} style={styles.avatarBtn} onPress={onAvatarPress}>
-            <Ionicons name="person-circle-outline" size={32} color="#9CA3AF" />
+          <Pressable hitSlop={8} style={styles.avatarBtn} onPress={handleAvatarPress}>
+            <Ionicons name="person-circle-outline" size={32} color={BrandColors.primary} />
           </Pressable>
         </View>
       </SafeAreaView>
@@ -76,6 +87,12 @@ export default function ScreenHeader({
           </Pressable>
         </Animated.View>
       )}
+
+      {/* Profile & Logout Modal */}
+      <ProfileModal
+        visible={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+      />
     </>
   );
 }
