@@ -6,11 +6,13 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DiscountController as ApiDiscountController;
 use App\Http\Controllers\Api\GroqController;
 use App\Http\Controllers\Api\PrintCategoryController;
 use App\Http\Controllers\Api\PrintItemController;
 use App\Http\Controllers\Api\ProductAiController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\RewardController as ApiRewardController;
 use App\Http\Controllers\Api\TaskController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
@@ -38,8 +40,18 @@ Route::post('customers/bulk-activate', [CustomerController::class, 'bulkActivate
 Route::post('customers/bulk-archive', [CustomerController::class, 'bulkArchive']);
 Route::post('customers/bulk-destroy', [CustomerController::class, 'bulkDestroy']);
 
+Route::post('print-items/ai-recognize', [\App\Http\Controllers\Api\PrintItemAiController::class, 'recognize']);
 Route::apiResource('print-items', PrintItemController::class);
 Route::apiResource('print-categories', PrintCategoryController::class);
+
+// Discounts & Coupons API
+Route::get('discounts', [ApiDiscountController::class, 'index']);
+Route::post('discounts/validate', [ApiDiscountController::class, 'validateCode']);
+
+// VIP & Rewards API
+Route::get('rewards/catalog', [ApiRewardController::class, 'catalog']);
+Route::get('rewards/vip-tiers', [ApiRewardController::class, 'vipTiers']);
+Route::get('rewards/customer/{customerId}', [ApiRewardController::class, 'customerPoints']);
 
 // ─── Groq AI proxy (no auth required — key is server-side only) ───────────────
 Route::prefix('groq')->group(function () {

@@ -29,6 +29,7 @@ import { dashboard } from '@/routes';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -708,6 +709,9 @@ export default function PrintItemsIndex({
                                 <span>{quickViewItem.name}</span>
                                 <span className="text-xs font-normal text-muted-foreground">[{quickViewItem.item_code}]</span>
                             </DialogTitle>
+                            <DialogDescription className="sr-only">
+                                Quick view details for selected print service or resource.
+                            </DialogDescription>
                         </DialogHeader>
 
                         <div className="space-y-3 font-sans text-xs">

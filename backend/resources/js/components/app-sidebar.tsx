@@ -86,22 +86,17 @@ const inventoryNavItems: NavItem[] = [
         href: '/print-items?filter[category_code]=STOCK',
         icon: Warehouse,
     },
-    {
-        title: 'Equipment & Inks',
-        href: '/print-items?filter[category_code]=EQUIPMENT',
-        icon: Boxes,
-    },
 ];
 
 const marketingNavItems: NavItem[] = [
     {
         title: 'Discounts & Coupons',
-        href: '#',
+        href: '/discounts',
         icon: Tag,
     },
     {
         title: 'VIP & Rewards',
-        href: '#',
+        href: '/rewards',
         icon: Sparkles,
     },
 ];

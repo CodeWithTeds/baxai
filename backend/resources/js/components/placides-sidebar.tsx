@@ -215,16 +215,13 @@ export default function PlacidesSidebar() {
                     <Item label="Paper & Stock" href="/print-items?filter[category_code]=STOCK">
                         <Warehouse size={18} />
                     </Item>
-                    <Item label="Equipment & Inks" href="/print-items?filter[category_code]=EQUIPMENT">
-                        <Boxes size={18} />
-                    </Item>
                 </Group>
 
                 <Group label="Marketing & Deals">
-                    <Item label="Discounts & Coupons">
+                    <Item label="Discounts & Coupons" href="/discounts">
                         <Tag size={18} />
                     </Item>
-                    <Item label="VIP & Rewards">
+                    <Item label="VIP & Rewards" href="/rewards">
                         <Sparkles size={18} />
                     </Item>
                 </Group>

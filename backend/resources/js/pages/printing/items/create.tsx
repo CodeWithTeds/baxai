@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { FormEvent, useEffect, useRef } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/select';
 import InputError from '@/components/input-error';
 import { cn } from '@/lib/utils';
+import { Camera, CheckCircle2, Sparkles } from 'lucide-react';
+import CameraScanModal, { RecognizedProductData } from '@/components/camera-scan-modal';
 
 interface PrintCategoryOption {
     id: number;
@@ -101,10 +103,29 @@ export function PrintItemForm({
 }: any) {
     const errorBoxRef = useRef<HTMLDivElement>(null);
     const errorEntries = Object.entries((errors ?? {}) as Record<string, string>);
+    const [scanModalOpen, setScanModalOpen] = useState(false);
+    const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
 
     useEffect(() => {
         if (errorEntries.length > 0) errorBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, [errors]);
+
+    const handleAiRecognize = (recognized: RecognizedProductData) => {
+        if (recognized.name) setData('name', recognized.name);
+        if (recognized.brand !== undefined) setData('brand', recognized.brand);
+        if (recognized.model !== undefined) setData('model', recognized.model);
+        if (recognized.category_id) setData('category_id', recognized.category_id);
+        if (recognized.paper_type !== undefined) setData('paper_type', recognized.paper_type);
+        if (recognized.paper_size !== undefined) setData('paper_size', recognized.paper_size);
+        if (recognized.compatibility !== undefined) setData('compatibility', recognized.compatibility);
+        if (recognized.available_quantity !== undefined) setData('available_quantity', recognized.available_quantity);
+        if (recognized.unit) setData('unit', recognized.unit);
+        if (recognized.description) setData('description', recognized.description);
+        if (recognized.notes) setData('notes', recognized.notes);
+
+        setAiSuccessMessage(`Auto-filled: "${recognized.name}" recognized from camera photo!`);
+        setTimeout(() => setAiSuccessMessage(null), 8000);
+    };
 
     const prettyField = (field: string) => FIELD_LABELS[field] ?? field.replace(/_/g, ' ');
 
@@ -113,19 +134,38 @@ export function PrintItemForm({
             {/* HEADING SECTION */}
             <div className="mb-3 border-b border-[#E5E7EB] pb-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-[15px] font-bold text-[#1A1C1E]">
-                        {initial ? `Edit Resource / Service` : 'Add Resource / Service'}
-                        {initial?.item_code && (
-                            <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
-                                [{initial.item_code}]
-                            </span>
-                        )}
-                    </h2>
+                    <div>
+                        <h2 className="text-[15px] font-bold text-[#1A1C1E]">
+                            {initial ? `Edit Resource / Service` : 'Add Resource / Service'}
+                            {initial?.item_code && (
+                                <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
+                                    [{initial.item_code}]
+                                </span>
+                            )}
+                        </h2>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-[#6B7280]">
+                            Configure printing stock, equipment specifications, available quantity, ink compatibility, and pricing rules.
+                        </p>
+                    </div>
+
+                    <Button
+                        type="button"
+                        onClick={() => setScanModalOpen(true)}
+                        className="h-8 rounded-none border border-emerald-600 bg-emerald-50 px-3 text-xs font-mono font-semibold text-emerald-800 hover:bg-emerald-100 flex items-center gap-1.5 shadow-sm"
+                    >
+                        <Camera size={14} className="text-emerald-700" />
+                        <Sparkles size={12} className="text-emerald-600" />
+                        AI Camera Scan
+                    </Button>
                 </div>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-[#6B7280]">
-                    Configure printing stock, equipment specifications, available quantity, ink compatibility, and pricing rules.
-                </p>
             </div>
+
+            {aiSuccessMessage && (
+                <div className="mb-3 rounded-none border border-emerald-300 bg-emerald-50 p-2 text-xs font-mono text-emerald-800 flex items-center gap-2">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                    <span>{aiSuccessMessage}</span>
+                </div>
+            )}
 
             {errorEntries.length > 0 && (
                 <div ref={errorBoxRef} className="mb-3 scroll-mt-4 rounded-none border border-red-300 bg-red-50 p-2.5 text-xs">
@@ -147,9 +187,28 @@ export function PrintItemForm({
                 <div className="space-y-3">
                     <Section title="Basic Resource Info">
                         <div className="grid gap-2 sm:grid-cols-2">
-                            <Field label="Resource / Service Name *" error={errors.name}>
-                                <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="e.g. 70gsm Premium Bond Paper Reams" className={inputCls} />
-                            </Field>
+                            <div className="sm:col-span-2">
+                                <Field label="Resource / Service Name *" error={errors.name}>
+                                    <div className="flex gap-1.5">
+                                        <Input
+                                            value={data.name}
+                                            onChange={(e) => setData('name', e.target.value)}
+                                            placeholder="e.g. 70gsm Premium Bond Paper Reams"
+                                            className={inputCls}
+                                        />
+                                        <Button
+                                            type="button"
+                                            title="Scan Product Label with AI Camera"
+                                            onClick={() => setScanModalOpen(true)}
+                                            variant="outline"
+                                            className="h-8 rounded-none border-[#D1D5DB] px-2.5 text-xs font-mono bg-white hover:bg-gray-50 text-emerald-800"
+                                        >
+                                            <Camera size={13} className="mr-1 text-emerald-700" />
+                                            Scan
+                                        </Button>
+                                    </div>
+                                </Field>
+                            </div>
 
                             <Field label="Category *" error={errors.category_id}>
                                 <Select value={String(data.category_id ?? '')} onValueChange={(v) => setData('category_id', Number(v))}>
@@ -352,6 +411,13 @@ export function PrintItemForm({
                     </Section>
                 </div>
             </div>
+
+            {/* CAMERA SCANNER MODAL */}
+            <CameraScanModal
+                open={scanModalOpen}
+                onClose={() => setScanModalOpen(false)}
+                onRecognize={handleAiRecognize}
+            />
         </form>
     );
 }

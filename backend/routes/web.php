@@ -1,11 +1,15 @@
 <?php
 
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DiscountController;
 use App\Http\Controllers\PrintCategoryController;
 use App\Http\Controllers\PrintItemController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\RewardController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\PrintItemAiController;
 use Inertia\Inertia;
+
 use Laravel\Fortify\Features;
 
 Route::inertia('/', 'welcome', [
@@ -14,8 +18,8 @@ Route::inertia('/', 'welcome', [
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
-    // Web bulk actions (Inertia-compatible redirects — the /api/v1/* twins are
-    // token-auth JSON endpoints and must not be called via Inertia).
+
+    // Web bulk actions
     Route::post('products/bulk-activate', [ProductController::class, 'bulkActivate'])->name('products.bulk-activate');
     Route::post('products/bulk-archive', [ProductController::class, 'bulkArchive'])->name('products.bulk-archive');
     Route::post('products/bulk-destroy', [ProductController::class, 'bulkDestroy'])->name('products.bulk-destroy');
@@ -26,11 +30,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('customers/bulk-destroy', [CustomerController::class, 'bulkDestroy'])->name('customers.bulk-destroy');
     Route::resource('customers', CustomerController::class);
 
+    Route::post('print-items/ai-recognize', [PrintItemAiController::class, 'recognize'])->name('print-items.ai-recognize');
     Route::post('print-items/bulk-activate', [PrintItemController::class, 'bulkActivate'])->name('print-items.bulk-activate');
     Route::post('print-items/bulk-archive', [PrintItemController::class, 'bulkArchive'])->name('print-items.bulk-archive');
     Route::post('print-items/bulk-destroy', [PrintItemController::class, 'bulkDestroy'])->name('print-items.bulk-destroy');
     Route::resource('print-items', PrintItemController::class);
     Route::resource('print-categories', PrintCategoryController::class);
+
+    // Discounts & Coupons
+    Route::post('discounts/calculate', [DiscountController::class, 'calculate'])->name('discounts.calculate');
+    Route::post('discounts/bulk-activate', [DiscountController::class, 'bulkActivate'])->name('discounts.bulk-activate');
+    Route::post('discounts/bulk-archive', [DiscountController::class, 'bulkArchive'])->name('discounts.bulk-archive');
+    Route::post('discounts/bulk-destroy', [DiscountController::class, 'bulkDestroy'])->name('discounts.bulk-destroy');
+    Route::resource('discounts', DiscountController::class);
+
+    // VIP & Rewards
+    Route::get('rewards', [RewardController::class, 'index'])->name('rewards.index');
+    Route::post('rewards/perks', [RewardController::class, 'storeReward'])->name('rewards.store-perk');
+    Route::put('rewards/perks/{reward}', [RewardController::class, 'updateReward'])->name('rewards.update-perk');
+    Route::delete('rewards/perks/{reward}', [RewardController::class, 'destroyReward'])->name('rewards.destroy-perk');
+    Route::post('rewards/adjust-points', [RewardController::class, 'adjustPoints'])->name('rewards.adjust-points');
+    Route::post('rewards/issue', [RewardController::class, 'issueReward'])->name('rewards.issue');
+    Route::put('rewards/vip-tiers/{vipTier}', [RewardController::class, 'updateVipTier'])->name('rewards.update-vip-tier');
 
     Route::get('design-studio/{type?}', fn (string $type = 'mug') => Inertia::render('design-studio/show', [
         'initialType' => $type,
