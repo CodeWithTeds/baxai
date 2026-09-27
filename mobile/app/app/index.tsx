@@ -11,7 +11,7 @@ import { BrandColors } from '@/constants/theme';
 import { useLanguage } from '@/contexts/language-context';
 
 export default function LanguageSelectionScreen() {
-  const { setLanguage } = useLanguage();
+  const { setLanguage, t } = useLanguage();
 
   const handleSelect = async (lang: 'en' | 'tl') => {
     if (Platform.OS !== 'web') {
@@ -31,7 +31,7 @@ export default function LanguageSelectionScreen() {
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
         <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
           <Ionicons name="print" size={20} color="#FFFFFF" style={styles.headerIcon} />
-          <Text style={styles.headerTitle}>NUYDA ENTERPRISE</Text>
+          <Text style={styles.headerTitle}>{t.brandName}</Text>
         </Animated.View>
       </SafeAreaView>
 
@@ -61,10 +61,9 @@ export default function LanguageSelectionScreen() {
         <Animated.View entering={FadeInUp.delay(300).duration(600).springify()} style={styles.card}>
           {/* Card Header */}
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Choose Your Language</Text>
+            <Text style={styles.cardTitle}>{t.chooseYourLanguage}</Text>
             <Text style={styles.cardSubtitle}>
-              Select your preferred language to customize your experience and manage your printing orders with
-              ease.
+              {t.subtitle}
             </Text>
           </View>
 
@@ -74,7 +73,7 @@ export default function LanguageSelectionScreen() {
             onPress={() => handleSelect('en')}
             style={({ pressed }) => [styles.languageButton, pressed && styles.languageButtonPressed]}
             android_ripple={{ color: '#E5F0FF' }}>
-            <Text style={styles.languageText}>English</Text>
+            <Text style={styles.languageText}>{t.english}</Text>
           </Pressable>
 
           <View style={styles.divider} />
@@ -83,7 +82,7 @@ export default function LanguageSelectionScreen() {
             onPress={() => handleSelect('tl')}
             style={({ pressed }) => [styles.languageButton, pressed && styles.languageButtonPressed]}
             android_ripple={{ color: '#E5F0FF' }}>
-            <Text style={styles.languageText}>Tagalog</Text>
+            <Text style={styles.languageText}>{t.tagalog}</Text>
           </Pressable>
         </Animated.View>
 

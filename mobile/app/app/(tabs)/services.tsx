@@ -203,13 +203,75 @@ function GridServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () =>
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+import { useLanguage } from '@/contexts/language-context';
+
 export default function ServicesScreen() {
   const [query, setQuery] = useState('');
   const router = useRouter();
+  const { t } = useLanguage();
+
+  const services: ServiceItem[] = [
+    {
+      id: '1',
+      name: t.prodMug,
+      description: t.prodMugDesc,
+      price: `${t.fromPrice} ₱9.99`,
+      image: require('@/assets/images/custom-mugs.jpeg'),
+      badge: t.bestseller,
+      badgeColor: BrandColors.primary,
+      featured: true,
+    },
+    {
+      id: '2',
+      name: t.prodPins,
+      description: t.prodPinsDesc,
+      price: `${t.fromPrice} ₱1.50`,
+      image: require('@/assets/images/button-pins.jpg'),
+    },
+    {
+      id: '3',
+      name: t.prodStickers,
+      description: t.prodStickersDesc,
+      price: '₱0.50 ea',
+      image: require('@/assets/images/custom-stickers.jpg'),
+      badge: t.deal,
+      badgeColor: '#D97706',
+    },
+    {
+      id: '4',
+      name: t.prodTshirt,
+      description: t.prodTshirtDesc,
+      price: `${t.fromPrice} ₱15.00`,
+      image: require('@/assets/images/custom-thirts.jpg'),
+      badge: t.fastTurnaround,
+      badgeColor: '#F53003',
+    },
+    {
+      id: '5',
+      name: t.prodTotes,
+      description: t.prodTotesDesc,
+      price: `${t.fromPrice} ₱12.00`,
+      image: require('@/assets/images/tote-bags.jpg'),
+    },
+    {
+      id: '6',
+      name: t.prodCalendars,
+      description: t.prodCalendarsDesc,
+      price: `${t.fromPrice} ₱8.00`,
+      image: require('@/assets/images/calendars.jpg'),
+    },
+    {
+      id: '7',
+      name: t.prodCustomPin,
+      description: t.prodCustomPinDesc,
+      price: `${t.fromPrice} ₱1.20`,
+      image: require('@/assets/images/custom-pin.jpeg'),
+    },
+  ];
 
   const handlePress = (item: ServiceItem) => {
     const isMug = item.id === '1' || item.name.toLowerCase().includes('mug');
-    const isPin = item.name.toLowerCase().includes('pin');
+    const isPin = item.id === '2' || item.id === '7' || item.name.toLowerCase().includes('pin');
     if (isMug) {
       router.push('/mug-3d' as any);
     } else if (isPin) {
@@ -217,8 +279,8 @@ export default function ServicesScreen() {
     }
   };
 
-  const featured = SERVICES.filter((s) => s.featured);
-  const grid = SERVICES.filter((s) => !s.featured).filter((s) =>
+  const featured = services.filter((s) => s.featured);
+  const grid = services.filter((s) => !s.featured).filter((s) =>
     query.length === 0 ? true : s.name.toLowerCase().includes(query.toLowerCase()),
   );
   const filteredFeatured = featured.filter((s) =>
@@ -231,7 +293,6 @@ export default function ServicesScreen() {
 
       {/* ── Header + Search ──────────────────────────────────── */}
       <ScreenHeader
-        searchPlaceholder="Search services..."
         searchValue={query}
         onSearchChange={setQuery}
       />

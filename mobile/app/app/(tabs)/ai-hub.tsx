@@ -28,25 +28,11 @@ import ScreenHeader from '@/components/screen-header';
 import { useVoiceConversation, type VoiceState } from '@/hooks/use-voice-conversation';
 import { BrandColors } from '@/constants/theme';
 
+import { useLanguage } from '@/contexts/language-context';
+
 // ─── Quick actions ────────────────────────────────────────────────────────────
 
-const QUICK_ACTIONS = [
-  { id: 'track',   label: 'Track Order',   icon: 'bus-outline' as const },
-  { id: 'pricing', label: 'Check Pricing', icon: 'pricetag-outline' as const },
-  { id: 'talk',    label: 'Talk to Agent', icon: 'headset-outline' as const },
-  { id: 'design',  label: 'Design Help',   icon: 'color-palette-outline' as const },
-];
-
 // ─── State labels ─────────────────────────────────────────────────────────────
-
-const STATE_LABEL: Record<VoiceState, string> = {
-  idle:          'Tap to speak',
-  recording:     'Listening… tap to stop',
-  transcribing:  'Transcribing…',
-  thinking:      'Thinking…',
-  speaking:      'Speaking…',
-  error:         'Tap to try again',
-};
 
 const STATE_COLOR: Record<VoiceState, string> = {
   idle:          '#9CA3AF',
@@ -146,8 +132,18 @@ function MicButton({
   voiceState: VoiceState;
   onPress: () => void;
 }) {
+  const { t } = useLanguage();
   const isRecording = voiceState === 'recording';
   const isBusy      = voiceState === 'transcribing' || voiceState === 'thinking' || voiceState === 'speaking';
+
+  const stateLabels: Record<VoiceState, string> = {
+    idle:          t.voiceIdle,
+    recording:     t.voiceRecording,
+    transcribing:  t.voiceTranscribing,
+    thinking:      t.voiceThinking,
+    speaking:      t.voiceSpeaking,
+    error:         t.voiceError,
+  };
 
   return (
     <View style={styles.micRow}>
@@ -169,7 +165,7 @@ function MicButton({
         </View>
       </View>
       <Text style={[styles.micLabel, { color: STATE_COLOR[voiceState] }]}>
-        {STATE_LABEL[voiceState]}
+        {stateLabels[voiceState]}
       </Text>
     </View>
   );
@@ -203,6 +199,23 @@ function Bubble({ msg, dimmed = false }: { msg: { role: string; text: string; id
 
 export default function AiHubScreen() {
   const { messages, voiceState, error, toggle, sendText } = useVoiceConversation();
+  const { t } = useLanguage();
+
+  const stateLabels: Record<VoiceState, string> = {
+    idle:          t.voiceIdle,
+    recording:     t.voiceRecording,
+    transcribing:  t.voiceTranscribing,
+    thinking:      t.voiceThinking,
+    speaking:      t.voiceSpeaking,
+    error:         t.voiceError,
+  };
+
+  const quickActions = [
+    { id: 'track',   label: t.qaTrackOrder,   icon: 'bus-outline' as const },
+    { id: 'pricing', label: t.qaCheckPricing, icon: 'pricetag-outline' as const },
+    { id: 'talk',    label: t.qaTalkAgent,    icon: 'headset-outline' as const },
+    { id: 'design',  label: t.qaDesignHelp,   icon: 'color-palette-outline' as const },
+  ];
 
   // Split messages: latest 2 prominent, rest dimmed history
   const history    = messages.slice(0, -2);
@@ -213,14 +226,14 @@ export default function AiHubScreen() {
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
-      <ScreenHeader hideSearch />
+      <ScreenHeader hideSearch title={t.aiAssistant} />
 
       {/* ── Owl ──────────────────────────────────────────────── */}
       <Animated.View entering={FadeIn.duration(500)} style={styles.owlSection}>
         <OwlMascot voiceState={voiceState} onPress={toggle} />
         <Text style={styles.owlName}>Owla</Text>
         <Text style={[styles.owlHint, { color: STATE_COLOR[voiceState] }]}>
-          {error ? `Error: ${error}` : STATE_LABEL[voiceState]}
+          {error ? `Error: ${error}` : stateLabels[voiceState]}
         </Text>
       </Animated.View>
 
@@ -244,7 +257,7 @@ export default function AiHubScreen() {
       {/* ── Quick actions ────────────────────────────────────── */}
       <View style={styles.quickWrap}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickScroll}>
-          {QUICK_ACTIONS.map((a) => (
+          {quickActions.map((a) => (
             <Pressable
               key={a.id}
               onPress={() => sendText(a.label)}

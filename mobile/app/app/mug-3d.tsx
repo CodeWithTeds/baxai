@@ -21,11 +21,12 @@ import * as THREE from 'three';
 global.THREE = (global as any).THREE || THREE;
 
 import { BrandColors } from '@/constants/theme';
+import { useLanguage } from '@/contexts/language-context';
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export default function Mug3DScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [webGLSupported, setWebGLSupported] = useState(true);
 
@@ -313,7 +314,7 @@ export default function Mug3DScreen() {
         <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]} hitSlop={10}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </Pressable>
-        <Text style={styles.headerTitle}>Custom Mug — 3D Preview</Text>
+        <Text style={styles.headerTitle}>{t.prodMug}</Text>
         <Pressable onPress={() => router.push('/(tabs)/services' as any)} style={({ pressed }) => [styles.headerCart, pressed && { opacity: 0.6 }]}>
           <Ionicons name="bag-outline" size={20} color={BrandColors.primary} />
         </Pressable>
@@ -327,7 +328,7 @@ export default function Mug3DScreen() {
             <Image source={require('@/assets/images/custom-mugs.jpeg')} style={styles.webImg} contentFit="cover" />
             <View style={styles.webBadge}>
               <Ionicons name="cube-outline" size={14} color="#fff" />
-              <Text style={styles.webBadgeText}>3D — drag to spin (native)</Text>
+              <Text style={styles.webBadgeText}>{t.dragToRotate}</Text>
             </View>
           </View>
         ) : !webGLSupported ? (
@@ -342,19 +343,19 @@ export default function Mug3DScreen() {
             {loading && (
               <View style={styles.loadingOverlay}>
                 <ActivityIndicator size="large" color={BrandColors.primary} />
-                <Text style={styles.loadingText}>Crafting your mug in 3D…</Text>
+                <Text style={styles.loadingText}>{t.dragToRotate}</Text>
               </View>
             )}
             {/* Hint pill */}
             {!loading && (
               <View style={styles.hintPill}>
                 <Ionicons name="hand-left-outline" size={14} color="#6B7280" />
-                <Text style={styles.hintText}>Drag to rotate • flick to spin</Text>
+                <Text style={styles.hintText}>{t.dragToRotate}</Text>
               </View>
             )}
             {/* Price badge */}
             <View style={styles.pricePill}>
-              <Text style={styles.priceText}>From ₱9.99</Text>
+              <Text style={styles.priceText}>{t.fromPrice} ₱9.99</Text>
             </View>
           </>
         )}
@@ -369,15 +370,11 @@ export default function Mug3DScreen() {
             <View style={styles.badgeRow}>
               <View style={[styles.badge, { backgroundColor: BrandColors.primary }]}>
                 <Ionicons name="star" size={10} color="#fff" />
-                <Text style={styles.badgeText}>Bestseller</Text>
-              </View>
-              <View style={styles.stockBadge}>
-                <View style={styles.stockDot} />
-                <Text style={styles.stockText}>In stock</Text>
+                <Text style={styles.badgeText}>{t.bestseller}</Text>
               </View>
             </View>
-            <Text style={styles.title}>Custom Ceramic Mug</Text>
-            <Text style={styles.subtitle}>11oz • High-gloss • Dishwasher safe • Full-wrap print</Text>
+            <Text style={styles.title}>{t.prodMug}</Text>
+            <Text style={styles.subtitle}>{t.prodMugDesc}</Text>
           </View>
           <Pressable style={({ pressed }) => [styles.wishBtn, pressed && { opacity: 0.7 }]}>
             <Ionicons name="heart-outline" size={20} color="#6B7280" />
@@ -387,17 +384,17 @@ export default function Mug3DScreen() {
         {/* Print area legend */}
         <View style={styles.legend}>
           <View style={styles.legendDot} />
-          <Text style={styles.legendText}>Plain white ceramic — ready for your custom artwork</Text>
+          <Text style={styles.legendText}>{t.prodMugDesc}</Text>
         </View>
 
         {/* Actions */}
         <View style={styles.actions}>
           <View style={styles.priceBlock}>
-            <Text style={styles.priceLabel}>Starting at</Text>
+            <Text style={styles.priceLabel}>{t.fromPrice}</Text>
             <Text style={styles.price}>₱9.99</Text>
           </View>
           <Pressable style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }]}>
-            <Text style={styles.primaryText}>Customize</Text>
+            <Text style={styles.primaryText}>{t.customize}</Text>
             <Ionicons name="color-palette-outline" size={16} color="#fff" />
           </Pressable>
           <Pressable style={({ pressed }) => [styles.cartBtn, pressed && { opacity: 0.85 }]}>

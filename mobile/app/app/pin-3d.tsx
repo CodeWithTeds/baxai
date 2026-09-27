@@ -8,8 +8,11 @@ import { useRouter } from 'expo-router';
 import { BrandColors } from '@/constants/theme';
 import { PIN_SHAPES, Pin3DViewer, type PinShape } from '@/components/Pin3DViewer';
 
+import { useLanguage } from '@/contexts/language-context';
+
 export default function Pin3DScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [shape, setShape] = useState<PinShape>('round');
   const [loading, setLoading] = useState(true);
 
@@ -24,7 +27,7 @@ export default function Pin3DScreen() {
         <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]} hitSlop={10}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </Pressable>
-        <Text style={styles.headerTitle}>Button Pin — 3D Preview</Text>
+        <Text style={styles.headerTitle}>{t.prodPins}</Text>
         <Pressable onPress={() => router.push('/(tabs)/services' as any)} style={({ pressed }) => [styles.headerCart, pressed && { opacity: 0.6 }]}>
           <Ionicons name="bag-outline" size={20} color={BrandColors.primary} />
         </Pressable>

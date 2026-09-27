@@ -28,16 +28,20 @@ interface ScreenHeaderProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+import { useLanguage } from '@/contexts/language-context';
+
 export default function ScreenHeader({
   title = 'NUYDA ENTERPRISE',
   hideSearch = false,
-  searchPlaceholder = 'Search...',
+  searchPlaceholder,
   searchValue,
   onSearchChange,
   onFilterPress,
   onMenuPress,
   onAvatarPress,
 }: ScreenHeaderProps) {
+  const { t } = useLanguage();
+  const effectivePlaceholder = searchPlaceholder ?? t.searchPlaceholder;
   return (
     <>
       {/* ── Top bar ──────────────────────────────────────────── */}
@@ -60,7 +64,7 @@ export default function ScreenHeader({
         <Animated.View entering={FadeIn.duration(400)} style={styles.searchWrap}>
           <Ionicons name="search-outline" size={18} color="#9CA3AF" style={styles.searchIcon} />
           <TextInput
-            placeholder={searchPlaceholder}
+            placeholder={effectivePlaceholder}
             placeholderTextColor="#9CA3AF"
             style={styles.searchInput}
             returnKeyType="search"

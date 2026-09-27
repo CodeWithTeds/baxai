@@ -96,7 +96,7 @@ function LineItemRow({ item }: { item: LineItem }) {
   return (
     <View style={li.row}>
       <View style={li.imgWrap}>
-        <Image source={item.image} style={li.img} contentFit="cover" />
+        <Image source={item.image as any} style={li.img} contentFit="cover" />
       </View>
       <View style={li.info}>
         <Text style={li.name}>{item.name}</Text>
@@ -114,8 +114,11 @@ function LineItemRow({ item }: { item: LineItem }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+import { useLanguage } from '@/contexts/language-context';
+
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t } = useLanguage();
   const order = ALL_ORDERS.find((o) => o.id === id);
 
   if (!order) {
@@ -124,7 +127,7 @@ export default function OrderDetailScreen() {
         <Ionicons name="receipt-outline" size={48} color="#D1D5DB" />
         <Text style={styles.notFoundText}>Order not found</Text>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>Go back</Text>
+          <Text style={styles.backBtnText}>{t.back}</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -145,7 +148,7 @@ export default function OrderDetailScreen() {
             style={({ pressed }) => [styles.backIconBtn, pressed && { opacity: 0.6 }]}>
             <Ionicons name="chevron-back" size={22} color={BrandColors.primary} />
           </Pressable>
-          <Text style={styles.topBarTitle}>Order Details</Text>
+          <Text style={styles.topBarTitle}>{t.orderDetails}</Text>
           <Pressable hitSlop={12} style={styles.shareBtn}>
             <Ionicons name="share-outline" size={20} color={BrandColors.primary} />
           </Pressable>
@@ -158,11 +161,11 @@ export default function OrderDetailScreen() {
 
         {/* ── Order number + date ──────────────────────────────── */}
         <Animated.View entering={FadeInUp.duration(400)} style={styles.heroSection}>
-          <Text style={styles.heroLabel}>ORDER NUMBER</Text>
+          <Text style={styles.heroLabel}>{t.orderNumberPrefix.toUpperCase()}</Text>
           <Text style={styles.heroNumber}>#{order.orderNumber}</Text>
           <View style={styles.heroBadgeRow}>
             <Ionicons name="calendar-outline" size={13} color="#9CA3AF" />
-            <Text style={styles.heroDate}>{order.placedOn}</Text>
+            <Text style={styles.heroDate}>{t.placedOn} {order.placedOn}</Text>
           </View>
         </Animated.View>
 
@@ -170,8 +173,8 @@ export default function OrderDetailScreen() {
         <Animated.View entering={FadeInDown.delay(80).duration(500)} style={styles.card}>
           <View style={styles.deliveryRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.deliveryLabel}>Expected Delivery</Text>
-              <Text style={styles.deliveryDate}>Arriving by {order.expectedDelivery}</Text>
+              <Text style={styles.deliveryLabel}>{t.estimatedDelivery}</Text>
+              <Text style={styles.deliveryDate}>{order.expectedDelivery}</Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
               <Ionicons name="bus-outline" size={13} color={cfg.color} style={{ marginRight: 4 }} />
@@ -187,7 +190,7 @@ export default function OrderDetailScreen() {
 
         {/* ── Items in order ───────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(160).duration(500)}>
-          <Text style={styles.sectionTitle}>Items in Order</Text>
+          <Text style={styles.sectionTitle}>{t.itemsOrdered}</Text>
 
           <View style={styles.card}>
             {order.lineItems.map((item, i) => (
@@ -202,18 +205,18 @@ export default function OrderDetailScreen() {
         {/* ── Price summary ────────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(240).duration(500)} style={styles.card}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
+            <Text style={styles.summaryLabel}>{t.subtotal}</Text>
             <Text style={styles.summaryValue}>{order.subtotal}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Delivery</Text>
+            <Text style={styles.summaryLabel}>{t.shippingFee}</Text>
             <Text style={[styles.summaryValue, order.delivery === 'Free' && styles.summaryFree]}>
               {order.delivery}
             </Text>
           </View>
           <View style={styles.cardDivider} />
           <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalLabel}>{t.total}</Text>
             <Text style={styles.totalValue}>{order.total}</Text>
           </View>
         </Animated.View>
@@ -224,20 +227,20 @@ export default function OrderDetailScreen() {
             <Pressable
               style={({ pressed }) => [styles.actionBtnPrimary, pressed && { opacity: 0.8 }]}>
               <Ionicons name="location-outline" size={18} color="#fff" />
-              <Text style={styles.actionBtnPrimaryText}>Track Shipment</Text>
+              <Text style={styles.actionBtnPrimaryText}>{t.trackOrder}</Text>
             </Pressable>
           )}
           {order.status === 'delivered' && (
             <Pressable
               style={({ pressed }) => [styles.actionBtnPrimary, pressed && { opacity: 0.8 }]}>
               <Ionicons name="repeat-outline" size={18} color="#fff" />
-              <Text style={styles.actionBtnPrimaryText}>Reorder</Text>
+              <Text style={styles.actionBtnPrimaryText}>{t.trackOrder}</Text>
             </Pressable>
           )}
           <Pressable
             style={({ pressed }) => [styles.actionBtnSecondary, pressed && { opacity: 0.7 }]}>
             <Ionicons name="chatbubble-outline" size={18} color={BrandColors.primary} />
-            <Text style={styles.actionBtnSecondaryText}>Contact Support</Text>
+            <Text style={styles.actionBtnSecondaryText}>{t.qaTalkAgent}</Text>
           </Pressable>
         </Animated.View>
 

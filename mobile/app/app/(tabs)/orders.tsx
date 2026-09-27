@@ -22,10 +22,23 @@ import {
 } from '@/constants/orders-data';
 import { BrandColors } from '@/constants/theme';
 
+import { useLanguage } from '@/contexts/language-context';
+
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
 function OrderCard({ item, index }: { item: Order; index: number }) {
+  const { t } = useLanguage();
   const cfg = STATUS_CONFIG[item.status];
+
+  const getStatusLabel = () => {
+    switch (item.status) {
+      case 'in_progress': return t.statusInProgress;
+      case 'processing': return t.statusProcessing;
+      case 'delivered': return t.statusCompleted;
+      case 'cancelled': return t.statusCancelled;
+      default: return cfg.label;
+    }
+  };
 
   const handlePress = () => {
     router.push(`/order/${item.id}` as any);
@@ -41,11 +54,11 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
         <View style={styles.cardHeader}>
           <View>
             <Text style={styles.orderNumber}>#{item.orderNumber}</Text>
-            <Text style={styles.orderDate}>Placed on {item.placedOn}</Text>
+            <Text style={styles.orderDate}>{t.placedOn} {item.placedOn}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
             <Ionicons name={cfg.icon} size={13} color={cfg.color} style={{ marginRight: 4 }} />
-            <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
+            <Text style={[styles.statusText, { color: cfg.color }]}>{getStatusLabel()}</Text>
           </View>
         </View>
 
@@ -56,7 +69,7 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
         <View style={styles.productRow}>
           <View style={styles.imgWrap}>
             <Image
-              source={item.image}
+              source={item.image as any}
               style={styles.productImg}
               contentFit="cover"
             />
@@ -68,7 +81,7 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
             <View style={styles.productMeta}>
               <View style={styles.qtyBadge}>
                 <Text style={styles.qtyText}>
-                  Qty: {item.lineItems.reduce((s, li) => s + li.qty, 0)}
+                  {t.qtyPrefix}: {item.lineItems.reduce((s, li) => s + li.qty, 0)}
                 </Text>
               </View>
               <Text style={styles.totalText}>{item.total}</Text>
@@ -83,7 +96,7 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
             hitSlop={8}
             style={({ pressed }) => [styles.footerBtn, pressed && styles.footerBtnPressed]}>
             <Ionicons name="document-text-outline" size={15} color={BrandColors.primary} />
-            <Text style={styles.footerBtnText}>View Details</Text>
+            <Text style={styles.footerBtnText}>{t.viewDetails}</Text>
           </Pressable>
 
           {(item.status === 'in_progress' || item.status === 'processing') && (
@@ -96,7 +109,7 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
                 pressed && styles.footerBtnPressed,
               ]}>
               <Ionicons name="location-outline" size={15} color="#6B7280" />
-              <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>Track Order</Text>
+              <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>{t.trackOrder}</Text>
             </Pressable>
           )}
 
@@ -109,7 +122,7 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
                 pressed && styles.footerBtnPressed,
               ]}>
               <Ionicons name="repeat-outline" size={15} color="#6B7280" />
-              <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>Reorder</Text>
+              <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>{t.trackOrder}</Text>
             </Pressable>
           )}
         </View>
@@ -127,13 +140,14 @@ function TabToggle({
   active: 'active' | 'past';
   onChange: (v: 'active' | 'past') => void;
 }) {
+  const { t } = useLanguage();
   return (
     <View style={styles.toggleWrap}>
       <Pressable
         onPress={() => onChange('active')}
         style={[styles.toggleTab, active === 'active' && styles.toggleTabActive]}>
         <Text style={[styles.toggleText, active === 'active' && styles.toggleTextActive]}>
-          Active Orders
+          {t.activeOrders}
         </Text>
         {ACTIVE_ORDERS.length > 0 && (
           <View style={[styles.toggleCount, active === 'active' && styles.toggleCountActive]}>
@@ -148,7 +162,7 @@ function TabToggle({
         onPress={() => onChange('past')}
         style={[styles.toggleTab, active === 'past' && styles.toggleTabActive]}>
         <Text style={[styles.toggleText, active === 'past' && styles.toggleTextActive]}>
-          Past Orders
+          {t.pastOrders}
         </Text>
       </Pressable>
     </View>
@@ -159,6 +173,7 @@ function TabToggle({
 
 export default function OrdersScreen() {
   const [tab, setTab] = useState<'active' | 'past'>('active');
+  const { t } = useLanguage();
   const orders = tab === 'active' ? ACTIVE_ORDERS : PAST_ORDERS;
 
   return (
@@ -167,7 +182,7 @@ export default function OrdersScreen() {
 
       {/* ── Header + Search ──────────────────────────────────── */}
       <ScreenHeader
-        title="My Orders"
+        title={t.ordersTitle}
         hideSearch
       />
 

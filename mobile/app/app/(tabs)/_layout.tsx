@@ -1,16 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter, useSegments } from 'expo-router';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import BubbleTabBar, { TabConfig } from '@/components/bubble-tab-bar';
-
-const TABS: TabConfig[] = [
-  { name: 'index',    label: 'Home',     icon: 'home-outline' },
-  { name: 'services', label: 'Services', icon: 'print-outline' },
-  { name: 'orders',   label: 'Orders',   icon: 'cube-outline' },
-  { name: 'ai-hub',   label: 'AI Hub',   icon: 'sparkles-outline' },
-];
+import { useLanguage } from '@/contexts/language-context';
 
 const ROUTE_TO_INDEX: Record<string, number> = {
   index:    0,
@@ -22,15 +16,26 @@ const ROUTE_TO_INDEX: Record<string, number> = {
 export default function TabLayout() {
   const router = useRouter();
   const segments = useSegments();
+  const { t } = useLanguage();
+
+  const tabs: TabConfig[] = useMemo(
+    () => [
+      { name: 'index',    label: t.navHome,     icon: 'home-outline' },
+      { name: 'services', label: t.navServices, icon: 'print-outline' },
+      { name: 'orders',   label: t.navOrders,   icon: 'cube-outline' },
+      { name: 'ai-hub',   label: t.navAiHub,    icon: 'sparkles-outline' },
+    ],
+    [t]
+  );
 
   // Derive active index from current route segment
   const lastSegment = segments[segments.length - 1] ?? 'index';
   const activeIndex = ROUTE_TO_INDEX[lastSegment] ?? 0;
 
   const handleTabPress = (index: number) => {
-    const tab = TABS[index];
+    const tab = tabs[index];
     if (tab.name === 'index') {
-      router.push('/(tabs)/');
+      router.push('/(tabs)' as any);
     } else {
       router.push(`/(tabs)/${tab.name}` as any);
     }
@@ -41,15 +46,15 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false }}
       tabBar={() => (
         <BubbleTabBar
-          tabs={TABS}
+          tabs={tabs}
           activeIndex={activeIndex}
           onPress={handleTabPress}
         />
       )}>
-      <Tabs.Screen name="index"    options={{ title: 'Home' }} />
-      <Tabs.Screen name="services" options={{ title: 'Services' }} />
-      <Tabs.Screen name="orders"   options={{ title: 'Orders' }} />
-      <Tabs.Screen name="ai-hub"   options={{ title: 'AI Hub' }} />
+      <Tabs.Screen name="index"    options={{ title: t.navHome }} />
+      <Tabs.Screen name="services" options={{ title: t.navServices }} />
+      <Tabs.Screen name="orders"   options={{ title: t.navOrders }} />
+      <Tabs.Screen name="ai-hub"   options={{ title: t.navAiHub }} />
       {/* Hide legacy tab */}
       <Tabs.Screen name="explore"  options={{ href: null }} />
     </Tabs>

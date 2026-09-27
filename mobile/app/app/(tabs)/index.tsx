@@ -15,58 +15,56 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import ScreenHeader from '@/components/screen-header';
 import { BrandColors } from '@/constants/theme';
-
-// ─── Data ────────────────────────────────────────────────────────────────────
-
-const CATEGORIES = [
-  { id: 'mugs', label: 'Mugs', icon: 'cafe-outline' as const },
-  { id: 'pins', label: 'Pins', icon: 'pricetag-outline' as const },
-  { id: 'calendars', label: 'Calendars', icon: 'calendar-outline' as const },
-  { id: 'totes', label: 'Totes', icon: 'bag-outline' as const },
-];
-
-const WIDE_CATEGORIES = [
-  { id: 'stickers', label: 'Stickers', sublabel: 'Custom', icon: 'layers-outline' as const },
-  { id: 'printing', label: 'Printing', sublabel: 'General', icon: 'print-outline' as const },
-];
-
-const FEATURED: { id: string; image: ImageSource; price: string; badge: string; badgeColor: string; name: string; rating: string; reviews: string }[] = [
-  {
-    id: '0',
-    image: require('@/assets/images/custom-mugs.jpeg'),
-    price: '₱9.99',
-    badge: '3D • Bestseller',
-    badgeColor: BrandColors.primary,
-    name: 'Custom Ceramic Mug',
-    rating: '4.9',
-    reviews: '210',
-  },
-  {
-    id: '1',
-    image: require('@/assets/images/custom-thirts.jpg'),
-    price: '₱15.00',
-    badge: 'Fast Turnaround',
-    badgeColor: '#F53003',
-    name: 'Premium Custom T-Shirts',
-    rating: '4.9',
-    reviews: '120',
-  },
-  {
-    id: '2',
-    image: require('@/assets/images/custom-stickers.jpg'),
-    price: '₱0.50 ea',
-    badge: 'High Demand',
-    badgeColor: '#D97706',
-    name: 'Die-Cut Vinyl Stickers',
-    rating: '4.8',
-    reviews: '340',
-  },
-];
-
-// ─── Component ───────────────────────────────────────────────────────────────
+import { useLanguage } from '@/contexts/language-context';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { t } = useLanguage();
+
+  const categories = [
+    { id: 'mugs', label: t.catMugs, icon: 'cafe-outline' as const },
+    { id: 'pins', label: t.catPins, icon: 'pricetag-outline' as const },
+    { id: 'calendars', label: t.catCalendars, icon: 'calendar-outline' as const },
+    { id: 'totes', label: t.catTotes, icon: 'bag-outline' as const },
+  ];
+
+  const wideCategories = [
+    { id: 'stickers', label: t.catStickers, sublabel: 'Custom', icon: 'layers-outline' as const },
+    { id: 'printing', label: t.catPrinting, sublabel: 'General', icon: 'print-outline' as const },
+  ];
+
+  const featured = [
+    {
+      id: '0',
+      image: require('@/assets/images/custom-mugs.jpeg'),
+      price: '₱9.99',
+      badge: t.bestseller,
+      badgeColor: BrandColors.primary,
+      name: t.prodMug,
+      rating: '4.9',
+      reviews: '210',
+    },
+    {
+      id: '1',
+      image: require('@/assets/images/custom-thirts.jpg'),
+      price: '₱15.00',
+      badge: t.fastTurnaround,
+      badgeColor: '#F53003',
+      name: t.prodTshirt,
+      rating: '4.9',
+      reviews: '120',
+    },
+    {
+      id: '2',
+      image: require('@/assets/images/custom-stickers.jpg'),
+      price: '₱0.50 ea',
+      badge: t.highDemand,
+      badgeColor: '#D97706',
+      name: t.prodStickers,
+      rating: '4.8',
+      reviews: '340',
+    },
+  ];
 
   const handleCategoryPress = (id: string) => {
     if (id === 'mugs') {
@@ -76,8 +74,8 @@ export default function HomeScreen() {
     }
   };
 
-  const handleFeaturedPress = (item: (typeof FEATURED)[number]) => {
-    if (item.name.toLowerCase().includes('mug')) {
+  const handleFeaturedPress = (item: (typeof featured)[number]) => {
+    if (item.id === '0') {
       router.push('/mug-3d' as any);
     }
   };
@@ -87,7 +85,7 @@ export default function HomeScreen() {
       <StatusBar style="dark" />
 
       {/* ── Header + Search ──────────────────────────────────── */}
-      <ScreenHeader searchPlaceholder="What are you looking to print?" />
+      <ScreenHeader />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -105,14 +103,14 @@ export default function HomeScreen() {
 
           {/* Text side */}
           <View style={styles.heroText}>
-            <Text style={styles.heroTitle}>{'High-impact\nprinting.'}</Text>
-            <Text style={styles.heroSub}>Precision quality for every{'\n'}order.</Text>
+            <Text style={styles.heroTitle}>{t.heroTitle}</Text>
+            <Text style={styles.heroSub}>{t.heroSubtitle}</Text>
 
             <Pressable
               style={({ pressed }) => [styles.shopBtn, pressed && styles.shopBtnPressed]}
               android_ripple={{ color: '#003D9B' }}>
               <Ionicons name="bag-outline" size={16} color="#FFFFFF" />
-              <Text style={styles.shopBtnText}>Shop Now</Text>
+              <Text style={styles.shopBtnText}>{t.getStarted}</Text>
             </Pressable>
           </View>
 
@@ -129,11 +127,11 @@ export default function HomeScreen() {
 
         {/* ── Explore Categories ───────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(160).duration(500)} style={styles.section}>
-          <Text style={styles.sectionTitle}>Explore Categories</Text>
+          <Text style={styles.sectionTitle}>{t.categories}</Text>
 
           {/* Icon grid row */}
           <View style={styles.catRow}>
-            {CATEGORIES.map((cat) => {
+            {categories.map((cat) => {
               const is3D = cat.id === 'mugs' || cat.id === 'pins';
               return (
                 <Pressable
@@ -161,7 +159,7 @@ export default function HomeScreen() {
 
           {/* Wide tiles row */}
           <View style={styles.wideCatRow}>
-            {WIDE_CATEGORIES.map((cat) => (
+            {wideCategories.map((cat) => (
               <Pressable
                 key={cat.id}
                 style={({ pressed }) => [styles.wideCatItem, pressed && styles.wideCatItemPressed]}>
@@ -178,15 +176,15 @@ export default function HomeScreen() {
         {/* ── Featured Services ─────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(240).duration(500)} style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Featured Services</Text>
+            <Text style={styles.sectionTitle}>{t.featuredProducts}</Text>
             <Pressable hitSlop={8} style={styles.seeAllBtn}>
-              <Text style={styles.seeAllText}>See all</Text>
+              <Text style={styles.seeAllText}>{t.viewAll}</Text>
               <Ionicons name="arrow-forward" size={14} color={BrandColors.primary} />
             </Pressable>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
-            {FEATURED.map((item) => (
+            {featured.map((item) => (
               <Pressable
                 key={item.id}
                 onPress={() => handleFeaturedPress(item)}
