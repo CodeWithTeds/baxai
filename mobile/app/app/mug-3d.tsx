@@ -155,12 +155,12 @@ const sliderStyles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 3,
     borderColor: BrandColors.primary,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 4,
     zIndex: 2,
     top: 10,
+    ...Platform.select({
+      web: { boxShadow: '0 2px 6px rgba(0,0,0,0.18)' } as any,
+      default: { shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 4, elevation: 4 },
+    }),
   },
 });
 
@@ -549,10 +549,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     position: 'relative',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    ...Platform.select({
+      web: { boxShadow: '0 2px 8px rgba(0,0,0,0.05)' } as any,
+      default: { shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+    }),
   },
   liveDesignPill: {
     position: 'absolute',

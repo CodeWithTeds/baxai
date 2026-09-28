@@ -637,14 +637,14 @@ export function Product3DPreview({
             setLoading(false);
           },
           undefined,
-          (err) => {
-            console.warn('[Product3DPreview] GLB load error, using fallback:', err);
-            setLoadError('Loading online 3D model failed.');
+          (_err) => {
+            // GLB not available — fall back to flat sticker preview silently
+            finish(buildSticker(activeColor));
             setLoading(false);
           }
         );
       } else {
-        setLoadError('No shirt model URL configured.');
+        finish(buildSticker(activeColor));
         setLoading(false);
       }
     } else if (resolvedViewerType === 'tote' && glbUrl) {
@@ -1001,12 +1001,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
     zIndex: 10,
+    ...Platform.select({
+      web: { boxShadow: '0 1px 3px rgba(0,0,0,0.10)' } as any,
+      default: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.10, shadowRadius: 2, elevation: 2 },
+    }),
   },
   frontViewBtnText: {
     fontSize: 11,
