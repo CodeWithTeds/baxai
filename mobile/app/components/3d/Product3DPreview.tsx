@@ -36,6 +36,11 @@ import {
 } from './shirt-builder';
 import { buildVessel, isVesselType } from './vessel-builder';
 import { createDesignCanvasTexture } from './design-texture';
+import {
+  build3DTextMesh,
+  buildDecalImageMesh,
+  loadUniversalTexture,
+} from './model-customizer';
 import { getApiBaseUrls } from '@/utils/api';
 
 export const PALETTE = ['#FFFFFF', '#111827', '#0052CC', '#EF4444', '#22C55E', '#F59E0B'];
@@ -113,7 +118,7 @@ export function Product3DPreview({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rafRef = useRef<number | null>(null);
   const isShirtRef = useRef(false);
-  const decalMeshRef = useRef<THREE.Mesh | null>(null);
+  const decalGroupRef = useRef<THREE.Group | null>(null);
   const shadowDiscRef = useRef<THREE.Mesh | null>(null);
   const modelBoxRef = useRef<THREE.Box3 | null>(null);
 
@@ -224,117 +229,123 @@ export function Product3DPreview({
   // ─── Custom Text & Logo Decal Projection ────────────────────────────────────
   const applyCustomDecal = useCallback(
     (targetGroup: THREE.Group) => {
-      createDesignCanvasTexture(
-        {
-          text: customText,
+      // Guard: only project once model bounds are ready
+      if (!modelBoxRef.current) return;
+
+      // Always cleanly remove existing decal group
+      if (decalGroupRef.current) {
+        if (decalGroupRef.current.parent) {
+          decalGroupRef.current.parent.remove(decalGroupRef.current);
+        }
+        decalGroupRef.current.traverse((o: any) => {
+          if (o.isMesh) {
+            o.geometry?.dispose();
+            if (Array.isArray(o.material)) o.material.forEach((m: any) => m.dispose());
+            else o.material?.dispose();
+          }
+        });
+        decalGroupRef.current = null;
+      }
+
+      const effectiveText = customText?.trim() || '';
+      const effectiveImage = (customImageUri || designImageUrl || '').trim();
+      const hasText = effectiveText.length > 0;
+      const hasImage = effectiveImage.length > 0;
+
+      if (!hasText && !hasImage) return;
+
+      const box = modelBoxRef.current;
+      if (!box) return;
+
+      const size = box.getSize(new THREE.Vector3());
+      const maxZ = box.max.z;
+
+      const isCylindrical = (isMugModel || isVessel);
+      const cylinderRadius = isCylindrical ? Math.max(size.z * 0.48, 0.98) : null;
+
+      const decalGroup = new THREE.Group();
+      decalGroup.userData = { isDecal: true };
+
+      // Layout vertical offsets if both text & image exist
+      let imgY = 0;
+      let textY = 0;
+      let imgSize = isCylindrical ? 0.72 : (size.x * 0.52);
+
+      if (hasImage && hasText) {
+        imgY = isShirt ? 0.18 : 0.22;
+        textY = isShirt ? -0.25 : -0.28;
+        imgSize = isCylindrical ? 0.52 : (size.x * 0.40);
+      } else if (hasText) {
+        textY = isShirt ? 0.05 : 0;
+      } else if (hasImage) {
+        imgY = isShirt ? 0.08 : 0;
+      }
+
+      // 1. Add 3D Text Mesh (synchronous, instant, zero latency, curves around mug)
+      if (hasText) {
+        const textMesh = build3DTextMesh({
+          text: effectiveText,
           textColor: customTextColor,
           fontFamily: customFontFamily,
           fontSize: customFontSize,
-          imageUri: customImageUri || designImageUrl,
-        },
-        (tex) => {
-          // If no texture (empty text and no image), remove existing decal
-          if (!tex) {
-            if (decalMeshRef.current) {
-              if (decalMeshRef.current.parent) {
-                decalMeshRef.current.parent.remove(decalMeshRef.current);
-              }
-              decalMeshRef.current.geometry?.dispose();
-              (decalMeshRef.current.material as THREE.Material)?.dispose();
-              decalMeshRef.current = null;
-            }
-            return;
-          }
+          cylinderRadius,
+          yOffset: textY,
+          zOffset: isCylindrical ? 0 : maxZ + 0.018,
+        });
+        decalGroup.add(textMesh);
+      }
 
-          // If decal already exists, update its texture in-place for zero-flicker instant live preview
-          if (decalMeshRef.current) {
-            const mat = decalMeshRef.current.material as THREE.MeshBasicMaterial;
-            mat.map = tex;
-            mat.needsUpdate = true;
-            decalMeshRef.current.visible = true;
-            return;
-          }
-
-          // Compute unrotated local bounds of the centered model
-          const box = modelBoxRef.current || new THREE.Box3().setFromObject(targetGroup);
-          const size = box.getSize(new THREE.Vector3());
-          const center = box.getCenter(new THREE.Vector3());
-          const maxZ = box.max.z;
+      // 2. Add Image Mesh (asynchronous texture load)
+      if (hasImage) {
+        loadUniversalTexture(effectiveImage, (tex) => {
+          if (!tex) return;
 
           if (isShirt) {
-            // T-shirt chest print draped over fabric folds
+            // T-shirt chest drape
             const torsoW = size.x;
             const torsoH = size.y;
-            const w = torsoW * 0.52;
+            const w = imgSize;
             const h = w;
             const geo = new THREE.PlaneGeometry(w, h, 20, 20);
-            applyShirtDecalDrape(geo, { centerY: 0, frontZ: 0, torsoW, torsoH, isBoxyHeavy: false });
+            applyShirtDecalDrape(geo, { centerY: imgY, frontZ: 0, torsoW, torsoH, isBoxyHeavy: false });
             const frontZ = maxZ + 0.015;
             const mat = new THREE.MeshBasicMaterial({
               map: tex,
               transparent: true,
               side: THREE.DoubleSide,
+              depthTest: true,
               depthWrite: false,
-              toneMapped: false,
+              polygonOffset: true,
+              polygonOffsetFactor: -1,
+              polygonOffsetUnits: -4,
             });
-            const decalMesh = new THREE.Mesh(geo, mat);
-            decalMesh.userData = { isDecal: true };
-            decalMesh.position.set(0, 0, frontZ);
-            targetGroup.add(decalMesh);
-            decalMeshRef.current = decalMesh;
-          } else if (isMugModel || isVessel) {
-            // Decal curved around the cylindrical mug surface
-            const w = Math.max(size.z * 0.65, 0.65);
-            const h = w;
-            const R = Math.max(size.z * 0.48, 0.45);
-            const geo = new THREE.PlaneGeometry(w, h, 24, 1);
-            const pos = geo.attributes.position;
-            for (let i = 0; i < pos.count; i++) {
-              const x = pos.getX(i);
-              const deltaZ = R - Math.sqrt(Math.max(0, R * R - x * x));
-              pos.setZ(i, -deltaZ);
-            }
-            geo.computeVertexNormals();
-
-            const mat = new THREE.MeshBasicMaterial({
-              map: tex,
-              transparent: true,
-              side: THREE.DoubleSide,
-              depthWrite: false,
-              toneMapped: false,
-            });
-            const decalMesh = new THREE.Mesh(geo, mat);
-            decalMesh.userData = { isDecal: true };
-            decalMesh.position.set(0, center.y, maxZ + 0.018);
-            targetGroup.add(decalMesh);
-            decalMeshRef.current = decalMesh;
+            const shirtImgMesh = new THREE.Mesh(geo, mat);
+            shirtImgMesh.userData = { isDecal: true };
+            shirtImgMesh.position.set(0, imgY, frontZ);
+            decalGroup.add(shirtImgMesh);
           } else {
-            // Front flat decal for bags, pins, calendars, stickers
-            const w = Math.max(size.x * 0.55, 0.45);
-            const h = w;
-            const geo = new THREE.PlaneGeometry(w, h);
-            const mat = new THREE.MeshBasicMaterial({
-              map: tex,
-              transparent: true,
-              side: THREE.DoubleSide,
-              depthWrite: false,
-              toneMapped: false,
+            const imgMesh = buildDecalImageMesh({
+              texture: tex,
+              width: imgSize,
+              height: imgSize,
+              cylinderRadius,
+              yOffset: imgY,
+              zOffset: isCylindrical ? 0 : maxZ + 0.018,
             });
-            const decalMesh = new THREE.Mesh(geo, mat);
-            decalMesh.userData = { isDecal: true };
-            decalMesh.position.set(center.x, center.y, maxZ + 0.018);
-            targetGroup.add(decalMesh);
-            decalMeshRef.current = decalMesh;
+            decalGroup.add(imgMesh);
           }
-        }
-      );
+        });
+      }
+
+      targetGroup.add(decalGroup);
+      decalGroupRef.current = decalGroup;
     },
     [customText, customTextColor, customFontFamily, customFontSize, customImageUri, designImageUrl, isShirt, isMugModel, isVessel]
   );
 
   // Re-apply decal whenever text, font, color, or image changes
   useEffect(() => {
-    if (groupRef.current) {
+    if (groupRef.current && modelBoxRef.current) {
       applyCustomDecal(groupRef.current);
     }
   }, [applyCustomDecal]);
@@ -345,7 +356,7 @@ export function Product3DPreview({
       const child = group.children[0];
       group.remove(child);
     }
-    decalMeshRef.current = null;
+    decalGroupRef.current = null;
 
     const finish = (obj: THREE.Object3D) => {
       const box = new THREE.Box3().setFromObject(obj);
@@ -354,8 +365,10 @@ export function Product3DPreview({
       const s = 2.0 / (Math.max(size.x, size.y, size.z) || 1);
       obj.scale.multiplyScalar(s);
       obj.position.sub(center.clone().multiplyScalar(s));
-      group.add(obj);
+      obj.updateMatrixWorld(true);
+      // Compute unrotated local bounding box BEFORE adding to group
       modelBoxRef.current = new THREE.Box3().setFromObject(obj);
+      group.add(obj);
 
       if (canTint) {
         obj.traverse((o) => {
@@ -378,11 +391,10 @@ export function Product3DPreview({
     const finishVessel = () => {
       const targetType = isMugModel ? 'mug' : viewerType;
       const built = buildVessel(targetType, activeColor);
-      const vbox = new THREE.Box3().setFromObject(built.group);
-      const vcenter = vbox.getCenter(new THREE.Vector3());
-      built.group.position.sub(vcenter);
-      group.add(built.group);
+      built.group.updateMatrixWorld(true);
+      // Compute unrotated local bounding box BEFORE adding to group
       modelBoxRef.current = new THREE.Box3().setFromObject(built.group);
+      group.add(built.group);
       addShadowDisc(scene, group);
       applyCustomDecal(group);
       setLoading(false);
@@ -393,8 +405,10 @@ export function Product3DPreview({
       const bbox = new THREE.Box3().setFromObject(built.group);
       const center = bbox.getCenter(new THREE.Vector3());
       built.group.position.sub(center);
-      group.add(built.group);
+      built.group.updateMatrixWorld(true);
+      // Compute unrotated local bounding box BEFORE adding to group
       modelBoxRef.current = new THREE.Box3().setFromObject(built.group);
+      group.add(built.group);
       addShadowDisc(scene, group);
       applyCustomDecal(group);
       setLoading(false);
@@ -411,8 +425,10 @@ export function Product3DPreview({
       built.group.position.sub(preCenter.clone().multiplyScalar(s));
       const bbox = new THREE.Box3().setFromObject(built.group);
       built.group.position.sub(bbox.getCenter(new THREE.Vector3()));
-      group.add(built.group);
+      built.group.updateMatrixWorld(true);
+      // Compute unrotated local bounding box BEFORE adding to group
       modelBoxRef.current = new THREE.Box3().setFromObject(built.group);
+      group.add(built.group);
       addShadowDisc(scene, group);
       applyCustomDecal(group);
       setLoading(false);
@@ -431,8 +447,10 @@ export function Product3DPreview({
       const bbox = new THREE.Box3().setFromObject(obj);
       const center = bbox.getCenter(new THREE.Vector3());
       obj.position.sub(center);
-      group.add(obj);
+      obj.updateMatrixWorld(true);
+      // Compute unrotated local bounding box BEFORE adding to group
       modelBoxRef.current = new THREE.Box3().setFromObject(obj);
+      group.add(obj);
 
       const trimContrast = fit.ringer ? shirtTrimContrast(activeColor) : null;
       obj.traverse((o) => {
@@ -695,9 +713,25 @@ export function Product3DPreview({
     })
   ).current;
 
+  const resetToFront = () => {
+    stateRef.current.rotY = 0;
+    stateRef.current.rotX = 0;
+  };
+
   const onNativeContextCreate = useCallback(
     async (gl: any) => {
       try {
+        // EXGL filter: suppress unhandled pixelStorei params (FLIP_Y, PREMULTIPLY_ALPHA)
+        // that trigger console warnings in Expo Go
+        const originalPixelStorei = gl.pixelStorei ? gl.pixelStorei.bind(gl) : null;
+        if (originalPixelStorei) {
+          gl.pixelStorei = (pname: number, param: any) => {
+            if (pname === 0x0cf5) {
+              return originalPixelStorei(pname, param);
+            }
+          };
+        }
+
         const { drawingBufferWidth: w, drawingBufferHeight: h } = gl;
         const rendererClass = NativeRenderer || (THREE as any).WebGLRenderer;
         const renderer = new (rendererClass as any)({ gl, antialias: true, alpha: true });
@@ -750,6 +784,14 @@ export function Product3DPreview({
         ) : (
           <GLView style={styles.glView} onContextCreate={onNativeContextCreate} />
         )}
+
+        {/* Quick Reset to Front View Button */}
+        <Pressable
+          onPress={resetToFront}
+          style={styles.frontViewBtn}
+          hitSlop={8}>
+          <Text style={styles.frontViewBtnText}>Front View</Text>
+        </Pressable>
 
         {loading && (
           <View style={styles.loadingOverlay} pointerEvents="none">
@@ -818,6 +860,28 @@ const styles = StyleSheet.create({
   glView: {
     width: '100%',
     height: '100%',
+  },
+  frontViewBtn: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    zIndex: 10,
+  },
+  frontViewBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#374151',
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFill,

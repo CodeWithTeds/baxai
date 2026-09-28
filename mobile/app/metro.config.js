@@ -10,5 +10,6 @@ const config = getDefaultConfig(__dirname);
 // Disabling packageExports for now silences the noisy WARNs with no runtime impact
 // (three still resolves via file-based resolution, which is how expo-three uses it).
 config.resolver.unstable_enablePackageExports = false;
+config.resolver.assetExts.push('glb', 'gltf');
 
 module.exports = config;

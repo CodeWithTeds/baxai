@@ -147,6 +147,20 @@ export default function Mug3DScreen() {
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* 3D Stage Card */}
         <View style={styles.stageCard}>
+          {/* Live Customization Active Indicator */}
+          {(customText.trim().length > 0 || customImageUri) ? (
+            <View style={styles.liveDesignPill}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveDesignLabel} numberOfLines={1}>
+                {customImageUri && customText.trim()
+                  ? `Logo + "${customText.trim()}"`
+                  : customImageUri
+                  ? 'Custom Logo Active'
+                  : `"${customText.trim()}"`}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.pricePill}>
             <Text style={styles.priceText}>{price}</Text>
           </View>
@@ -388,6 +402,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
+  },
+  liveDesignPill: {
+    position: 'absolute',
+    top: 24,
+    left: 24,
+    zIndex: 10,
+    backgroundColor: 'rgba(17, 24, 39, 0.88)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    maxWidth: '55%',
+  },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10B981',
+  },
+  liveDesignLabel: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   pricePill: {
     position: 'absolute',

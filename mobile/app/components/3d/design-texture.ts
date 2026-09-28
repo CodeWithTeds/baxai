@@ -33,29 +33,7 @@ export function createDesignCanvasTexture(
     return;
   }
 
-  // 1. Direct image load if ONLY image is provided (fastest path)
-  if (hasImage && !hasText && imageUri) {
-    try {
-      new THREE.TextureLoader().load(
-        imageUri,
-        (tex) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.needsUpdate = true;
-          onLoaded(tex);
-        },
-        undefined,
-        (err) => {
-          console.warn('[DesignTexture] Direct image load error:', err);
-          onLoaded(null);
-        }
-      );
-      return;
-    } catch (e) {
-      console.warn('[DesignTexture] Direct TextureLoader threw:', e);
-    }
-  }
-
-  // 2. Real HTML5 2D Canvas (Web & supported polyfill runtimes)
+  // 1. Real HTML5 2D Canvas (Web & supported polyfill runtimes)
   let canvas: HTMLCanvasElement | null = null;
   let ctx: CanvasRenderingContext2D | null = null;
 
@@ -84,7 +62,7 @@ export function createDesignCanvasTexture(
 
   if (canvas && ctx) {
     try {
-      // Clear canvas safely
+      // Clear canvas buffer safely
       if (typeof ctx.clearRect === 'function') {
         ctx.clearRect(0, 0, 1024, 1024);
       } else {
@@ -124,12 +102,21 @@ export function createDesignCanvasTexture(
         onLoaded(tex);
       };
 
+      // Case A: Image is present (either image-only or image + text)
       if (hasImage && imageUri) {
         const img =
           typeof window !== 'undefined' && (window as any).Image
             ? new (window as any).Image()
             : new Image();
-        img.crossOrigin = 'anonymous';
+
+        // ONLY set crossOrigin for remote http(s) URLs; setting it on data: or blob: triggers CORS errors
+        if (
+          typeof imageUri === 'string' &&
+          (imageUri.startsWith('http://') || imageUri.startsWith('https://'))
+        ) {
+          img.crossOrigin = 'anonymous';
+        }
+
         img.onload = () => {
           const maxDim = hasText ? 480 : 720;
           const aspect = img.width && img.height ? img.width / img.height : 1;
@@ -146,6 +133,7 @@ export function createDesignCanvasTexture(
           }
           finishCanvas();
         };
+
         img.onerror = (err: any) => {
           console.warn('[DesignTexture] Image load error:', err);
           if (hasText) {
@@ -155,10 +143,12 @@ export function createDesignCanvasTexture(
             onLoaded(null);
           }
         };
+
         img.src = imageUri;
         return;
       }
 
+      // Case B: Text-only (no image)
       if (hasText) {
         drawText(512);
         finishCanvas();
@@ -169,7 +159,7 @@ export function createDesignCanvasTexture(
     }
   }
 
-  // 3. Fallback for image when 2D canvas is unavailable (native)
+  // 2. Direct TextureLoader fallback for image on native devices
   if (hasImage && imageUri) {
     try {
       new THREE.TextureLoader().load(
