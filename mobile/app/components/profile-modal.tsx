@@ -6,6 +6,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 
 import { BrandColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
+import { getApiBaseUrls } from '@/utils/api';
 
 interface Props {
   visible: boolean;
@@ -80,7 +81,7 @@ export default function ProfileModal({ visible, onClose, email: propEmail, name:
           <View style={styles.backendBox}>
             <Ionicons name="cloud-done-outline" size={18} color={BrandColors.primary} />
             <Text style={styles.backendText}>
-              Synced to <Text style={{ fontWeight: '700' }}>http://192.168.1.3:8081/customers</Text>
+              Synced to <Text style={{ fontWeight: '700' }}>{`${getApiBaseUrls()[0] || 'http://192.168.100.184:8081'}/customers`}</Text>
             </Text>
           </View>
 

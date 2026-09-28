@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image, type ImageSource } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,87 +17,64 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import ScreenHeader from '@/components/screen-header';
 import { BrandColors } from '@/constants/theme';
+import { useLanguage } from '@/contexts/language-context';
+import { fetchPrintItems, fetchProducts, type ApiPrintItem, type ApiProduct } from '@/utils/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ServiceItem = {
+export type ServiceItem = {
   id: string;
   name: string;
   description: string;
   price: string;
-  image: ImageSource;
+  image: ImageSource | { uri: string };
   badge?: string;
   badgeColor?: string;
   featured?: boolean;
+  is3D?: boolean;
+  type?: 'product' | 'print-item';
+  category?: string;
 };
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// Helper to determine image source based on dynamic product / print item attributes
+function getProductImage(item: { thumbnail?: string | null; name: string; category?: string }): any {
+  if (item.thumbnail) {
+    const uri = item.thumbnail.startsWith('http')
+      ? item.thumbnail
+      : `http://192.168.1.3:8081${item.thumbnail}`;
+    return { uri };
+  }
+  const nameLower = item.name.toLowerCase();
+  const catLower = (item.category || '').toLowerCase();
 
-const SERVICES: ServiceItem[] = [
-  {
-    id: '1',
-    name: 'Custom Mugs',
-    description: 'High-quality ceramic prints for home or office.',
-    price: 'From ₱9.99',
-    image: require('@/assets/images/custom-mugs.jpeg'),
-    badge: 'Bestseller',
-    badgeColor: BrandColors.primary,
-    featured: true,
-  },
-  {
-    id: '2',
-    name: 'Button Pins',
-    description: 'Vibrant enamel-style pins.',
-    price: 'From ₱1.50',
-    image: require('@/assets/images/button-pins.jpg'),
-  },
-  {
-    id: '3',
-    name: 'Custom Stickers',
-    description: 'Die-cut vinyl, waterproof.',
-    price: '₱0.50 ea',
-    image: require('@/assets/images/custom-stickers.jpg'),
-    badge: 'Deal',
-    badgeColor: '#D97706',
-  },
-  {
-    id: '4',
-    name: 'Custom T-Shirts',
-    description: 'Premium full-colour prints on soft cotton.',
-    price: 'From ₱15.00',
-    image: require('@/assets/images/custom-thirts.jpg'),
-    badge: 'Fast Turnaround',
-    badgeColor: '#F53003',
-  },
-  {
-    id: '5',
-    name: 'Tote Bags',
-    description: 'Eco-friendly canvas with custom artwork.',
-    price: 'From ₱12.00',
-    image: require('@/assets/images/tote-bags.jpg'),
-  },
-  {
-    id: '6',
-    name: 'Calendars',
-    description: 'Wall & desk calendars, personalised.',
-    price: 'From ₱8.00',
-    image: require('@/assets/images/calendars.jpg'),
-  },
-  {
-    id: '7',
-    name: 'Custom Pin',
-    description: 'Premium custom pin — single-piece showcase.',
-    price: 'From ₱1.20',
-    image: require('@/assets/images/custom-pin.jpeg'),
-  },
-];
+  if (nameLower.includes('mug') || nameLower.includes('tumbler') || catLower.includes('mug')) {
+    return require('@/assets/images/custom-mugs.jpeg');
+  }
+  if (nameLower.includes('pin') || catLower.includes('pin')) {
+    return require('@/assets/images/button-pins.jpg');
+  }
+  if (nameLower.includes('sticker') || catLower.includes('sticker')) {
+    return require('@/assets/images/custom-stickers.jpg');
+  }
+  if (nameLower.includes('shirt') || nameLower.includes('t-shirt') || catLower.includes('apparel')) {
+    return require('@/assets/images/custom-thirts.jpg');
+  }
+  if (nameLower.includes('tote') || nameLower.includes('bag')) {
+    return require('@/assets/images/tote-bags.jpg');
+  }
+  if (nameLower.includes('calendar')) {
+    return require('@/assets/images/calendars.jpg');
+  }
+  return require('@/assets/images/custom-mugs.jpeg');
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function FeaturedServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () => void }) {
   const isMug = item.name.toLowerCase().includes('mug');
   const isPin = item.name.toLowerCase().includes('pin');
-  const is3D = isMug || isPin;
+  const is3D = item.is3D || isMug || isPin;
+
   return (
     <Pressable
       onPress={onPress}
@@ -108,7 +87,7 @@ function FeaturedServiceCard({ item, onPress }: { item: ServiceItem; onPress?: (
           contentFit="cover"
         />
         {item.badge && (
-          <View style={[styles.badge, { backgroundColor: item.badgeColor }]}>
+          <View style={[styles.badge, { backgroundColor: item.badgeColor || BrandColors.primary }]}>
             <Ionicons name="star" size={11} color="#fff" style={{ marginRight: 3 }} />
             <Text style={styles.badgeText}>{item.badge}</Text>
           </View>
@@ -132,7 +111,7 @@ function FeaturedServiceCard({ item, onPress }: { item: ServiceItem; onPress?: (
         <View style={styles.featuredInfoTop}>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardName}>{item.name}</Text>
-            <Text style={styles.cardDesc}>{item.description}</Text>
+            <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
           </View>
         </View>
 
@@ -152,7 +131,8 @@ function FeaturedServiceCard({ item, onPress }: { item: ServiceItem; onPress?: (
 function GridServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () => void }) {
   const isMug = item.name.toLowerCase().includes('mug');
   const isPin = item.name.toLowerCase().includes('pin');
-  const is3D = isMug || isPin;
+  const is3D = item.is3D || isMug || isPin;
+
   return (
     <Pressable
       onPress={onPress}
@@ -165,7 +145,7 @@ function GridServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () =>
           contentFit="cover"
         />
         {item.badge && (
-          <View style={[styles.badge, { backgroundColor: item.badgeColor }]}>
+          <View style={[styles.badge, { backgroundColor: item.badgeColor || BrandColors.primary }]}>
             <Text style={styles.badgeText}>{item.badge}</Text>
           </View>
         )}
@@ -185,7 +165,7 @@ function GridServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () =>
 
       {/* Info */}
       <View style={styles.gridInfo}>
-        <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
 
         <View style={styles.gridInfoBottom}>
@@ -203,79 +183,112 @@ function GridServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () =>
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-import { useLanguage } from '@/contexts/language-context';
-
 export default function ServicesScreen() {
   const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [services, setServices] = useState<ServiceItem[]>([]);
   const router = useRouter();
   const { t } = useLanguage();
 
-  const services: ServiceItem[] = [
-    {
-      id: '1',
-      name: t.prodMug,
-      description: t.prodMugDesc,
-      price: `${t.fromPrice} ₱9.99`,
-      image: require('@/assets/images/custom-mugs.jpeg'),
-      badge: t.bestseller,
-      badgeColor: BrandColors.primary,
-      featured: true,
-    },
-    {
-      id: '2',
-      name: t.prodPins,
-      description: t.prodPinsDesc,
-      price: `${t.fromPrice} ₱1.50`,
-      image: require('@/assets/images/button-pins.jpg'),
-    },
-    {
-      id: '3',
-      name: t.prodStickers,
-      description: t.prodStickersDesc,
-      price: '₱0.50 ea',
-      image: require('@/assets/images/custom-stickers.jpg'),
-      badge: t.deal,
-      badgeColor: '#D97706',
-    },
-    {
-      id: '4',
-      name: t.prodTshirt,
-      description: t.prodTshirtDesc,
-      price: `${t.fromPrice} ₱15.00`,
-      image: require('@/assets/images/custom-thirts.jpg'),
-      badge: t.fastTurnaround,
-      badgeColor: '#F53003',
-    },
-    {
-      id: '5',
-      name: t.prodTotes,
-      description: t.prodTotesDesc,
-      price: `${t.fromPrice} ₱12.00`,
-      image: require('@/assets/images/tote-bags.jpg'),
-    },
-    {
-      id: '6',
-      name: t.prodCalendars,
-      description: t.prodCalendarsDesc,
-      price: `${t.fromPrice} ₱8.00`,
-      image: require('@/assets/images/calendars.jpg'),
-    },
-    {
-      id: '7',
-      name: t.prodCustomPin,
-      description: t.prodCustomPinDesc,
-      price: `${t.fromPrice} ₱1.20`,
-      image: require('@/assets/images/custom-pin.jpeg'),
-    },
-  ];
+  const loadData = async () => {
+    try {
+      const [apiProducts, apiPrintItems] = await Promise.all([
+        fetchProducts(),
+        fetchPrintItems(),
+      ]);
+
+      const mappedProducts: ServiceItem[] = apiProducts.map((p: ApiProduct) => {
+        const nameLower = p.name.toLowerCase();
+        const priceVal = p.base_price ? `₱${p.base_price}` : '₱9.99';
+        const is3D = p.has_3d_preview || p.is_customizable || nameLower.includes('mug') || nameLower.includes('pin');
+        
+        return {
+          id: `prod-${p.id}`,
+          name: p.name,
+          description: p.short_description || p.description || t.prodMugDesc,
+          price: `${t.fromPrice} ${priceVal}`,
+          image: getProductImage(p),
+          badge: p.badge || (is3D ? '3D Customizable' : undefined),
+          badgeColor: p.badge ? BrandColors.primary : '#7C3AED',
+          featured: p.is_customizable || p.has_3d_preview || false,
+          is3D,
+          type: 'product',
+          category: p.category,
+        };
+      });
+
+      const mappedPrintItems: ServiceItem[] = apiPrintItems.map((pi: ApiPrintItem) => {
+        const priceVal = pi.base_price ? `₱${pi.base_price}` : '₱3.50';
+        return {
+          id: `item-${pi.id}`,
+          name: pi.name,
+          description: pi.description || `${pi.paper_type || 'Custom Print'} • ${pi.color_mode || 'Full Color'}`,
+          price: `${t.fromPrice} ${priceVal}`,
+          image: getProductImage({ name: pi.name, category: pi.category?.name }),
+          badge: pi.category?.name || 'Print Item',
+          badgeColor: '#D97706',
+          featured: false,
+          is3D: pi.name.toLowerCase().includes('mug') || pi.name.toLowerCase().includes('pin'),
+          type: 'print-item',
+          category: pi.category?.name,
+        };
+      });
+
+      const combined = [...mappedProducts, ...mappedPrintItems];
+
+      if (combined.length > 0) {
+        setServices(combined);
+      } else {
+        // Fallback default items if API yields 0 items
+        setServices([
+          {
+            id: '1',
+            name: t.prodMug,
+            description: t.prodMugDesc,
+            price: `${t.fromPrice} ₱9.99`,
+            image: require('@/assets/images/custom-mugs.jpeg'),
+            badge: t.bestseller,
+            badgeColor: BrandColors.primary,
+            featured: true,
+            is3D: true,
+          },
+          {
+            id: '2',
+            name: t.prodPins,
+            description: t.prodPinsDesc,
+            price: `${t.fromPrice} ₱1.50`,
+            image: require('@/assets/images/button-pins.jpg'),
+            is3D: true,
+          },
+        ]);
+      }
+    } catch (err) {
+      console.warn('[ServicesScreen] Error loading live API products:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
 
   const handlePress = (item: ServiceItem) => {
-    const isMug = item.id === '1' || item.name.toLowerCase().includes('mug');
-    const isPin = item.id === '2' || item.id === '7' || item.name.toLowerCase().includes('pin');
+    const isMug = item.name.toLowerCase().includes('mug') || item.name.toLowerCase().includes('tumbler');
+    const isPin = item.name.toLowerCase().includes('pin');
     if (isMug) {
       router.push('/mug-3d' as any);
     } else if (isPin) {
       router.push('/pin-3d' as any);
+    } else {
+      router.push('/mug-3d' as any);
     }
   };
 
@@ -300,34 +313,46 @@ export default function ServicesScreen() {
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BrandColors.primary]} />
+        }>
 
-        {/* ── Featured (full-width) ─────────────────────────── */}
-        {filteredFeatured.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(80).duration(500)}>
-            {filteredFeatured.map((item) => (
-              <FeaturedServiceCard key={item.id} item={item} onPress={() => handlePress(item)} />
-            ))}
-          </Animated.View>
-        )}
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={BrandColors.primary} />
+            <Text style={styles.loadingText}>Fetching live products from backend...</Text>
+          </View>
+        ) : (
+          <>
+            {/* ── Featured (full-width) ─────────────────────────── */}
+            {filteredFeatured.length > 0 && (
+              <Animated.View entering={FadeInDown.delay(80).duration(500)}>
+                {filteredFeatured.map((item) => (
+                  <FeaturedServiceCard key={item.id} item={item} onPress={() => handlePress(item)} />
+                ))}
+              </Animated.View>
+            )}
 
-        {/* ── All Services grid ─────────────────────────────── */}
-        {grid.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(160).duration(500)} style={styles.gridSection}>
-            <View style={styles.gridRow}>
-              {grid.map((item) => (
-                <GridServiceCard key={item.id} item={item} onPress={() => handlePress(item)} />
-              ))}
-            </View>
-          </Animated.View>
-        )}
+            {/* ── All Services grid ─────────────────────────────── */}
+            {grid.length > 0 && (
+              <Animated.View entering={FadeInDown.delay(160).duration(500)} style={styles.gridSection}>
+                <View style={styles.gridRow}>
+                  {grid.map((item) => (
+                    <GridServiceCard key={item.id} item={item} onPress={() => handlePress(item)} />
+                  ))}
+                </View>
+              </Animated.View>
+            )}
 
-        {/* Empty state */}
-        {filteredFeatured.length === 0 && grid.length === 0 && (
-          <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyWrap}>
-            <Ionicons name="search-outline" size={40} color="#D1D5DB" />
-            <Text style={styles.emptyText}>No services found for "{query}"</Text>
-          </Animated.View>
+            {/* Empty state */}
+            {filteredFeatured.length === 0 && grid.length === 0 && (
+              <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyWrap}>
+                <Ionicons name="search-outline" size={40} color="#D1D5DB" />
+                <Text style={styles.emptyText}>No products found for "{query}"</Text>
+              </Animated.View>
+            )}
+          </>
         )}
 
         <View style={styles.bottomSpacer} />
@@ -356,6 +381,17 @@ const styles = StyleSheet.create({
   scroll: {
     paddingTop: 16,
     paddingBottom: 24,
+  },
+  loadingWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'Inter_400Regular',
   },
 
   // ── Featured card ──────────────────────────────────────────

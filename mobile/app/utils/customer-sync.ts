@@ -1,5 +1,7 @@
+import { getApiBaseUrls } from './api';
+
 /**
- * Sync customer account directly to Laravel backend database at http://192.168.1.3:8081/customers
+ * Sync customer account directly to backend database
  */
 export async function syncCustomerToBackend(email: string, name?: string, avatar?: string): Promise<boolean> {
   if (!email || email === 'undefined' || email.includes('Google User')) return false;
@@ -12,12 +14,7 @@ export async function syncCustomerToBackend(email: string, name?: string, avatar
     avatar: avatar || null,
   });
 
-  const urlsToTry = Array.from(new Set([
-    process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.3:8081',
-    'http://192.168.1.3:8081',
-    'http://localhost:8081',
-    'http://127.0.0.1:8081',
-  ]));
+  const urlsToTry = getApiBaseUrls();
 
   for (const baseUrl of urlsToTry) {
     try {
