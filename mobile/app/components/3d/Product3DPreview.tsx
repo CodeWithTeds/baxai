@@ -34,7 +34,7 @@ import {
   SHIRT_TRIM_MATS,
   shirtTrimContrast,
 } from './shirt-builder';
-import { buildVessel, isVesselType } from './vessel-builder';
+import { buildVessel, isVesselType, VesselLabel } from './vessel-builder';
 import { createDesignCanvasTexture } from './design-texture';
 import {
   build3DTextMesh,
@@ -121,6 +121,8 @@ export function Product3DPreview({
   const decalGroupRef = useRef<THREE.Group | null>(null);
   const shadowDiscRef = useRef<THREE.Mesh | null>(null);
   const modelBoxRef = useRef<THREE.Box3 | null>(null);
+  const vcenterRef = useRef<THREE.Vector3 | null>(null);
+  const vesselLabelRef = useRef<VesselLabel | null>(null);
 
   const isMugModel =
     viewerType === 'mug' ||
@@ -258,57 +260,52 @@ export function Product3DPreview({
       if (!box) return;
 
       const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
       const maxZ = box.max.z;
 
-      const isCylindrical = (isMugModel || isVessel);
-      const cylinderRadius = isCylindrical ? Math.max(size.z * 0.48, 0.98) : null;
-
-      const decalGroup = new THREE.Group();
-      decalGroup.userData = { isDecal: true };
-
-      // Layout vertical offsets if both text & image exist
-      let imgY = 0;
-      let textY = 0;
-      let imgSize = isCylindrical ? 0.72 : (size.x * 0.52);
-
-      if (hasImage && hasText) {
-        imgY = isShirt ? 0.18 : 0.22;
-        textY = isShirt ? -0.25 : -0.28;
-        imgSize = isCylindrical ? 0.52 : (size.x * 0.40);
-      } else if (hasText) {
-        textY = isShirt ? 0.05 : 0;
-      } else if (hasImage) {
-        imgY = isShirt ? 0.08 : 0;
-      }
-
-      // 1. Add 3D Text Mesh (synchronous, instant, zero latency, curves around mug)
-      if (hasText) {
-        const textMesh = build3DTextMesh({
+      createDesignCanvasTexture(
+        {
           text: effectiveText,
           textColor: customTextColor,
           fontFamily: customFontFamily,
           fontSize: customFontSize,
-          cylinderRadius,
-          yOffset: textY,
-          zOffset: isCylindrical ? 0 : maxZ + 0.018,
-        });
-        decalGroup.add(textMesh);
-      }
+          imageUri: effectiveImage,
+        },
+        (tex) => {
+          const decalGroup = new THREE.Group();
+          decalGroup.userData = { isDecal: true };
 
-      // 2. Add Image Mesh (asynchronous texture load)
-      if (hasImage) {
-        loadUniversalTexture(effectiveImage, (tex) => {
-          if (!tex) return;
+          if (!tex) {
+            // Fallback for native text if canvas context is unavailable
+            if (hasText) {
+              const isCyl = isMugModel || isVessel;
+              const textMesh = build3DTextMesh({
+                text: effectiveText,
+                textColor: customTextColor,
+                fontFamily: customFontFamily,
+                fontSize: customFontSize,
+                cylinderRadius: isCyl ? 1.04 : null,
+                yOffset: isShirt ? 0.2 : (vesselLabelRef.current ? vesselLabelRef.current.y : 0),
+                zOffset: isCyl ? 0 : maxZ + 0.02,
+              });
+              decalGroup.add(textMesh);
+              if (vcenterRef.current && isCyl) {
+                decalGroup.position.set(-vcenterRef.current.x, -vcenterRef.current.y, -vcenterRef.current.z);
+              }
+              targetGroup.add(decalGroup);
+              decalGroupRef.current = decalGroup;
+            }
+            return;
+          }
 
           if (isShirt) {
-            // T-shirt chest drape
+            // T-shirt chest print draped over fabric folds
             const torsoW = size.x;
             const torsoH = size.y;
-            const w = imgSize;
+            const w = torsoW * 0.52;
             const h = w;
             const geo = new THREE.PlaneGeometry(w, h, 20, 20);
-            applyShirtDecalDrape(geo, { centerY: imgY, frontZ: 0, torsoW, torsoH, isBoxyHeavy: false });
-            const frontZ = maxZ + 0.015;
+            applyShirtDecalDrape(geo, { centerY: 0, frontZ: 0, torsoW, torsoH, isBoxyHeavy: false });
             const mat = new THREE.MeshBasicMaterial({
               map: tex,
               transparent: true,
@@ -319,26 +316,65 @@ export function Product3DPreview({
               polygonOffsetFactor: -1,
               polygonOffsetUnits: -4,
             });
-            const shirtImgMesh = new THREE.Mesh(geo, mat);
-            shirtImgMesh.userData = { isDecal: true };
-            shirtImgMesh.position.set(0, imgY, frontZ);
-            decalGroup.add(shirtImgMesh);
-          } else {
-            const imgMesh = buildDecalImageMesh({
-              texture: tex,
-              width: imgSize,
-              height: imgSize,
-              cylinderRadius,
-              yOffset: imgY,
-              zOffset: isCylindrical ? 0 : maxZ + 0.018,
-            });
-            decalGroup.add(imgMesh);
-          }
-        });
-      }
+            const shirtMesh = new THREE.Mesh(geo, mat);
+            shirtMesh.userData = { isDecal: true };
+            shirtMesh.position.set(0, 0, maxZ + 0.015);
+            decalGroup.add(shirtMesh);
+          } else if (isMugModel || isVessel) {
+            // Mug / vessel: cylindrical print label matching mug wall curvature
+            const label = vesselLabelRef.current;
+            const rTop = label ? label.rTop : (size.z * 0.5 + 0.025);
+            const rBottom = label ? label.rBottom : (size.z * 0.5 + 0.02);
+            const lh = label ? label.height : (size.y * 0.55);
+            const arc = 1.8; // visible arc on front face of mug
 
-      targetGroup.add(decalGroup);
-      decalGroupRef.current = decalGroup;
+            const geo = new THREE.CylinderGeometry(rTop, rBottom, lh, 48, 1, true, -arc / 2, arc);
+            const mat = new THREE.MeshBasicMaterial({
+              map: tex,
+              transparent: true,
+              side: THREE.DoubleSide,
+              depthTest: true,
+              depthWrite: false,
+              polygonOffset: true,
+              polygonOffsetFactor: -1,
+              polygonOffsetUnits: -4,
+            });
+            const mugMesh = new THREE.Mesh(geo, mat);
+            mugMesh.userData = { isDecal: true };
+
+            if (vcenterRef.current) {
+              const vc = vcenterRef.current;
+              const labelY = label ? label.y : 0;
+              mugMesh.position.set(-vc.x, labelY - vc.y, -vc.z);
+            } else {
+              mugMesh.position.set(center.x, center.y, center.z);
+            }
+            decalGroup.add(mugMesh);
+          } else {
+            // Tote bag, button pin, calendar, sticker
+            let w = Math.max(size.x * 0.55, 0.35);
+            let h = w;
+            const geo = new THREE.PlaneGeometry(w, h);
+            const mat = new THREE.MeshBasicMaterial({
+              map: tex,
+              transparent: true,
+              side: THREE.DoubleSide,
+              depthTest: true,
+              depthWrite: false,
+              polygonOffset: true,
+              polygonOffsetFactor: -1,
+              polygonOffsetUnits: -4,
+            });
+            const planeMesh = new THREE.Mesh(geo, mat);
+            planeMesh.userData = { isDecal: true };
+            planeMesh.position.set(center.x, center.y, maxZ + 0.018);
+            decalGroup.add(planeMesh);
+          }
+
+          targetGroup.add(decalGroup);
+          decalGroupRef.current = decalGroup;
+        }
+      );
     },
     [customText, customTextColor, customFontFamily, customFontSize, customImageUri, designImageUrl, isShirt, isMugModel, isVessel]
   );
@@ -391,6 +427,11 @@ export function Product3DPreview({
     const finishVessel = () => {
       const targetType = isMugModel ? 'mug' : viewerType;
       const built = buildVessel(targetType, activeColor);
+      vesselLabelRef.current = built.label;
+      const vbox = new THREE.Box3().setFromObject(built.group);
+      const vcenter = vbox.getCenter(new THREE.Vector3());
+      vcenterRef.current = vcenter;
+      built.group.position.sub(vcenter);
       built.group.updateMatrixWorld(true);
       // Compute unrotated local bounding box BEFORE adding to group
       modelBoxRef.current = new THREE.Box3().setFromObject(built.group);

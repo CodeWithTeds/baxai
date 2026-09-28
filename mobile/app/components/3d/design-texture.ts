@@ -72,7 +72,21 @@ export function createDesignCanvasTexture(
       const drawText = (yPos: number) => {
         if (!hasText) return;
         if (typeof ctx.save === 'function') ctx.save();
-        ctx.font = `bold ${fontSize}px ${fontFamily}`;
+
+        let currentFontSize = Math.max(64, Math.round(fontSize * 1.5));
+        ctx.font = `bold ${currentFontSize}px ${fontFamily}`;
+
+        // Auto-scale font if any text line is wider than 860px
+        const lines = trimmedText.split('\n');
+        lines.forEach((line) => {
+          const m = ctx.measureText(line);
+          if (m && m.width > 860) {
+            const ratio = 860 / m.width;
+            currentFontSize = Math.max(36, Math.floor(currentFontSize * ratio));
+          }
+        });
+
+        ctx.font = `bold ${currentFontSize}px ${fontFamily}`;
         ctx.fillStyle = textColor;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -80,12 +94,11 @@ export function createDesignCanvasTexture(
         // High-contrast subtle outline/shadow
         ctx.shadowColor =
           textColor.toUpperCase() === '#FFFFFF' ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.65)';
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = 8;
         ctx.shadowOffsetX = 1;
         ctx.shadowOffsetY = 1;
 
-        const lines = trimmedText.split('\n');
-        const lineHeight = fontSize * 1.25;
+        const lineHeight = currentFontSize * 1.25;
         const startY = yPos - ((lines.length - 1) * lineHeight) / 2;
 
         lines.forEach((line, index) => {
@@ -118,7 +131,7 @@ export function createDesignCanvasTexture(
         }
 
         img.onload = () => {
-          const maxDim = hasText ? 480 : 720;
+          const maxDim = hasText ? 480 : 740;
           const aspect = img.width && img.height ? img.width / img.height : 1;
           let drawW = maxDim;
           let drawH = drawW / aspect;
@@ -126,10 +139,10 @@ export function createDesignCanvasTexture(
             drawH = maxDim;
             drawW = drawH * aspect;
           }
-          const imgY = hasText ? 360 : 512;
+          const imgY = hasText ? 340 : 512;
           ctx.drawImage(img, 512 - drawW / 2, imgY - drawH / 2, drawW, drawH);
           if (hasText) {
-            drawText(imgY + drawH / 2 + fontSize * 1.15);
+            drawText(720);
           }
           finishCanvas();
         };
