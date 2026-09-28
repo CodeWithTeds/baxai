@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -20,32 +21,150 @@ import { BrandColors } from '@/constants/theme';
 import { useLanguage } from '@/contexts/language-context';
 
 export const FONT_STYLES = [
-  { id: 'sans', label: 'Modern', family: 'system-ui, -apple-system, sans-serif' },
-  { id: 'serif', label: 'Serif', family: 'Georgia, Times New Roman, serif' },
-  { id: 'bold', label: 'Bold', family: 'Impact, Arial Black, sans-serif' },
-  { id: 'cursive', label: 'Cursive', family: '"Brush Script MT", "Caveat", cursive' },
-  { id: 'mono', label: 'Retro', family: '"Courier New", Courier, monospace' },
-  { id: 'playful', label: 'Playful', family: '"Comic Sans MS", "Chalkboard SE", sans-serif' },
+  { id: 'sans',    label: 'Modern',  family: 'system-ui, -apple-system, sans-serif',         sample: 'Aa' },
+  { id: 'serif',   label: 'Serif',   family: 'Georgia, Times New Roman, serif',               sample: 'Aa' },
+  { id: 'bold',    label: 'Bold',    family: 'Impact, Arial Black, sans-serif',                sample: 'Aa' },
+  { id: 'cursive', label: 'Cursive', family: '"Brush Script MT", "Caveat", cursive',           sample: 'Aa' },
+  { id: 'mono',    label: 'Retro',   family: '"Courier New", Courier, monospace',              sample: 'Aa' },
+  { id: 'playful', label: 'Playful', family: '"Comic Sans MS", "Chalkboard SE", sans-serif',  sample: 'Aa' },
 ];
 
 export const TEXT_PALETTE = [
   { id: 'black', hex: '#111827', label: 'Black' },
   { id: 'white', hex: '#FFFFFF', label: 'White' },
-  { id: 'gold', hex: '#D97706', label: 'Gold' },
-  { id: 'red', hex: '#DC2626', label: 'Red' },
-  { id: 'blue', hex: '#2563EB', label: 'Blue' },
+  { id: 'gold',  hex: '#D97706', label: 'Gold' },
+  { id: 'red',   hex: '#DC2626', label: 'Red' },
+  { id: 'blue',  hex: '#2563EB', label: 'Blue' },
   { id: 'green', hex: '#059669', label: 'Green' },
+  { id: 'pink',  hex: '#EC4899', label: 'Pink' },
+  { id: 'purple',hex: '#7C3AED', label: 'Purple' },
 ];
 
-const FONT_SIZES = [
-  { label: 'S', size: 48 },
-  { label: 'M', size: 64 },
-  { label: 'L', size: 84 },
-  { label: 'XL', size: 104 },
-];
+export const PRESET_TEXTS = ['Custom Mug', 'Coffee First', 'Placides Co.', 'Best Boss', '☕ Love'];
 
-export const PRESET_TEXTS = ['Custom Mug', 'Coffee First', 'Placides Co.', 'Best Boss'];
+// ─── Smooth Drag Slider ───────────────────────────────────────────────────────
+function DragSlider({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  onValueChange,
+  leftIcon,
+  rightIcon,
+  formatValue,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onValueChange: (v: number) => void;
+  leftIcon?: string;
+  rightIcon?: string;
+  formatValue?: (v: number) => string;
+}) {
+  const trackWidthRef = useRef(1);
+  const startValueRef = useRef(value);
 
+  const clamp = (v: number) => Math.max(min, Math.min(max, v));
+  const snap = (v: number) => Math.round(v / step) * step;
+
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        startValueRef.current = value;
+      },
+      onPanResponderMove: (_, gs) => {
+        const delta = (gs.dx / trackWidthRef.current) * (max - min);
+        onValueChange(clamp(snap(startValueRef.current + delta)));
+      },
+    })
+  ).current;
+
+  const ratio = Math.max(0, Math.min(1, (value - min) / (max - min)));
+
+  return (
+    <View style={sliderStyles.wrapper}>
+      <View style={sliderStyles.labelRow}>
+        <Text style={sliderStyles.label}>{label}</Text>
+        <Text style={sliderStyles.val}>{formatValue ? formatValue(value) : value}</Text>
+      </View>
+      <View style={sliderStyles.trackRow}>
+        {leftIcon ? (
+          <Ionicons name={leftIcon as any} size={16} color="#9CA3AF" style={{ marginRight: 6 }} />
+        ) : null}
+        <View
+          style={sliderStyles.trackOuter}
+          onLayout={(e) => {
+            trackWidthRef.current = e.nativeEvent.layout.width;
+          }}
+          {...pan.panHandlers}
+        >
+          {/* Filled track */}
+          <View style={[sliderStyles.trackFill, { width: `${ratio * 100}%` as any }]} />
+          {/* Thumb */}
+          <View
+            style={[
+              sliderStyles.thumb,
+              { left: `${ratio * 100}%` as any, transform: [{ translateX: -12 }] },
+            ]}
+          />
+        </View>
+        {rightIcon ? (
+          <Ionicons name={rightIcon as any} size={20} color="#9CA3AF" style={{ marginLeft: 6 }} />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+const sliderStyles = StyleSheet.create({
+  wrapper: { gap: 4 },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  label: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
+  val: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: BrandColors.primary,
+    minWidth: 32,
+    textAlign: 'right',
+  },
+  trackRow: { flexDirection: 'row', alignItems: 'center' },
+  trackOuter: {
+    flex: 1,
+    height: 44,
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  trackFill: {
+    position: 'absolute',
+    left: 0,
+    height: 6,
+    backgroundColor: BrandColors.primary,
+    borderRadius: 3,
+    zIndex: 1,
+  },
+  thumb: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: BrandColors.primary,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 2,
+    top: 10,
+  },
+});
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function Mug3DScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -58,24 +177,25 @@ export default function Mug3DScreen() {
     description?: string;
   }>();
 
-  const name = params.name || 'Coffee Mugs';
-  const price = params.price || '₱99.00';
-  const sku = params.sku || 'MUG-COFFEE';
-  const stock = params.stock !== undefined ? params.stock : '30';
-  const viewerType = (params.viewer_type || 'coffee_cup').toLowerCase();
-  const category = params.category || 'mugs';
+  const name        = params.name        || 'Coffee Mugs';
+  const price       = params.price       || '₱99.00';
+  const sku         = params.sku         || 'MUG-COFFEE';
+  const stock       = params.stock       !== undefined ? params.stock : '30';
+  const viewerType  = (params.viewer_type || 'coffee_cup').toLowerCase();
+  const category    = params.category    || 'mugs';
   const description = params.description || 'Custom product with vibrant high-resolution printing.';
 
   const { t } = useLanguage();
-  const [selectedColor, setSelectedColor] = useState('#FFFFFF');
-  const [customText, setCustomText] = useState('Custom Mug');
-  const [selectedFont, setSelectedFont] = useState(FONT_STYLES[0].family);
+  const [selectedColor, setSelectedColor]     = useState('#FFFFFF');
+  const [customText, setCustomText]           = useState('');
+  const [selectedFont, setSelectedFont]       = useState(FONT_STYLES[0].family);
   const [selectedTextColor, setSelectedTextColor] = useState('#111827');
-  const [selectedFontSize, setSelectedFontSize] = useState(64);
-  const [customImageUri, setCustomImageUri] = useState<string | null>(null);
-  const [pickingImage, setPickingImage] = useState(false);
+  const [customFontSize, setCustomFontSize]   = useState(64);
+  const [textYOffset, setTextYOffset]         = useState(0);
+  const [customImageUri, setCustomImageUri]   = useState<string | null>(null);
+  const [pickingImage, setPickingImage]       = useState(false);
 
-  // Logo / Design picker for both Web and Mobile devices
+  // ─── Image picker ─────────────────────────────────────────────────────────
   const handlePickLogo = async () => {
     try {
       setPickingImage(true);
@@ -88,9 +208,7 @@ export default function Mug3DScreen() {
           if (file) {
             const reader = new FileReader();
             reader.onload = (event) => {
-              if (event.target?.result) {
-                setCustomImageUri(event.target.result as string);
-              }
+              if (event.target?.result) setCustomImageUri(event.target.result as string);
               setPickingImage(false);
             };
             reader.readAsDataURL(file);
@@ -111,7 +229,7 @@ export default function Mug3DScreen() {
           allowsEditing: true,
           quality: 0.9,
         });
-        if (!result.canceled && result.assets && result.assets.length > 0) {
+        if (!result.canceled && result.assets?.length > 0) {
           setCustomImageUri(result.assets[0].uri);
         }
         setPickingImage(false);
@@ -122,15 +240,17 @@ export default function Mug3DScreen() {
     }
   };
 
+  const hasDesign = customText.trim().length > 0 || !!customImageUri;
+
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* Header */}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <Pressable
           onPress={() => router.back()}
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.6 }]}
           hitSlop={10}>
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </Pressable>
@@ -139,16 +259,16 @@ export default function Mug3DScreen() {
         </Text>
         <Pressable
           onPress={() => router.push('/(tabs)/services' as any)}
-          style={({ pressed }) => [styles.headerCart, pressed && { opacity: 0.6 }]}>
+          style={({ pressed }) => [styles.headerBtn, { backgroundColor: '#EFF6FF' }, pressed && { opacity: 0.6 }]}>
           <Ionicons name="bag-outline" size={20} color={BrandColors.primary} />
         </Pressable>
       </View>
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* 3D Stage Card */}
+
+        {/* ── 3D Stage ─────────────────────────────────────────────────────── */}
         <View style={styles.stageCard}>
-          {/* Live Customization Active Indicator */}
-          {(customText.trim().length > 0 || customImageUri) ? (
+          {hasDesign && (
             <View style={styles.liveDesignPill}>
               <View style={styles.liveDot} />
               <Text style={styles.liveDesignLabel} numberOfLines={1}>
@@ -159,11 +279,11 @@ export default function Mug3DScreen() {
                   : `"${customText.trim()}"`}
               </Text>
             </View>
-          ) : null}
-
+          )}
           <View style={styles.pricePill}>
             <Text style={styles.priceText}>{price}</Text>
           </View>
+
           <Product3DPreview
             viewerType={viewerType}
             selectedColor={selectedColor}
@@ -171,48 +291,60 @@ export default function Mug3DScreen() {
             customText={customText}
             customTextColor={selectedTextColor}
             customFontFamily={selectedFont}
-            customFontSize={selectedFontSize}
+            customFontSize={customFontSize}
+            customTextYOffset={textYOffset}
             customImageUri={customImageUri || undefined}
             height={360}
             label={name}
           />
+
+          {/* Drag hint */}
+          <View style={styles.hintRow}>
+            <Ionicons name="hand-left-outline" size={13} color="#9CA3AF" />
+            <Text style={styles.hintText}>Drag on model to rotate</Text>
+          </View>
         </View>
 
-        {/* ── Customization Controls ─────────────────────────────────── */}
-        <View style={styles.customizerSection}>
-          {/* 1. Custom Text Input */}
+        {/* ── Text Studio ──────────────────────────────────────────────────── */}
+        <View style={styles.card}>
+          {/* Header row */}
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>1. Add Custom Text</Text>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="text" size={16} color={BrandColors.primary} />
+              <Text style={styles.sectionTitle}>Text</Text>
+            </View>
             {customText ? (
               <Pressable onPress={() => setCustomText('')} hitSlop={8}>
-                <Text style={styles.clearBtnText}>Clear text</Text>
+                <Text style={styles.clearBtn}>✕ Clear</Text>
               </Pressable>
             ) : null}
           </View>
 
+          {/* Text input */}
           <TextInput
             style={styles.textInput}
-            placeholder="Type your name or custom text here..."
+            placeholder="Type your text here…"
             placeholderTextColor="#9CA3AF"
             value={customText}
             onChangeText={setCustomText}
             maxLength={40}
+            returnKeyType="done"
           />
 
-          {/* Quick Preset Text Chips */}
-          <View style={styles.presetRow}>
+          {/* Preset chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             {PRESET_TEXTS.map((p) => (
               <Pressable
                 key={p}
                 onPress={() => setCustomText(p)}
-                style={styles.presetChip}>
-                <Text style={styles.presetChipText}>{p}</Text>
+                style={[styles.presetChip, customText === p && styles.presetChipActive]}>
+                <Text style={[styles.presetChipText, customText === p && styles.presetChipTextActive]}>{p}</Text>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
 
-          {/* 2. Choose Text Font */}
-          <Text style={styles.subSectionTitle}>Choose Font Style</Text>
+          {/* Font style — big tap targets with sample text */}
+          <Text style={styles.subLabel}>Font Style</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             {FONT_STYLES.map((f) => {
               const isSelected = selectedFont === f.family;
@@ -220,73 +352,96 @@ export default function Mug3DScreen() {
                 <Pressable
                   key={f.id}
                   onPress={() => setSelectedFont(f.family)}
-                  style={[styles.fontChip, isSelected && styles.fontChipActive]}>
-                  <Text style={[styles.fontChipText, isSelected && styles.fontChipTextActive]}>
-                    {f.label}
+                  style={[styles.fontCard, isSelected && styles.fontCardActive]}>
+                  <Text style={[styles.fontSample, { fontFamily: undefined }, isSelected && styles.fontSampleActive]}>
+                    Aa
                   </Text>
+                  <Text style={[styles.fontLabel, isSelected && styles.fontLabelActive]}>{f.label}</Text>
                 </Pressable>
               );
             })}
           </ScrollView>
 
-          {/* 3. Text Color & Size Row */}
-          <View style={styles.controlsRow}>
-            {/* Color Swatches */}
-            <View style={{ flex: 1 }}>
-              <Text style={styles.subSectionTitle}>Text Color</Text>
-              <View style={styles.textColorRow}>
-                {TEXT_PALETTE.map((c) => {
-                  const isSelected = selectedTextColor === c.hex;
-                  return (
-                    <Pressable
-                      key={c.id}
-                      onPress={() => setSelectedTextColor(c.hex)}
-                      style={[
-                        styles.textSwatch,
-                        { backgroundColor: c.hex },
-                        isSelected && styles.textSwatchActive,
-                      ]}
-                    />
-                  );
-                })}
-              </View>
-            </View>
+          {/* Text color */}
+          <Text style={styles.subLabel}>Text Color</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { gap: 10 }]}>
+            {TEXT_PALETTE.map((c) => {
+              const isSelected = selectedTextColor === c.hex;
+              return (
+                <Pressable
+                  key={c.id}
+                  onPress={() => setSelectedTextColor(c.hex)}
+                  style={[
+                    styles.colorSwatch,
+                    { backgroundColor: c.hex },
+                    c.hex === '#FFFFFF' && styles.colorSwatchWhite,
+                    isSelected && styles.colorSwatchActive,
+                  ]}>
+                  {isSelected && (
+                    <Ionicons name="checkmark" size={14} color={c.hex === '#FFFFFF' ? '#111827' : '#fff'} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
 
-            {/* Size Buttons */}
-            <View>
-              <Text style={styles.subSectionTitle}>Text Size</Text>
-              <View style={styles.sizeBtnRow}>
-                {FONT_SIZES.map((s) => {
-                  const isSelected = selectedFontSize === s.size;
-                  return (
-                    <Pressable
-                      key={s.label}
-                      onPress={() => setSelectedFontSize(s.size)}
-                      style={[styles.sizeBtn, isSelected && styles.sizeBtnActive]}>
-                      <Text style={[styles.sizeBtnText, isSelected && styles.sizeBtnTextActive]}>
-                        {s.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
+          {/* ── DRAG SLIDERS ── */}
+          <View style={styles.divider} />
+
+          {/* Font size slider */}
+          <DragSlider
+            label="Text Size"
+            value={customFontSize}
+            min={28}
+            max={120}
+            step={2}
+            onValueChange={setCustomFontSize}
+            leftIcon="remove-circle-outline"
+            rightIcon="add-circle-outline"
+            formatValue={(v) => `${v}px`}
+          />
+
+          {/* Vertical position slider */}
+          <DragSlider
+            label="Position on Product"
+            value={Math.round(textYOffset * 100)}
+            min={-50}
+            max={50}
+            step={1}
+            onValueChange={(v) => setTextYOffset(v / 100)}
+            leftIcon="arrow-down-outline"
+            rightIcon="arrow-up-outline"
+            formatValue={(v) => (v === 0 ? 'Center' : v > 0 ? `+${v}%` : `${v}%`)}
+          />
+
+          {/* Reset position */}
+          {(textYOffset !== 0 || customFontSize !== 64) && (
+            <Pressable
+              onPress={() => { setTextYOffset(0); setCustomFontSize(64); }}
+              style={styles.resetBtn}>
+              <Ionicons name="refresh-outline" size={13} color="#6B7280" />
+              <Text style={styles.resetBtnText}>Reset size & position</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* ── Logo / Artwork ────────────────────────────────────────────────── */}
+        <View style={styles.card}>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="image-outline" size={16} color={BrandColors.primary} />
+            <Text style={styles.sectionTitle}>Logo / Artwork</Text>
           </View>
 
-          {/* 4. Upload Logo or Design */}
-          <View style={styles.divider} />
-          <Text style={styles.sectionTitle}>2. Upload Logo or Artwork</Text>
-
           {customImageUri ? (
-            <View style={styles.uploadedImageBox}>
-              <ExpoImage source={{ uri: customImageUri }} style={styles.uploadedThumbnail} contentFit="contain" />
+            <View style={styles.uploadedBox}>
+              <ExpoImage source={{ uri: customImageUri }} style={styles.uploadedThumb} contentFit="contain" />
               <View style={{ flex: 1 }}>
-                <Text style={styles.uploadedTitle}>Artwork Applied to 3D Model</Text>
-                <Text style={styles.uploadedSubtitle}>Visible live on the model surface</Text>
+                <Text style={styles.uploadedTitle}>Artwork applied ✓</Text>
+                <Text style={styles.uploadedSub}>Visible on the 3D model surface</Text>
               </View>
-              <Pressable onPress={() => setCustomImageUri(null)} style={styles.removeImageBtn}>
+              <Pressable onPress={() => setCustomImageUri(null)} style={styles.removeBtn}>
                 <Ionicons name="trash-outline" size={16} color="#DC2626" />
-                <Text style={styles.removeImageText}>Remove</Text>
+                <Text style={styles.removeBtnText}>Remove</Text>
               </Pressable>
             </View>
           ) : (
@@ -298,58 +453,61 @@ export default function Mug3DScreen() {
                 <ActivityIndicator size="small" color={BrandColors.primary} />
               ) : (
                 <>
-                  <Ionicons name="cloud-upload-outline" size={20} color={BrandColors.primary} />
-                  <Text style={styles.uploadBtnText}>Upload Custom Image / Logo</Text>
+                  <Ionicons name="cloud-upload-outline" size={22} color={BrandColors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.uploadBtnTitle}>Upload Logo or Image</Text>
+                    <Text style={styles.uploadBtnSub}>PNG, JPG, GIF supported</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={BrandColors.primary} />
                 </>
               )}
             </Pressable>
           )}
         </View>
 
-        {/* Product Details Sheet */}
-        <View style={styles.sheet}>
-          <View style={styles.sheetHeader}>
-            <View style={{ flex: 1 }}>
-              <View style={styles.badgeRow}>
-                <View style={[styles.badge, { backgroundColor: BrandColors.primary }]}>
-                  <Ionicons name="star" size={10} color="#fff" />
-                  <Text style={styles.badgeText}>{category.toUpperCase()}</Text>
-                </View>
-                {sku ? (
-                  <View style={[styles.badge, { backgroundColor: '#4B5563' }]}>
-                    <Text style={styles.badgeText}>SKU: {sku}</Text>
-                  </View>
-                ) : null}
-                <View style={[styles.badge, { backgroundColor: Number(stock) > 0 ? '#059669' : '#DC2626' }]}>
-                  <Text style={styles.badgeText}>Stock: {stock}</Text>
-                </View>
+        {/* ── Product Sheet ─────────────────────────────────────────────────── */}
+        <View style={styles.card}>
+          <View style={styles.badgeRow}>
+            <View style={[styles.badge, { backgroundColor: BrandColors.primary }]}>
+              <Ionicons name="star" size={10} color="#fff" />
+              <Text style={styles.badgeText}>{category.toUpperCase()}</Text>
+            </View>
+            {sku ? (
+              <View style={[styles.badge, { backgroundColor: '#4B5563' }]}>
+                <Text style={styles.badgeText}>SKU: {sku}</Text>
               </View>
-              <Text style={styles.title}>{name}</Text>
-              <Text style={styles.subtitle} numberOfLines={3}>{description}</Text>
+            ) : null}
+            <View style={[styles.badge, { backgroundColor: Number(stock) > 0 ? '#059669' : '#DC2626' }]}>
+              <Text style={styles.badgeText}>Stock: {stock}</Text>
             </View>
           </View>
+          <Text style={styles.productName}>{name}</Text>
+          <Text style={styles.productDesc} numberOfLines={3}>{description}</Text>
 
-          {/* Actions */}
-          <View style={styles.actions}>
-            <View style={styles.priceBlock}>
+          <View style={styles.actionsRow}>
+            <View>
               <Text style={styles.priceLabel}>Total Price</Text>
-              <Text style={styles.price}>{price}</Text>
+              <Text style={styles.priceValue}>{price}</Text>
             </View>
             <Pressable
               onPress={() => alert(`Customized ${name} (${price}) added to cart!`)}
-              style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }]}>
-              <Text style={styles.primaryText}>Add Customized Item</Text>
+              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.9 }]}>
+              <Text style={styles.addBtnText}>Add to Cart</Text>
               <Ionicons name="cart-outline" size={18} color="#fff" />
             </Pressable>
           </View>
         </View>
+
       </ScrollView>
     </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F9FAFB' },
+  root: { flex: 1, backgroundColor: '#F3F4F6' },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -361,7 +519,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  backBtn: {
+  headerBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -372,76 +530,68 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     textAlign: 'center',
-    marginHorizontal: 12,
-    fontSize: 16,
+    marginHorizontal: 10,
+    fontSize: 15,
     fontWeight: '700',
     color: '#111827',
     fontFamily: 'Manrope_700Bold',
   },
-  headerCart: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
+
+  scrollContent: { paddingBottom: 40 },
+
+  // Stage
   stageCard: {
     marginHorizontal: 16,
     marginTop: 16,
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 16,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E5E7EB',
     position: 'relative',
     shadowColor: '#000',
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
   liveDesignPill: {
     position: 'absolute',
-    top: 24,
-    left: 24,
+    top: 14,
+    left: 14,
     zIndex: 10,
-    backgroundColor: 'rgba(17, 24, 39, 0.88)',
+    backgroundColor: 'rgba(17,24,39,0.88)',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingVertical: 5,
+    borderRadius: 14,
     maxWidth: '55%',
   },
-  liveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#10B981',
-  },
-  liveDesignLabel: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-  },
+  liveDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#10B981' },
+  liveDesignLabel: { color: '#fff', fontSize: 11, fontWeight: '700' },
   pricePill: {
     position: 'absolute',
-    top: 24,
-    right: 24,
+    top: 14,
+    right: 14,
     zIndex: 10,
     backgroundColor: BrandColors.primary,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingVertical: 5,
+    borderRadius: 14,
   },
-  priceText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  priceText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  hintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingBottom: 10,
+  },
+  hintText: { fontSize: 11, color: '#9CA3AF' },
 
-  // Customizer Section
-  customizerSection: {
+  // Generic card
+  card: {
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
     marginTop: 14,
@@ -451,204 +601,123 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
+
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
-    fontFamily: 'Manrope_700Bold',
-  },
-  subSectionTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4B5563',
-    marginBottom: 6,
-  },
-  clearBtnText: {
-    fontSize: 12,
-    color: '#DC2626',
-    fontWeight: '600',
-  },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold' },
+  clearBtn: { fontSize: 12, color: '#DC2626', fontWeight: '600' },
+  subLabel: { fontSize: 12, fontWeight: '600', color: '#4B5563', marginBottom: -4 },
+
+  // Text input
   textInput: {
     backgroundColor: '#F9FAFB',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#D1D5DB',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
     color: '#111827',
   },
-  presetRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
-    marginBottom: 6,
-  },
+
+  // Presets
+  chipRow: { flexDirection: 'row', gap: 8, paddingVertical: 2 },
   presetChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 14,
     backgroundColor: '#F3F4F6',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  presetChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  chipRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingVertical: 4,
-  },
-  fontChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
+  presetChipActive: { backgroundColor: '#111827', borderColor: '#111827' },
+  presetChipText: { fontSize: 12, fontWeight: '600', color: '#4B5563' },
+  presetChipTextActive: { color: '#FFFFFF' },
+
+  // Font cards
+  fontCard: {
+    width: 68,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1.5,
     borderColor: '#E5E7EB',
+    alignItems: 'center',
+    gap: 2,
   },
-  fontChipActive: {
-    backgroundColor: '#111827',
-    borderColor: '#111827',
-  },
-  fontChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  fontChipTextActive: {
-    color: '#FFFFFF',
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 16,
-    marginTop: 4,
-  },
-  textColorRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  textSwatch: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+  fontCardActive: { backgroundColor: '#EFF6FF', borderColor: BrandColors.primary },
+  fontSample: { fontSize: 20, color: '#374151' },
+  fontSampleActive: { color: BrandColors.primary },
+  fontLabel: { fontSize: 10, fontWeight: '600', color: '#6B7280' },
+  fontLabelActive: { color: BrandColors.primary },
+
+  // Color swatches
+  colorSwatch: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#D1D5DB',
-  },
-  textSwatchActive: {
-    borderWidth: 2.5,
-    borderColor: '#111827',
-    transform: [{ scale: 1.15 }],
-  },
-  sizeBtnRow: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  sizeBtn: {
-    width: 32,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sizeBtnActive: {
-    backgroundColor: BrandColors.primary,
-    borderColor: BrandColors.primary,
-  },
-  sizeBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#4B5563',
-  },
-  sizeBtnTextActive: {
-    color: '#FFFFFF',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginVertical: 4,
-  },
-  uploadBtn: {
+  colorSwatchWhite: { borderWidth: 1.5, borderColor: '#D1D5DB' },
+  colorSwatchActive: { borderWidth: 2.5, borderColor: '#111827', transform: [{ scale: 1.15 }] },
+
+  // Divider
+  divider: { height: 1, backgroundColor: '#F3F4F6' },
+
+  // Reset button
+  resetBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1.5,
-    borderColor: BrandColors.primary,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    paddingVertical: 14,
-  },
-  uploadBtnText: {
-    color: BrandColors.primary,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  uploadedImageBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 10,
-    borderRadius: 12,
+    gap: 5,
+    paddingVertical: 8,
+    borderRadius: 10,
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  uploadedThumbnail: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-  },
-  uploadedTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  uploadedSubtitle: {
-    fontSize: 11,
-    color: '#059669',
-    fontWeight: '500',
-  },
-  removeImageBtn: {
+  resetBtnText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
+
+  // Upload / logo
+  uploadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    gap: 12,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1.5,
+    borderColor: BrandColors.primary,
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
-  removeImageText: {
-    fontSize: 12,
-    color: '#DC2626',
-    fontWeight: '600',
-  },
-
-  sheet: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 14,
-    borderRadius: 16,
-    padding: 16,
-    gap: 16,
+  uploadBtnTitle: { fontSize: 14, fontWeight: '700', color: BrandColors.primary },
+  uploadBtnSub: { fontSize: 11, color: '#60A5FA', marginTop: 1 },
+  uploadedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#F0FDF4',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#BBF7D0',
   },
-  sheetHeader: { gap: 8 },
-  badgeRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 4 },
+  uploadedThumb: { width: 52, height: 52, borderRadius: 10, backgroundColor: '#fff' },
+  uploadedTitle: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  uploadedSub: { fontSize: 11, color: '#059669', fontWeight: '500', marginTop: 2 },
+  removeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6 },
+  removeBtnText: { fontSize: 12, color: '#DC2626', fontWeight: '600' },
+
+  // Product sheet
+  badgeRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -658,9 +727,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  title: { fontSize: 20, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold' },
-  subtitle: { fontSize: 13, color: '#6B7280', lineHeight: 18 },
-  actions: {
+  productName: { fontSize: 20, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold' },
+  productDesc: { fontSize: 13, color: '#6B7280', lineHeight: 18 },
+  actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -668,17 +737,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
-  priceBlock: { gap: 2 },
   priceLabel: { fontSize: 11, color: '#9CA3AF' },
-  price: { fontSize: 20, fontWeight: '800', color: BrandColors.primary, fontFamily: 'Manrope_700Bold' },
-  primaryBtn: {
+  priceValue: { fontSize: 22, fontWeight: '800', color: BrandColors.primary, fontFamily: 'Manrope_700Bold' },
+  addBtn: {
     backgroundColor: BrandColors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 13,
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  primaryText: { color: '#fff', fontSize: 14, fontWeight: '700', fontFamily: 'Manrope_700Bold' },
+  addBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', fontFamily: 'Manrope_700Bold' },
 });

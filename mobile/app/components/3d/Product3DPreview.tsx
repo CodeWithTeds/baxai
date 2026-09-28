@@ -50,7 +50,6 @@ import {
   shirtTrimContrast,
 } from './shirt-builder';
 import { buildVessel, isVesselType, VesselLabel } from './vessel-builder';
-import { createDesignCanvasTexture } from './design-texture';
 import {
   build3DTextMesh,
   buildDecalImageMesh,
@@ -88,6 +87,8 @@ export interface Product3DPreviewProps {
   customFontFamily?: string;
   customFontSize?: number;
   customImageUri?: string;
+  /** Y-axis offset for text on vessel/shirt surfaces (-0.5 to 0.5 world units) */
+  customTextYOffset?: number;
 }
 
 export function Product3DPreview({
@@ -105,6 +106,7 @@ export function Product3DPreview({
   customFontFamily = 'system-ui, sans-serif',
   customFontSize = 64,
   customImageUri,
+  customTextYOffset = 0,
 }: Product3DPreviewProps) {
   const [internalColor, setInternalColor] = useState('#FFFFFF');
   const color = controlledColor !== undefined ? controlledColor : internalColor;
@@ -247,6 +249,7 @@ export function Product3DPreview({
   };
 
   // ─── Custom Text & Logo Decal Projection ────────────────────────────────────
+  // ─── Custom Text & Logo Decal Projection ────────────────────────────────────
   const applyCustomDecal = useCallback(
     (targetGroup: THREE.Group) => {
       // Guard: only project once model bounds are ready
@@ -281,51 +284,84 @@ export function Product3DPreview({
       const center = box.getCenter(new THREE.Vector3());
       const maxZ = box.max.z;
 
-      createDesignCanvasTexture(
-        {
-          text: effectiveText,
-          textColor: customTextColor,
-          fontFamily: customFontFamily,
-          fontSize: customFontSize,
-          imageUri: effectiveImage,
-        },
-        (tex) => {
-          const decalGroup = new THREE.Group();
-          decalGroup.userData = { isDecal: true };
+      const decalGroup = new THREE.Group();
+      decalGroup.userData = { isDecal: true };
 
-          if (!tex) {
-            // Fallback for native text if canvas context is unavailable
-            if (hasText) {
-              const cylR =
-                isVessel && vesselLabelRef.current
-                  ? (vesselLabelRef.current.rTop + vesselLabelRef.current.rBottom) / 2
-                  : null;
-              const textMesh = build3DTextMesh({
-                text: effectiveText,
-                textColor: customTextColor,
-                fontFamily: customFontFamily,
-                fontSize: customFontSize,
-                cylinderRadius: cylR,
-                yOffset: isShirt ? 0.2 : (vesselLabelRef.current ? vesselLabelRef.current.y : 0),
-                zOffset: isVessel ? 0 : maxZ + 0.02,
-              });
-              decalGroup.add(textMesh);
-              if (vcenterRef.current && isVessel) {
-                decalGroup.position.set(-vcenterRef.current.x, -vcenterRef.current.y, -vcenterRef.current.z);
-              }
-              targetGroup.add(decalGroup);
-              decalGroupRef.current = decalGroup;
-            }
-            return;
-          }
+      // ─── Drinkware (Mugs, Cups, Tumblers, Demitasse) ───────────────────────
+      if (isVessel && vesselLabelRef.current && vcenterRef.current) {
+        const label = vesselLabelRef.current;
+        const vc = vcenterRef.current;
+        const cylR = (label.rTop + label.rBottom) / 2;
 
-          if (isShirt) {
-            // T-shirt chest print draped over fabric folds
-            const torsoW = size.x;
-            const torsoH = size.y;
-            const w = torsoW * 0.52;
-            const h = w;
-            const geo = new THREE.PlaneGeometry(w, h, 20, 20);
+        decalGroup.position.set(-vc.x, -vc.y, -vc.z);
+
+        if (hasText) {
+          const textY = hasImage
+            ? label.y - label.height * 0.24 + customTextYOffset
+            : label.y + customTextYOffset;
+          const textScaleFactor = hasImage ? 0.75 : 1.0;
+          const textMesh = build3DTextMesh({
+            text: effectiveText,
+            textColor: customTextColor,
+            fontFamily: customFontFamily,
+            fontSize: customFontSize * textScaleFactor,
+            cylinderRadius: cylR,
+            yOffset: textY,
+          });
+          decalGroup.add(textMesh);
+        }
+
+        if (hasImage) {
+          const imgH = hasText
+            ? Math.min(label.height * 0.48, cylR * 0.9)
+            : Math.min(label.height * 0.82, cylR * 1.4);
+          const imgW = imgH;
+          const imgY = hasText ? label.y + label.height * 0.22 : label.y + customTextYOffset;
+
+          loadUniversalTexture(effectiveImage, (tex) => {
+            if (!tex || !decalGroupRef.current) return;
+            const imgMesh = buildDecalImageMesh({
+              texture: tex,
+              width: imgW,
+              height: imgH,
+              cylinderRadius: cylR,
+              yOffset: imgY,
+            });
+            decalGroup.add(imgMesh);
+          });
+        }
+
+        targetGroup.add(decalGroup);
+        decalGroupRef.current = decalGroup;
+        return;
+      }
+
+      // ─── Apparel (T-Shirts) ────────────────────────────────────────────────
+      if (isShirt) {
+        const torsoW = size.x;
+        const torsoH = size.y;
+
+        if (hasText) {
+          const textY = hasImage ? 0.05 + customTextYOffset : 0.2 + customTextYOffset;
+          const textMesh = build3DTextMesh({
+            text: effectiveText,
+            textColor: customTextColor,
+            fontFamily: customFontFamily,
+            fontSize: customFontSize * (hasImage ? 0.75 : 1.0),
+            yOffset: textY,
+            zOffset: maxZ + 0.02,
+          });
+          decalGroup.add(textMesh);
+        }
+
+        if (hasImage) {
+          const imgW = torsoW * (hasText ? 0.38 : 0.52);
+          const imgH = imgW;
+          const imgY = hasText ? 0.32 + customTextYOffset : 0.2 + customTextYOffset;
+
+          loadUniversalTexture(effectiveImage, (tex) => {
+            if (!tex || !decalGroupRef.current) return;
+            const geo = new THREE.PlaneGeometry(imgW, imgH, 20, 20);
             applyShirtDecalDrape(geo, { centerY: 0, frontZ: 0, torsoW, torsoH, isBoxyHeavy: false });
             const mat = new THREE.MeshBasicMaterial({
               map: tex,
@@ -333,80 +369,97 @@ export function Product3DPreview({
               side: THREE.DoubleSide,
               depthTest: true,
               depthWrite: false,
-              polygonOffset: true,
-              polygonOffsetFactor: -1,
-              polygonOffsetUnits: -4,
             });
             const shirtMesh = new THREE.Mesh(geo, mat);
             shirtMesh.userData = { isDecal: true };
-            shirtMesh.position.set(0, 0, maxZ + 0.015);
+            shirtMesh.renderOrder = 2;
+            shirtMesh.position.set(0, imgY, maxZ + 0.015);
             decalGroup.add(shirtMesh);
-          } else if (isVessel && vesselLabelRef.current && vcenterRef.current) {
-            // Mug / vessel: cylindrical print label matching mug wall curvature
-            const label = vesselLabelRef.current;
-            const vc = vcenterRef.current;
-            const arc = 1.95; // visible arc on front face of mug
+          });
+        }
 
-            const geo = new THREE.CylinderGeometry(
-              label.rTop,
-              label.rBottom,
-              label.height,
-              48,
-              1,
-              true,
-              -arc / 2,
-              arc
-            );
-            const mat = new THREE.MeshBasicMaterial({
-              map: tex,
-              transparent: true,
-              side: THREE.DoubleSide,
-              depthTest: true,
-              depthWrite: false,
-              polygonOffset: true,
-              polygonOffsetFactor: -1.5,
-              polygonOffsetUnits: -4,
-            });
-            const mugMesh = new THREE.Mesh(geo, mat);
-            mugMesh.userData = { isDecal: true };
-            mugMesh.position.set(-vc.x, label.y - vc.y, -vc.z);
-            decalGroup.add(mugMesh);
-          } else if (isPin) {
-            // Pin decal conforming to pin shape / dome
+        targetGroup.add(decalGroup);
+        decalGroupRef.current = decalGroup;
+        return;
+      }
+
+      // ─── Button Pins ───────────────────────────────────────────────────────
+      if (isPin) {
+        if (hasImage) {
+          loadUniversalTexture(effectiveImage, (tex) => {
+            if (!tex || !decalGroupRef.current) return;
             const decal = buildPinDecal(resolvedViewerType, tex);
             decal.userData = { isDecal: true };
+            decal.renderOrder = 2;
             decalGroup.add(decal);
-          } else {
-            // Tote bag, button pin, calendar, sticker
-            let w = Math.max(size.x * 0.55, 0.35);
-            let h = w;
-            const geo = new THREE.PlaneGeometry(w, h);
-            const mat = new THREE.MeshBasicMaterial({
-              map: tex,
-              transparent: true,
-              side: THREE.DoubleSide,
-              depthTest: true,
-              depthWrite: false,
-              polygonOffset: true,
-              polygonOffsetFactor: -1,
-              polygonOffsetUnits: -4,
-            });
-            const planeMesh = new THREE.Mesh(geo, mat);
-            planeMesh.userData = { isDecal: true };
-            planeMesh.position.set(center.x, center.y, maxZ + 0.018);
-            decalGroup.add(planeMesh);
-          }
-
-          targetGroup.add(decalGroup);
-          decalGroupRef.current = decalGroup;
+          });
         }
-      );
+
+        if (hasText) {
+          const textMesh = build3DTextMesh({
+            text: effectiveText,
+            textColor: customTextColor,
+            fontFamily: customFontFamily,
+            fontSize: customFontSize * (hasImage ? 0.6 : 0.85),
+            yOffset: hasImage ? -0.25 : 0,
+            zOffset: 0.12,
+          });
+          decalGroup.add(textMesh);
+        }
+
+        targetGroup.add(decalGroup);
+        decalGroupRef.current = decalGroup;
+        return;
+      }
+
+      // ─── Bags, Stickers, Calendars ─────────────────────────────────────────
+      const baseW = Math.max(size.x * 0.55, 0.35);
+
+      if (hasText) {
+        const textY = hasImage ? center.y - baseW * 0.3 : center.y;
+        const textMesh = build3DTextMesh({
+          text: effectiveText,
+          textColor: customTextColor,
+          fontFamily: customFontFamily,
+          fontSize: customFontSize * (hasImage ? 0.75 : 1.0),
+          yOffset: textY,
+          zOffset: maxZ + 0.02,
+        });
+        decalGroup.add(textMesh);
+      }
+
+      if (hasImage) {
+        const imgW = hasText ? baseW * 0.75 : baseW;
+        const imgH = imgW;
+        const imgY = hasText ? center.y + baseW * 0.25 : center.y;
+
+        loadUniversalTexture(effectiveImage, (tex) => {
+          if (!tex || !decalGroupRef.current) return;
+          const geo = new THREE.PlaneGeometry(imgW, imgH);
+          const mat = new THREE.MeshBasicMaterial({
+            map: tex,
+            transparent: true,
+            side: THREE.DoubleSide,
+            depthTest: true,
+            depthWrite: false,
+          });
+          const planeMesh = new THREE.Mesh(geo, mat);
+          planeMesh.userData = { isDecal: true };
+          planeMesh.renderOrder = 2;
+          planeMesh.position.set(center.x, imgY, maxZ + 0.018);
+          decalGroup.add(planeMesh);
+        });
+      }
+
+      targetGroup.add(decalGroup);
+      decalGroupRef.current = decalGroup;
     },
     [
       customText,
       customTextColor,
       customFontFamily,
       customFontSize,
+      customTextYOffset,
       customImageUri,
       designImageUrl,
       isShirt,
@@ -464,6 +517,20 @@ export function Product3DPreview({
     const finishVessel = () => {
       const targetType = resolvedViewerType;
       const built = buildVessel(targetType, activeColor);
+
+      // Hero normalization: auto-scale smaller drinkware (e.g. espresso cup, teacup) to fill viewport
+      const preBox = new THREE.Box3().setFromObject(built.group);
+      const preSize = preBox.getSize(new THREE.Vector3());
+      const maxDim = Math.max(preSize.x, preSize.y, preSize.z);
+      if (maxDim < 1.65 && maxDim > 0) {
+        const s = 1.85 / maxDim;
+        built.group.scale.setScalar(s);
+        built.label.rTop *= s;
+        built.label.rBottom *= s;
+        built.label.height *= s;
+        built.label.y *= s;
+      }
+
       vesselLabelRef.current = built.label;
       const vbox = new THREE.Box3().setFromObject(built.group);
       const vcenter = vbox.getCenter(new THREE.Vector3());

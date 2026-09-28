@@ -182,9 +182,10 @@ export function buildVessel(type: string, color = '#FFFFFF'): { group: THREE.Gro
     // Print band for the reference-artwork decal (vessel-local coords).
     const t0 = 0.35;
     const t1 = 0.7;
+    const offset = 0.035 + (p.bulge ?? 0) * 0.45;
     const label: VesselLabel = {
-        rTop: radiusAt(p, t1) + 0.02,
-        rBottom: radiusAt(p, t0) + 0.02,
+        rTop: radiusAt(p, t1) + offset,
+        rBottom: radiusAt(p, t0) + offset,
         y: (t0 + t1) / 2 * h - h / 2,
         height: (t1 - t0) * h,
     };

@@ -84,11 +84,11 @@ export function build3DTextMesh(options: Build3DTextOptions): THREE.Group {
   const totalHeight = lines.length * lineHeight;
   const startY = yOffset + (totalHeight / 2) - baseSize * 0.8;
 
-  const textMat = new THREE.MeshStandardMaterial({
+  // Use MeshBasicMaterial for bright, unattenuated text colors across EXGL & WebGL1
+  const textMat = new THREE.MeshBasicMaterial({
     color: new THREE.Color(textColor),
-    roughness: 0.35,
-    metalness: 0.08,
     side: THREE.DoubleSide,
+    depthTest: true,
   });
 
   lines.forEach((line, idx) => {
@@ -114,16 +114,17 @@ export function build3DTextMesh(options: Build3DTextOptions): THREE.Group {
     const center = geo.boundingBox.getCenter(new THREE.Vector3());
     geo.translate(-center.x, -center.y, -geo.boundingBox.min.z);
 
-    // Auto-fit long lines so they stay within visible front arc (~1.1 width)
+    // Auto-fit long lines so they stay within visible front arc
+    const maxArcWidth = cylinderRadius ? cylinderRadius * 1.35 : 1.15;
     const rawWidth = geo.boundingBox.max.x - geo.boundingBox.min.x;
-    if (rawWidth > 1.15) {
-      const scale = 1.15 / rawWidth;
+    if (rawWidth > maxArcWidth && rawWidth > 0) {
+      const scale = maxArcWidth / rawWidth;
       geo.scale(scale, scale, 1);
     }
 
     // Cylindrical projection wrapping around mug curvature
     if (cylinderRadius && cylinderRadius > 0) {
-      const R = cylinderRadius + 0.015;
+      const R = cylinderRadius + 0.008;
       const pos = geo.attributes.position;
       for (let i = 0; i < pos.count; i++) {
         const x = pos.getX(i);
@@ -140,6 +141,7 @@ export function build3DTextMesh(options: Build3DTextOptions): THREE.Group {
 
     const mesh = new THREE.Mesh(geo, textMat);
     mesh.userData = { isDecal: true };
+    mesh.renderOrder = 3;
     mesh.position.y = startY - idx * lineHeight;
     group.add(mesh);
   });
@@ -172,9 +174,9 @@ export function buildDecalImageMesh(options: BuildDecalImageOptions): THREE.Mesh
   let geo: THREE.BufferGeometry;
 
   if (cylinderRadius && cylinderRadius > 0) {
-    // 16 segments horizontally to smoothly hug the cylindrical wall
-    const planeGeo = new THREE.PlaneGeometry(width, height, 16, 1);
-    const R = cylinderRadius + 0.014;
+    // 24 segments horizontally to smoothly hug the cylindrical wall
+    const planeGeo = new THREE.PlaneGeometry(width, height, 24, 1);
+    const R = cylinderRadius;
     const pos = planeGeo.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
@@ -197,13 +199,11 @@ export function buildDecalImageMesh(options: BuildDecalImageOptions): THREE.Mesh
     side: THREE.DoubleSide,
     depthTest: true,
     depthWrite: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -4,
   });
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.userData = { isDecal: true };
+  mesh.renderOrder = 2;
   mesh.position.y = yOffset;
   return mesh;
 }
@@ -246,20 +246,36 @@ export function loadUniversalTexture(
 
   // Native (iOS/Android Expo) via expo-three loadTextureAsync
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { loadTextureAsync } = require('expo-three');
-    loadTextureAsync({ asset: cleanUri })
-      .then((tex: any) => {
-        if (tex) {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.needsUpdate = true;
-        }
-        onLoaded(tex || null);
-      })
-      .catch((err: any) => {
-        console.warn('[Decal] Native loadTextureAsync error:', err);
-        onLoaded(null);
-      });
+    let loaderFn: any = null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const exp3 = require('expo-three');
+      loaderFn = exp3.loadTextureAsync;
+    } catch {}
+    if (!loaderFn) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        loaderFn = require('expo-three/build/loaders/loadTextureAsync').loadTextureAsync;
+      } catch {}
+    }
+
+    if (loaderFn) {
+      loaderFn({ asset: cleanUri })
+        .then((tex: any) => {
+          if (tex) {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.needsUpdate = true;
+          }
+          onLoaded(tex || null);
+        })
+        .catch((err: any) => {
+          console.warn('[Decal] Native loadTextureAsync error:', err);
+          onLoaded(null);
+        });
+    } else {
+      console.warn('[Decal] loadTextureAsync could not be resolved');
+      onLoaded(null);
+    }
   } catch (err) {
     console.warn('[Decal] expo-three loadTextureAsync unavailable:', err);
     onLoaded(null);
