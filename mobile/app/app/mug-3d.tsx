@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -11,10 +13,38 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 
 import { Product3DPreview } from '@/components/3d/Product3DPreview';
 import { BrandColors } from '@/constants/theme';
 import { useLanguage } from '@/contexts/language-context';
+
+export const FONT_STYLES = [
+  { id: 'sans', label: 'Modern', family: 'system-ui, -apple-system, sans-serif' },
+  { id: 'serif', label: 'Serif', family: 'Georgia, Times New Roman, serif' },
+  { id: 'bold', label: 'Bold', family: 'Impact, Arial Black, sans-serif' },
+  { id: 'cursive', label: 'Cursive', family: '"Brush Script MT", "Caveat", cursive' },
+  { id: 'mono', label: 'Retro', family: '"Courier New", Courier, monospace' },
+  { id: 'playful', label: 'Playful', family: '"Comic Sans MS", "Chalkboard SE", sans-serif' },
+];
+
+export const TEXT_PALETTE = [
+  { id: 'black', hex: '#111827', label: 'Black' },
+  { id: 'white', hex: '#FFFFFF', label: 'White' },
+  { id: 'gold', hex: '#D97706', label: 'Gold' },
+  { id: 'red', hex: '#DC2626', label: 'Red' },
+  { id: 'blue', hex: '#2563EB', label: 'Blue' },
+  { id: 'green', hex: '#059669', label: 'Green' },
+];
+
+const FONT_SIZES = [
+  { label: 'S', size: 48 },
+  { label: 'M', size: 64 },
+  { label: 'L', size: 84 },
+  { label: 'XL', size: 104 },
+];
+
+export const PRESET_TEXTS = ['Custom Mug', 'Coffee First', 'Placides Co.', 'Best Boss'];
 
 export default function Mug3DScreen() {
   const router = useRouter();
@@ -38,7 +68,59 @@ export default function Mug3DScreen() {
 
   const { t } = useLanguage();
   const [selectedColor, setSelectedColor] = useState('#FFFFFF');
-  const [customText, setCustomText] = useState('');
+  const [customText, setCustomText] = useState('Custom Mug');
+  const [selectedFont, setSelectedFont] = useState(FONT_STYLES[0].family);
+  const [selectedTextColor, setSelectedTextColor] = useState('#111827');
+  const [selectedFontSize, setSelectedFontSize] = useState(64);
+  const [customImageUri, setCustomImageUri] = useState<string | null>(null);
+  const [pickingImage, setPickingImage] = useState(false);
+
+  // Logo / Design picker for both Web and Mobile devices
+  const handlePickLogo = async () => {
+    try {
+      setPickingImage(true);
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e: any) => {
+          const file = e.target?.files?.[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              if (event.target?.result) {
+                setCustomImageUri(event.target.result as string);
+              }
+              setPickingImage(false);
+            };
+            reader.readAsDataURL(file);
+          } else {
+            setPickingImage(false);
+          }
+        };
+        input.click();
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          alert('Photo library permission is needed to upload custom designs.');
+          setPickingImage(false);
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          quality: 0.9,
+        });
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          setCustomImageUri(result.assets[0].uri);
+        }
+        setPickingImage(false);
+      }
+    } catch (err) {
+      console.warn('[ImagePicker] Error picking logo:', err);
+      setPickingImage(false);
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -72,32 +154,142 @@ export default function Mug3DScreen() {
             viewerType={viewerType}
             selectedColor={selectedColor}
             onColorChange={setSelectedColor}
+            customText={customText}
+            customTextColor={selectedTextColor}
+            customFontFamily={selectedFont}
+            customFontSize={selectedFontSize}
+            customImageUri={customImageUri || undefined}
             height={360}
             label={name}
           />
         </View>
 
-        {/* Customization Options Bar */}
+        {/* ── Customization Controls ─────────────────────────────────── */}
         <View style={styles.customizerSection}>
-          {/* Custom Text Input */}
-          <Text style={styles.sectionTitle}>1. Add Custom Text / Name</Text>
+          {/* 1. Custom Text Input */}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>1. Add Custom Text</Text>
+            {customText ? (
+              <Pressable onPress={() => setCustomText('')} hitSlop={8}>
+                <Text style={styles.clearBtnText}>Clear text</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
           <TextInput
             style={styles.textInput}
-            placeholder="Type custom text to print..."
+            placeholder="Type your name or custom text here..."
             placeholderTextColor="#9CA3AF"
             value={customText}
             onChangeText={setCustomText}
-            maxLength={30}
+            maxLength={40}
           />
 
-          {/* Upload Logo / Image Button */}
-          <Text style={styles.sectionTitle}>2. Upload Logo or Design</Text>
-          <Pressable
-            onPress={() => alert('Logo Upload: Select image from device gallery to place on 3D model.')}
-            style={({ pressed }) => [styles.uploadBtn, pressed && { opacity: 0.8 }]}>
-            <Ionicons name="cloud-upload-outline" size={20} color={BrandColors.primary} />
-            <Text style={styles.uploadBtnText}>Upload Custom Image / Logo</Text>
-          </Pressable>
+          {/* Quick Preset Text Chips */}
+          <View style={styles.presetRow}>
+            {PRESET_TEXTS.map((p) => (
+              <Pressable
+                key={p}
+                onPress={() => setCustomText(p)}
+                style={styles.presetChip}>
+                <Text style={styles.presetChipText}>{p}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* 2. Choose Text Font */}
+          <Text style={styles.subSectionTitle}>Choose Font Style</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            {FONT_STYLES.map((f) => {
+              const isSelected = selectedFont === f.family;
+              return (
+                <Pressable
+                  key={f.id}
+                  onPress={() => setSelectedFont(f.family)}
+                  style={[styles.fontChip, isSelected && styles.fontChipActive]}>
+                  <Text style={[styles.fontChipText, isSelected && styles.fontChipTextActive]}>
+                    {f.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {/* 3. Text Color & Size Row */}
+          <View style={styles.controlsRow}>
+            {/* Color Swatches */}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.subSectionTitle}>Text Color</Text>
+              <View style={styles.textColorRow}>
+                {TEXT_PALETTE.map((c) => {
+                  const isSelected = selectedTextColor === c.hex;
+                  return (
+                    <Pressable
+                      key={c.id}
+                      onPress={() => setSelectedTextColor(c.hex)}
+                      style={[
+                        styles.textSwatch,
+                        { backgroundColor: c.hex },
+                        isSelected && styles.textSwatchActive,
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Size Buttons */}
+            <View>
+              <Text style={styles.subSectionTitle}>Text Size</Text>
+              <View style={styles.sizeBtnRow}>
+                {FONT_SIZES.map((s) => {
+                  const isSelected = selectedFontSize === s.size;
+                  return (
+                    <Pressable
+                      key={s.label}
+                      onPress={() => setSelectedFontSize(s.size)}
+                      style={[styles.sizeBtn, isSelected && styles.sizeBtnActive]}>
+                      <Text style={[styles.sizeBtnText, isSelected && styles.sizeBtnTextActive]}>
+                        {s.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+
+          {/* 4. Upload Logo or Design */}
+          <View style={styles.divider} />
+          <Text style={styles.sectionTitle}>2. Upload Logo or Artwork</Text>
+
+          {customImageUri ? (
+            <View style={styles.uploadedImageBox}>
+              <ExpoImage source={{ uri: customImageUri }} style={styles.uploadedThumbnail} contentFit="contain" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.uploadedTitle}>Artwork Applied to 3D Model</Text>
+                <Text style={styles.uploadedSubtitle}>Visible live on the model surface</Text>
+              </View>
+              <Pressable onPress={() => setCustomImageUri(null)} style={styles.removeImageBtn}>
+                <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                <Text style={styles.removeImageText}>Remove</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              onPress={handlePickLogo}
+              disabled={pickingImage}
+              style={({ pressed }) => [styles.uploadBtn, pressed && { opacity: 0.8 }]}>
+              {pickingImage ? (
+                <ActivityIndicator size="small" color={BrandColors.primary} />
+              ) : (
+                <>
+                  <Ionicons name="cloud-upload-outline" size={20} color={BrandColors.primary} />
+                  <Text style={styles.uploadBtnText}>Upload Custom Image / Logo</Text>
+                </>
+              )}
+            </Pressable>
+          )}
         </View>
 
         {/* Product Details Sheet */}
@@ -220,11 +412,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: '#111827',
     fontFamily: 'Manrope_700Bold',
+  },
+  subSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4B5563',
+    marginBottom: 6,
+  },
+  clearBtnText: {
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '600',
   },
   textInput: {
     backgroundColor: '#F9FAFB',
@@ -236,6 +444,104 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#111827',
   },
+  presetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  presetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  presetChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  fontChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  fontChipActive: {
+    backgroundColor: '#111827',
+    borderColor: '#111827',
+  },
+  fontChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  fontChipTextActive: {
+    color: '#FFFFFF',
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 16,
+    marginTop: 4,
+  },
+  textColorRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  textSwatch: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  textSwatchActive: {
+    borderWidth: 2.5,
+    borderColor: '#111827',
+    transform: [{ scale: 1.15 }],
+  },
+  sizeBtnRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  sizeBtn: {
+    width: 32,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sizeBtnActive: {
+    backgroundColor: BrandColors.primary,
+    borderColor: BrandColors.primary,
+  },
+  sizeBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4B5563',
+  },
+  sizeBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 4,
+  },
   uploadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -246,12 +552,50 @@ const styles = StyleSheet.create({
     borderColor: BrandColors.primary,
     borderStyle: 'dashed',
     borderRadius: 12,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   uploadBtnText: {
     color: BrandColors.primary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  uploadedImageBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  uploadedThumbnail: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  uploadedTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  uploadedSubtitle: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '500',
+  },
+  removeImageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  removeImageText: {
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '600',
   },
 
   sheet: {

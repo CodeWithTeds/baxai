@@ -9,16 +9,24 @@ import {
   View,
 } from 'react-native';
 import { GLView } from 'expo-gl';
-import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+// Lazy load native renderer to keep web DOM and HTML5 canvas untainted
+let NativeRenderer: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    NativeRenderer = require('expo-three').Renderer;
+  } catch {}
+}
 
 // Polyfill global.THREE if needed
 // @ts-ignore
 global.THREE = (global as any).THREE || THREE;
 
 import { buildBag, isBagType } from './bag-builder';
-import { buildPin, buildPinDecal, isPinType } from './pin-builder';
+import { buildPin, isPinType } from './pin-builder';
 import {
   applyShirtDecalDrape,
   isShirtType,
@@ -27,6 +35,7 @@ import {
   shirtTrimContrast,
 } from './shirt-builder';
 import { buildVessel, isVesselType } from './vessel-builder';
+import { createDesignCanvasTexture } from './design-texture';
 import { getApiBaseUrls } from '@/utils/api';
 
 export const PALETTE = ['#FFFFFF', '#111827', '#0052CC', '#EF4444', '#22C55E', '#F59E0B'];
@@ -54,6 +63,11 @@ export interface Product3DPreviewProps {
   selectedColor?: string;
   onColorChange?: (color: string) => void;
   height?: number;
+  customText?: string;
+  customTextColor?: string;
+  customFontFamily?: string;
+  customFontSize?: number;
+  customImageUri?: string;
 }
 
 export function Product3DPreview({
@@ -66,6 +80,11 @@ export function Product3DPreview({
   selectedColor: controlledColor,
   onColorChange,
   height = 340,
+  customText = '',
+  customTextColor = '#111827',
+  customFontFamily = 'system-ui, sans-serif',
+  customFontSize = 64,
+  customImageUri,
 }: Product3DPreviewProps) {
   const [internalColor, setInternalColor] = useState('#FFFFFF');
   const color = controlledColor !== undefined ? controlledColor : internalColor;
@@ -94,6 +113,9 @@ export function Product3DPreview({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rafRef = useRef<number | null>(null);
   const isShirtRef = useRef(false);
+  const decalMeshRef = useRef<THREE.Mesh | null>(null);
+  const shadowDiscRef = useRef<THREE.Mesh | null>(null);
+  const modelBoxRef = useRef<THREE.Box3 | null>(null);
 
   const isMugModel =
     viewerType === 'mug' ||
@@ -122,7 +144,6 @@ export function Product3DPreview({
   };
 
   const glbUrl = getEffectiveGlbUrl();
-  const designUrl = (designImageUrl || '').trim();
 
   // ─── Shared Scene Construction ─────────────────────────────────────────────
   const setupScene = (width: number, height: number) => {
@@ -143,7 +164,7 @@ export function Product3DPreview({
     }
     cameraRef.current = camera;
 
-    // Lighting matching backend studio setup
+    // Studio Lighting matching web admin
     if (isShirt) {
       scene.add(new THREE.AmbientLight(0xffffff, 0.92));
       const key = new THREE.DirectionalLight(0xffffff, 1.15);
@@ -180,6 +201,13 @@ export function Product3DPreview({
   };
 
   const addShadowDisc = (scene: THREE.Scene, target: THREE.Group) => {
+    if (shadowDiscRef.current) {
+      scene.remove(shadowDiscRef.current);
+      shadowDiscRef.current.geometry?.dispose();
+      (shadowDiscRef.current.material as THREE.Material)?.dispose();
+      shadowDiscRef.current = null;
+    }
+
     const b = new THREE.Box3().setFromObject(target);
     const sizeX = b.getSize(new THREE.Vector3()).x;
     const radius = Math.max(sizeX * (isShirt ? 0.36 : 0.48), 0.42);
@@ -190,7 +218,126 @@ export function Product3DPreview({
     disc.rotation.x = -Math.PI / 2;
     disc.position.y = b.min.y + 0.05;
     scene.add(disc);
+    shadowDiscRef.current = disc;
   };
+
+  // ─── Custom Text & Logo Decal Projection ────────────────────────────────────
+  const applyCustomDecal = useCallback(
+    (targetGroup: THREE.Group) => {
+      createDesignCanvasTexture(
+        {
+          text: customText,
+          textColor: customTextColor,
+          fontFamily: customFontFamily,
+          fontSize: customFontSize,
+          imageUri: customImageUri || designImageUrl,
+        },
+        (tex) => {
+          // If no texture (empty text and no image), remove existing decal
+          if (!tex) {
+            if (decalMeshRef.current) {
+              if (decalMeshRef.current.parent) {
+                decalMeshRef.current.parent.remove(decalMeshRef.current);
+              }
+              decalMeshRef.current.geometry?.dispose();
+              (decalMeshRef.current.material as THREE.Material)?.dispose();
+              decalMeshRef.current = null;
+            }
+            return;
+          }
+
+          // If decal already exists, update its texture in-place for zero-flicker instant live preview
+          if (decalMeshRef.current) {
+            const mat = decalMeshRef.current.material as THREE.MeshBasicMaterial;
+            mat.map = tex;
+            mat.needsUpdate = true;
+            decalMeshRef.current.visible = true;
+            return;
+          }
+
+          // Compute unrotated local bounds of the centered model
+          const box = modelBoxRef.current || new THREE.Box3().setFromObject(targetGroup);
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+          const maxZ = box.max.z;
+
+          if (isShirt) {
+            // T-shirt chest print draped over fabric folds
+            const torsoW = size.x;
+            const torsoH = size.y;
+            const w = torsoW * 0.52;
+            const h = w;
+            const geo = new THREE.PlaneGeometry(w, h, 20, 20);
+            applyShirtDecalDrape(geo, { centerY: 0, frontZ: 0, torsoW, torsoH, isBoxyHeavy: false });
+            const frontZ = maxZ + 0.015;
+            const mat = new THREE.MeshBasicMaterial({
+              map: tex,
+              transparent: true,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+              toneMapped: false,
+            });
+            const decalMesh = new THREE.Mesh(geo, mat);
+            decalMesh.userData = { isDecal: true };
+            decalMesh.position.set(0, 0, frontZ);
+            targetGroup.add(decalMesh);
+            decalMeshRef.current = decalMesh;
+          } else if (isMugModel || isVessel) {
+            // Decal curved around the cylindrical mug surface
+            const w = Math.max(size.z * 0.65, 0.65);
+            const h = w;
+            const R = Math.max(size.z * 0.48, 0.45);
+            const geo = new THREE.PlaneGeometry(w, h, 24, 1);
+            const pos = geo.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+              const x = pos.getX(i);
+              const deltaZ = R - Math.sqrt(Math.max(0, R * R - x * x));
+              pos.setZ(i, -deltaZ);
+            }
+            geo.computeVertexNormals();
+
+            const mat = new THREE.MeshBasicMaterial({
+              map: tex,
+              transparent: true,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+              toneMapped: false,
+            });
+            const decalMesh = new THREE.Mesh(geo, mat);
+            decalMesh.userData = { isDecal: true };
+            decalMesh.position.set(0, center.y, maxZ + 0.018);
+            targetGroup.add(decalMesh);
+            decalMeshRef.current = decalMesh;
+          } else {
+            // Front flat decal for bags, pins, calendars, stickers
+            const w = Math.max(size.x * 0.55, 0.45);
+            const h = w;
+            const geo = new THREE.PlaneGeometry(w, h);
+            const mat = new THREE.MeshBasicMaterial({
+              map: tex,
+              transparent: true,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+              toneMapped: false,
+            });
+            const decalMesh = new THREE.Mesh(geo, mat);
+            decalMesh.userData = { isDecal: true };
+            decalMesh.position.set(center.x, center.y, maxZ + 0.018);
+            targetGroup.add(decalMesh);
+            decalMeshRef.current = decalMesh;
+          }
+        }
+      );
+    },
+    [customText, customTextColor, customFontFamily, customFontSize, customImageUri, designImageUrl, isShirt, isMugModel, isVessel]
+  );
+
+  // Re-apply decal whenever text, font, color, or image changes
+  useEffect(() => {
+    if (groupRef.current) {
+      applyCustomDecal(groupRef.current);
+    }
+  }, [applyCustomDecal]);
 
   const populateGroup = (group: THREE.Group, scene: THREE.Scene, activeColor: string) => {
     // Clear old children
@@ -198,6 +345,7 @@ export function Product3DPreview({
       const child = group.children[0];
       group.remove(child);
     }
+    decalMeshRef.current = null;
 
     const finish = (obj: THREE.Object3D) => {
       const box = new THREE.Box3().setFromObject(obj);
@@ -207,11 +355,12 @@ export function Product3DPreview({
       obj.scale.multiplyScalar(s);
       obj.position.sub(center.clone().multiplyScalar(s));
       group.add(obj);
+      modelBoxRef.current = new THREE.Box3().setFromObject(obj);
 
       if (canTint) {
         obj.traverse((o) => {
           const mesh = o as THREE.Mesh;
-          if (mesh.isMesh) {
+          if (mesh.isMesh && !mesh.userData?.isDecal) {
             const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
             mats.forEach((m) => {
               const sm = m as THREE.MeshStandardMaterial;
@@ -222,6 +371,8 @@ export function Product3DPreview({
       }
 
       addShadowDisc(scene, group);
+      applyCustomDecal(group);
+      setLoading(false);
     };
 
     const finishVessel = () => {
@@ -231,7 +382,9 @@ export function Product3DPreview({
       const vcenter = vbox.getCenter(new THREE.Vector3());
       built.group.position.sub(vcenter);
       group.add(built.group);
+      modelBoxRef.current = new THREE.Box3().setFromObject(built.group);
       addShadowDisc(scene, group);
+      applyCustomDecal(group);
       setLoading(false);
     };
 
@@ -241,7 +394,9 @@ export function Product3DPreview({
       const center = bbox.getCenter(new THREE.Vector3());
       built.group.position.sub(center);
       group.add(built.group);
+      modelBoxRef.current = new THREE.Box3().setFromObject(built.group);
       addShadowDisc(scene, group);
+      applyCustomDecal(group);
       setLoading(false);
     };
 
@@ -257,7 +412,9 @@ export function Product3DPreview({
       const bbox = new THREE.Box3().setFromObject(built.group);
       built.group.position.sub(bbox.getCenter(new THREE.Vector3()));
       group.add(built.group);
+      modelBoxRef.current = new THREE.Box3().setFromObject(built.group);
       addShadowDisc(scene, group);
+      applyCustomDecal(group);
       setLoading(false);
     };
 
@@ -275,6 +432,7 @@ export function Product3DPreview({
       const center = bbox.getCenter(new THREE.Vector3());
       obj.position.sub(center);
       group.add(obj);
+      modelBoxRef.current = new THREE.Box3().setFromObject(obj);
 
       const trimContrast = fit.ringer ? shirtTrimContrast(activeColor) : null;
       obj.traverse((o) => {
@@ -299,12 +457,12 @@ export function Product3DPreview({
       });
 
       addShadowDisc(scene, group);
+      applyCustomDecal(group);
       setLoading(false);
     };
 
     // Route to appropriate builder or GLTF loader
     if (isMugModel) {
-      // Normal coffee mug: Load Kenney's CC0 mug.glb (with procedural full-mug fallback)
       if (glbUrl) {
         setLoading(true);
         new GLTFLoader().load(
@@ -391,7 +549,7 @@ export function Product3DPreview({
 
     group.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (mesh.isMesh) {
+      if (mesh.isMesh && !mesh.userData?.isDecal) {
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         mats.forEach((m) => {
           const sm = m as THREE.MeshStandardMaterial;
@@ -541,7 +699,8 @@ export function Product3DPreview({
     async (gl: any) => {
       try {
         const { drawingBufferWidth: w, drawingBufferHeight: h } = gl;
-        const renderer = new (Renderer as any)({ gl, antialias: true, alpha: true });
+        const rendererClass = NativeRenderer || (THREE as any).WebGLRenderer;
+        const renderer = new (rendererClass as any)({ gl, antialias: true, alpha: true });
         renderer.setSize(w, h);
         nativeRendererRef.current = renderer;
 
