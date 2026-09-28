@@ -459,8 +459,40 @@ export function Pin3DViewer({ shape, color, height = 380, autoRotate = true, onL
     })
   ).current;
 
+  const isMouseDownRef = useRef(false);
+  const lastMouseXRef = useRef(0);
+
+  const handleMouseDown = (e: any) => {
+    isMouseDownRef.current = true;
+    lastMouseXRef.current = e.nativeEvent?.clientX ?? e.clientX ?? 0;
+    autoRotateSpeedRef.current = 0;
+  };
+
+  const handleMouseMove = (e: any) => {
+    if (!isMouseDownRef.current || !pinGroupRef.current) return;
+    const currentX = e.nativeEvent?.clientX ?? e.clientX ?? 0;
+    const deltaX = currentX - lastMouseXRef.current;
+    lastMouseXRef.current = currentX;
+    pinGroupRef.current.rotation.y += deltaX * 0.012;
+  };
+
+  const handleMouseUp = () => {
+    isMouseDownRef.current = false;
+    autoRotateSpeedRef.current = 0.006;
+  };
+
   return (
-    <View style={[styles.stage, { height }, style]} {...panResponder.panHandlers}>
+    <View
+      style={[styles.stage, { height }, style]}
+      {...panResponder.panHandlers}
+      // @ts-ignore
+      onMouseDown={handleMouseDown}
+      // @ts-ignore
+      onMouseMove={handleMouseMove}
+      // @ts-ignore
+      onMouseUp={handleMouseUp}
+      // @ts-ignore
+      onMouseLeave={handleMouseUp}>
       <GLView style={styles.gl} onContextCreate={onContextCreate} />
     </View>
   );

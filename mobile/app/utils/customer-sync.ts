@@ -18,7 +18,6 @@ export async function syncCustomerToBackend(email: string, name?: string, avatar
 
   for (const baseUrl of urlsToTry) {
     try {
-      console.log(`[SyncCustomer] Syncing customer to ${baseUrl}/api/v1/sync-customer...`);
       const res = await fetch(`${baseUrl}/api/v1/sync-customer`, {
         method: 'POST',
         headers: {
@@ -29,15 +28,12 @@ export async function syncCustomerToBackend(email: string, name?: string, avatar
       });
 
       if (res.ok) {
-        const json = await res.json();
-        console.log('[SyncCustomer] Database Sync Successful:', json);
         return true;
       }
     } catch (err) {
-      console.warn(`[SyncCustomer] Failed to connect to ${baseUrl}:`, err);
+      // Quietly ignore failed candidates until all fallbacks finish
     }
   }
 
-  console.error('[SyncCustomer] All database sync attempts failed!');
   return false;
 }

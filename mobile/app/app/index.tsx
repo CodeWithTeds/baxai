@@ -7,11 +7,20 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 
+import { useEffect } from 'react';
 import { BrandColors } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
 
 export default function LanguageSelectionScreen() {
+  const { user } = useAuth();
   const { setLanguage, t } = useLanguage();
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/(tabs)');
+    }
+  }, [user]);
 
   const handleSelect = async (lang: 'en' | 'tl') => {
     if (Platform.OS !== 'web') {

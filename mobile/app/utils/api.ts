@@ -14,6 +14,8 @@ export interface ApiProduct {
   has_3d_preview?: boolean;
   is_customizable?: boolean;
   viewer_type?: string;
+  sku?: string;
+  stock_quantity?: number;
 }
 
 export interface ApiPrintItem {

@@ -16,6 +16,19 @@ Route::inertia('/', 'welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ])->name('home');
 
+Route::get('models/{file}', function ($file) {
+    $path = public_path('models/' . $file);
+    if (!file_exists($path)) {
+        abort(404);
+    }
+    return response()->file($path, [
+        'Access-Control-Allow-Origin' => '*',
+        'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+        'Access-Control-Allow-Headers' => 'Origin, X-Requested-With, Content-Type, Accept',
+        'Content-Type' => 'model/gltf-binary',
+    ]);
+});
+
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
 

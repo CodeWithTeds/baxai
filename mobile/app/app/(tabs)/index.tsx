@@ -22,7 +22,8 @@ import ScreenHeader from '@/components/screen-header';
 import { BrandColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
-import { fetchPrintItems, fetchProducts, type ApiPrintItem, type ApiProduct } from '@/utils/api';
+import { fetchPrintItems, fetchProducts, getApiBaseUrls, type ApiPrintItem, type ApiProduct } from '@/utils/api';
+import { getCategoryForItem } from '@/utils/category';
 import { syncCustomerToBackend } from '@/utils/customer-sync';
 
 export interface FeaturedItem {
@@ -39,9 +40,10 @@ export interface FeaturedItem {
 
 function getProductImage(item: { thumbnail?: string | null; name: string; category?: string }): any {
   if (item.thumbnail) {
+    const baseUrl = getApiBaseUrls()[0] || 'http://192.168.100.184:8081';
     const uri = item.thumbnail.startsWith('http')
       ? item.thumbnail
-      : `http://192.168.1.3:8081${item.thumbnail}`;
+      : `${baseUrl}${item.thumbnail.startsWith('/') ? '' : '/'}${item.thumbnail}`;
     return { uri };
   }
   const nameLower = item.name.toLowerCase();
@@ -176,6 +178,7 @@ export default function HomeScreen() {
   const categories = [
     { id: 'mugs', label: t.catMugs, icon: 'cafe-outline' as const },
     { id: 'pins', label: t.catPins, icon: 'pricetag-outline' as const },
+    { id: 'apparel', label: t.prodTshirt || 'T-Shirts', icon: 'shirt-outline' as const },
     { id: 'calendars', label: t.catCalendars, icon: 'calendar-outline' as const },
     { id: 'totes', label: t.catTotes, icon: 'bag-outline' as const },
   ];
@@ -191,7 +194,10 @@ export default function HomeScreen() {
     } else if (id === 'pins') {
       router.push('/pin-3d' as any);
     } else {
-      router.push('/(tabs)/services' as any);
+      router.push({
+        pathname: '/(tabs)/services',
+        params: { category: id },
+      } as any);
     }
   };
 
@@ -203,7 +209,11 @@ export default function HomeScreen() {
     } else if (isPin) {
       router.push('/pin-3d' as any);
     } else {
-      router.push('/mug-3d' as any);
+      const cat = getCategoryForItem(item);
+      router.push({
+        pathname: '/(tabs)/services',
+        params: { category: cat, query: item.name },
+      } as any);
     }
   };
 

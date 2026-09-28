@@ -21,6 +21,19 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/sync-customer', [AuthController::class, 'syncCustomer']);
 
+Route::get('/models/{file}', function ($file) {
+    $path = public_path('models/' . $file);
+    if (!file_exists($path)) {
+        abort(404);
+    }
+    return response()->file($path, [
+        'Access-Control-Allow-Origin' => '*',
+        'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+        'Access-Control-Allow-Headers' => 'Origin, X-Requested-With, Content-Type, Accept',
+        'Content-Type' => 'model/gltf-binary',
+    ]);
+});
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', function (Request $request) {
