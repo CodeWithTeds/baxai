@@ -25,8 +25,23 @@ if (Platform.OS !== 'web') {
 // @ts-ignore
 global.THREE = (global as any).THREE || THREE;
 
+// Suppress known non-fatal WebGL 1 deprecation warning from Three.js r153+ and EXGL notices
+if (typeof console !== 'undefined' && console.warn) {
+  const _origWarn = console.warn.bind(console);
+  console.warn = (...args: any[]) => {
+    const text = args.map((a) => (typeof a === 'string' ? a : a?.message || '')).join(' ');
+    if (
+      text.includes('WebGL 1 support was deprecated') ||
+      text.includes("EXGL: gl.pixelStorei() doesn't support this parameter yet")
+    ) {
+      return;
+    }
+    _origWarn(...args);
+  };
+}
+
 import { buildBag, isBagType } from './bag-builder';
-import { buildPin, isPinType } from './pin-builder';
+import { buildPin, buildPinDecal, isPinType } from './pin-builder';
 import {
   applyShirtDecalDrape,
   isShirtType,
@@ -124,29 +139,32 @@ export function Product3DPreview({
   const vcenterRef = useRef<THREE.Vector3 | null>(null);
   const vesselLabelRef = useRef<VesselLabel | null>(null);
 
-  const isMugModel =
-    viewerType === 'mug' ||
-    viewerType === 'coffee_cup' ||
-    viewerType === 'coffee_mugs' ||
-    viewerType === 'mugs';
-  const isVessel = !isMugModel && isVesselType(viewerType);
-  const isBag = isBagType(viewerType);
-  const isShirt = isShirtType(viewerType);
-  const isPin = isPinType(viewerType);
+  const normalizeViewerType = (vt: string): string => {
+    const clean = (vt || '').toLowerCase().trim();
+    if (clean === 'mugs' || clean === 'coffee_mugs' || clean === 'coffee_cup') return 'coffee_cup';
+    if (clean === 'mug') return 'mug';
+    if (clean === 'bag') return 'tote';
+    return clean;
+  };
+
+  const resolvedViewerType = normalizeViewerType(viewerType);
+  const isVessel = isVesselType(resolvedViewerType);
+  const isBag = isBagType(resolvedViewerType);
+  const isShirt = isShirtType(resolvedViewerType);
+  const isPin = isPinType(resolvedViewerType);
   isShirtRef.current = isShirt;
 
-  const canTint = TINTABLE.has(viewerType) || isMugModel || isVessel || isBag || isShirt || isPin;
+  const canTint = TINTABLE.has(resolvedViewerType) || isVessel || isBag || isShirt || isPin;
 
-  // Resolve GLB URL from backend API server with CORS route
+  // Resolve GLB URL from backend API server with CORS route (only shirts/totes/custom models use GLBs)
   const getEffectiveGlbUrl = (): string => {
     if (modelUrl && modelUrl.trim()) return modelUrl.trim();
     const baseUrl = getApiBaseUrls()[0] || 'http://192.168.100.184:8082';
 
     if (isShirt) return `${baseUrl}/api/v1/models/shirt.glb`;
-    if (isMugModel) return `${baseUrl}/api/v1/models/mug.glb`;
-    if (viewerType === 'tote' || viewerType === 'bag') return `${baseUrl}/api/v1/models/tote.glb`;
-    if (viewerType === 'calendar') return `${baseUrl}/api/v1/models/calendar.glb`;
-    if (viewerType === 'pin') return `${baseUrl}/api/v1/models/pin.glb`;
+    if (resolvedViewerType === 'tote') return `${baseUrl}/api/v1/models/tote.glb`;
+    if (resolvedViewerType === 'calendar') return `${baseUrl}/api/v1/models/calendar.glb`;
+    if (resolvedViewerType === 'pin') return `${baseUrl}/api/v1/models/pin.glb`;
     return '';
   };
 
@@ -278,18 +296,21 @@ export function Product3DPreview({
           if (!tex) {
             // Fallback for native text if canvas context is unavailable
             if (hasText) {
-              const isCyl = isMugModel || isVessel;
+              const cylR =
+                isVessel && vesselLabelRef.current
+                  ? (vesselLabelRef.current.rTop + vesselLabelRef.current.rBottom) / 2
+                  : null;
               const textMesh = build3DTextMesh({
                 text: effectiveText,
                 textColor: customTextColor,
                 fontFamily: customFontFamily,
                 fontSize: customFontSize,
-                cylinderRadius: isCyl ? 1.04 : null,
+                cylinderRadius: cylR,
                 yOffset: isShirt ? 0.2 : (vesselLabelRef.current ? vesselLabelRef.current.y : 0),
-                zOffset: isCyl ? 0 : maxZ + 0.02,
+                zOffset: isVessel ? 0 : maxZ + 0.02,
               });
               decalGroup.add(textMesh);
-              if (vcenterRef.current && isCyl) {
+              if (vcenterRef.current && isVessel) {
                 decalGroup.position.set(-vcenterRef.current.x, -vcenterRef.current.y, -vcenterRef.current.z);
               }
               targetGroup.add(decalGroup);
@@ -320,15 +341,22 @@ export function Product3DPreview({
             shirtMesh.userData = { isDecal: true };
             shirtMesh.position.set(0, 0, maxZ + 0.015);
             decalGroup.add(shirtMesh);
-          } else if (isMugModel || isVessel) {
+          } else if (isVessel && vesselLabelRef.current && vcenterRef.current) {
             // Mug / vessel: cylindrical print label matching mug wall curvature
             const label = vesselLabelRef.current;
-            const rTop = label ? label.rTop : (size.z * 0.5 + 0.025);
-            const rBottom = label ? label.rBottom : (size.z * 0.5 + 0.02);
-            const lh = label ? label.height : (size.y * 0.55);
-            const arc = 1.8; // visible arc on front face of mug
+            const vc = vcenterRef.current;
+            const arc = 1.95; // visible arc on front face of mug
 
-            const geo = new THREE.CylinderGeometry(rTop, rBottom, lh, 48, 1, true, -arc / 2, arc);
+            const geo = new THREE.CylinderGeometry(
+              label.rTop,
+              label.rBottom,
+              label.height,
+              48,
+              1,
+              true,
+              -arc / 2,
+              arc
+            );
             const mat = new THREE.MeshBasicMaterial({
               map: tex,
               transparent: true,
@@ -336,20 +364,18 @@ export function Product3DPreview({
               depthTest: true,
               depthWrite: false,
               polygonOffset: true,
-              polygonOffsetFactor: -1,
+              polygonOffsetFactor: -1.5,
               polygonOffsetUnits: -4,
             });
             const mugMesh = new THREE.Mesh(geo, mat);
             mugMesh.userData = { isDecal: true };
-
-            if (vcenterRef.current) {
-              const vc = vcenterRef.current;
-              const labelY = label ? label.y : 0;
-              mugMesh.position.set(-vc.x, labelY - vc.y, -vc.z);
-            } else {
-              mugMesh.position.set(center.x, center.y, center.z);
-            }
+            mugMesh.position.set(-vc.x, label.y - vc.y, -vc.z);
             decalGroup.add(mugMesh);
+          } else if (isPin) {
+            // Pin decal conforming to pin shape / dome
+            const decal = buildPinDecal(resolvedViewerType, tex);
+            decal.userData = { isDecal: true };
+            decalGroup.add(decal);
           } else {
             // Tote bag, button pin, calendar, sticker
             let w = Math.max(size.x * 0.55, 0.35);
@@ -376,7 +402,18 @@ export function Product3DPreview({
         }
       );
     },
-    [customText, customTextColor, customFontFamily, customFontSize, customImageUri, designImageUrl, isShirt, isMugModel, isVessel]
+    [
+      customText,
+      customTextColor,
+      customFontFamily,
+      customFontSize,
+      customImageUri,
+      designImageUrl,
+      isShirt,
+      isVessel,
+      isPin,
+      resolvedViewerType,
+    ]
   );
 
   // Re-apply decal whenever text, font, color, or image changes
@@ -425,7 +462,7 @@ export function Product3DPreview({
     };
 
     const finishVessel = () => {
-      const targetType = isMugModel ? 'mug' : viewerType;
+      const targetType = resolvedViewerType;
       const built = buildVessel(targetType, activeColor);
       vesselLabelRef.current = built.label;
       const vbox = new THREE.Box3().setFromObject(built.group);
@@ -521,25 +558,8 @@ export function Product3DPreview({
     };
 
     // Route to appropriate builder or GLTF loader
-    if (isMugModel) {
-      if (glbUrl) {
-        setLoading(true);
-        new GLTFLoader().load(
-          glbUrl,
-          (gltf) => {
-            finish(gltf.scene);
-            setLoading(false);
-          },
-          undefined,
-          (err) => {
-            console.warn('[Product3DPreview] mug.glb load failed, using normal ceramic mug fallback:', err);
-            finishVessel();
-            setLoading(false);
-          }
-        );
-      } else {
-        finishVessel();
-      }
+    if (isVessel) {
+      finishVessel();
     } else if (isShirt) {
       if (glbUrl) {
         setLoading(true);
@@ -560,7 +580,7 @@ export function Product3DPreview({
         setLoadError('No shirt model URL configured.');
         setLoading(false);
       }
-    } else if (viewerType === 'tote' && glbUrl) {
+    } else if (resolvedViewerType === 'tote' && glbUrl) {
       setLoading(true);
       new GLTFLoader().load(
         glbUrl,
@@ -573,8 +593,6 @@ export function Product3DPreview({
           finishBag();
         }
       );
-    } else if (isVessel) {
-      finishVessel();
     } else if (isBag) {
       finishBag();
     } else if (isPin && !glbUrl) {
@@ -635,7 +653,11 @@ export function Product3DPreview({
     const w = mount.clientWidth || 340;
     const h = mount.clientHeight || height;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance',
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(w, h);
     mount.innerHTML = '';
@@ -715,7 +737,7 @@ export function Product3DPreview({
         mount.removeChild(renderer.domElement);
       }
     };
-  }, [viewerType, glbUrl]);
+  }, [resolvedViewerType, glbUrl]);
 
   // ─── Native (iOS / Android) Implementation ──────────────────────────────────
   const prevDx = useRef(0);
@@ -795,7 +817,7 @@ export function Product3DPreview({
         console.warn('[Product3DPreview] native GL init error:', err);
       }
     },
-    [viewerType, glbUrl]
+    [resolvedViewerType, glbUrl]
   );
 
   return (
