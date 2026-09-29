@@ -15,6 +15,8 @@ import {
     ImagePlus,
     Layers,
     CircleStop,
+    Minus,
+    Plus,
     Save,
     Shirt,
     Trash2,
@@ -27,6 +29,64 @@ let uid = 1;
 const nid = () => `obj-${Date.now()}-${uid++}`;
 
 const INKS = ['#1A1C1E', '#FFFFFF', '#0052CC', '#EF4444', '#22C55E', '#F59E0B', '#EC4899', '#8B5CF6'];
+
+function WebNumberControl({
+    label,
+    value,
+    min,
+    max,
+    step = 1,
+    unit = '',
+    onChange,
+}: {
+    label: string;
+    value: number;
+    min: number;
+    max: number;
+    step?: number;
+    unit?: string;
+    onChange: (v: number) => void;
+}) {
+    const clamp = (n: number) => Math.max(min, Math.min(max, n));
+    return (
+        <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[12px] font-semibold text-[#3A3D48]">
+                <span>{label}</span>
+                <span className="font-bold text-[#0052CC]">{value}{unit}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+                <button
+                    type="button"
+                    onClick={() => onChange(clamp(value - step))}
+                    disabled={value <= min}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F1F2F7] text-[#1A1C1E] transition hover:bg-[#E5E7EF] disabled:opacity-40"
+                >
+                    <Minus size={14} />
+                </button>
+                <input
+                    type="number"
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={value}
+                    onChange={(e) => {
+                        const n = parseFloat(e.target.value);
+                        if (!isNaN(n)) onChange(clamp(n));
+                    }}
+                    className="h-8 w-full rounded-lg border border-[#E9EBF3] bg-[#F9FAFB] text-center text-[12px] font-bold text-[#1A1C1E] focus:border-[#0052CC] focus:outline-none"
+                />
+                <button
+                    type="button"
+                    onClick={() => onChange(clamp(value + step))}
+                    disabled={value >= max}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F1F2F7] text-[#1A1C1E] transition hover:bg-[#E5E7EF] disabled:opacity-40"
+                >
+                    <Plus size={14} />
+                </button>
+            </div>
+        </div>
+    );
+}
 
 export default function DesignStudio({ initialType }: { initialType: string }) {
     const isKnownType = (t: string) =>
@@ -95,7 +155,7 @@ export default function DesignStudio({ initialType }: { initialType: string }) {
         const url = URL.createObjectURL(f);
         const img = new Image();
         img.onload = () => {
-            const fit = Math.min(config.canvasW * 0.6 / img.naturalWidth, config.canvasH * 0.6 / img.naturalHeight, 1);
+            const fit = Math.min(config.canvasW * 0.85 / img.naturalWidth, config.canvasH * 0.85 / img.naturalHeight, 1);
             const o: DesignObject = {
                 id: nid(),
                 kind: 'image',
@@ -278,28 +338,52 @@ export default function DesignStudio({ initialType }: { initialType: string }) {
                                     ))}
                                     <input type="color" value={selected.color ?? '#1A1C1E'} onChange={(e) => patch({ color: e.target.value })} className="h-6 w-9 cursor-pointer rounded border border-[#E9EBF3]" />
                                 </div>
-                                <div className="mt-3 grid grid-cols-2 gap-2">
-                                    <p className="flex h-9 items-center rounded-lg bg-[#F1F2F7] px-2 text-[12px] font-bold text-[#1A1C1E]">Inter</p>
-                                    <label className="flex items-center gap-1.5 text-[12px] font-semibold">Size
-                                        <input type="range" min={12} max={220} value={selected.fontSize ?? 48} onChange={(e) => patch({ fontSize: Number(e.target.value) })} className="w-full" />
-                                    </label>
+                                <div className="mt-3 space-y-2">
+                                    <p className="flex h-8 items-center rounded-lg bg-[#F1F2F7] px-2 text-[12px] font-bold text-[#1A1C1E]">Font: Inter</p>
+                                    <WebNumberControl
+                                        label="Font Size"
+                                        value={selected.fontSize ?? 48}
+                                        min={12}
+                                        max={220}
+                                        step={4}
+                                        unit="px"
+                                        onChange={(v) => patch({ fontSize: v })}
+                                    />
                                 </div>
                             </section>
                         )}
 
                         {selected && (
-                            <section className="rounded-2xl bg-white p-4 shadow-sm">
-                                <h3 className="mb-3 text-[13px] font-extrabold">Object</h3>
-                                <label className="flex items-center gap-2 text-[12px] font-semibold">Rotate
-                                    <input type="range" min={-180} max={180} value={Math.round((selected.rotation * 180) / Math.PI)} onChange={(e) => patch({ rotation: (Number(e.target.value) * Math.PI) / 180 })} className="w-full" />
-                                </label>
-                                <label className="mt-2 flex items-center gap-2 text-[12px] font-semibold">Opacity
-                                    <input type="range" min={10} max={100} value={Math.round(selected.opacity * 100)} onChange={(e) => patch({ opacity: Number(e.target.value) / 100 })} className="w-full" />
-                                </label>
+                            <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+                                <h3 className="text-[13px] font-extrabold">Object Controls</h3>
+                                <WebNumberControl
+                                    label="Rotate"
+                                    value={Math.round((selected.rotation * 180) / Math.PI)}
+                                    min={-180}
+                                    max={180}
+                                    step={15}
+                                    unit="°"
+                                    onChange={(v) => patch({ rotation: (v * Math.PI) / 180 })}
+                                />
+                                <WebNumberControl
+                                    label="Opacity"
+                                    value={Math.round(selected.opacity * 100)}
+                                    min={10}
+                                    max={100}
+                                    step={5}
+                                    unit="%"
+                                    onChange={(v) => patch({ opacity: v / 100 })}
+                                />
                                 {selected.kind === 'image' && (
-                                    <label className="mt-2 flex items-center gap-2 text-[12px] font-semibold">Scale
-                                        <input type="range" min={10} max={400} value={Math.round(selected.scale * 100)} onChange={(e) => patch({ scale: Number(e.target.value) / 100 })} className="w-full" />
-                                    </label>
+                                    <WebNumberControl
+                                        label="Scale / Size"
+                                        value={Math.round(selected.scale * 100)}
+                                        min={10}
+                                        max={400}
+                                        step={10}
+                                        unit="%"
+                                        onChange={(v) => patch({ scale: v / 100 })}
+                                    />
                                 )}
                             </section>
                         )}

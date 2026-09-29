@@ -268,7 +268,7 @@ export function build3DTextMesh(options: Build3DTextOptions): THREE.Group {
     // 1. Surface placement on Apparel / T-Shirt
     if ((surfaceMeshes && surfaceMeshes.length > 0) || isShirt) {
       const pos = geo.attributes.position;
-      const baseZ = zOffset || 0.38;
+      const effBaseZ = Math.abs(zOffset || 0.38);
       const isBack = placement === 'back';
       const pocketShift = placement === 'left' ? -0.22 : placement === 'right' ? 0.22 : 0;
 
@@ -284,11 +284,11 @@ export function build3DTextMesh(options: Build3DTextOptions): THREE.Group {
         const finalX = rx + pocketShift + xOffset;
         if (isBack) {
           // Curved back drape facing backwards (-Z)
-          const curveZ = -baseZ + finalX * finalX * 0.45;
+          const curveZ = -effBaseZ + (finalX * finalX) * 0.35;
           pos.setXYZ(i, -finalX, ry, curveZ - z);
         } else {
           // Curved chest drape facing front (+Z)
-          const curveZ = baseZ - finalX * finalX * 0.45;
+          const curveZ = effBaseZ - (finalX * finalX) * 0.35;
           pos.setXYZ(i, finalX, ry, curveZ + z);
         }
       }
@@ -356,6 +356,8 @@ export interface BuildCylinderWrapOptions {
   spanDegrees?: number; // e.g. 270 or 360
   rotationDegrees?: number; // start angle in degrees
   side?: THREE.Side;
+  flipX?: boolean;
+  flipY?: boolean;
 }
 
 /**
@@ -372,6 +374,8 @@ export function buildCylinderWrapMesh(options: BuildCylinderWrapOptions): THREE.
     spanDegrees = 270,
     rotationDegrees = 0,
     side = THREE.DoubleSide,
+    flipX = false,
+    flipY = false,
   } = options;
 
   const spanRad = (Math.max(30, Math.min(360, spanDegrees)) / 360) * Math.PI * 2;
@@ -387,6 +391,8 @@ export function buildCylinderWrapMesh(options: BuildCylinderWrapOptions): THREE.
     startRad,
     spanRad
   );
+  if (flipX) geo.scale(-1, 1, 1);
+  if (flipY) geo.scale(1, -1, 1);
 
   const mat = new THREE.MeshBasicMaterial({
     map: texture || null,
@@ -425,6 +431,8 @@ export interface BuildDecalImageOptions {
   isWrap?: boolean;
   isShirt?: boolean;
   shirtTorsoW?: number;
+  flipX?: boolean;
+  flipY?: boolean;
 }
 
 /**
@@ -449,18 +457,23 @@ export function buildDecalImageMesh(options: BuildDecalImageOptions): THREE.Mesh
     wrapRotation = 0,
     isWrap = false,
     isShirt = false,
+    flipX = false,
+    flipY = false,
   } = options;
 
   const effW = width * scale;
   const effH = height * scale;
 
-  if (rotation !== 0) {
-    texture.center.set(0.5, 0.5);
-    texture.rotation = (rotation * Math.PI) / 180;
-  }
-
   // 1. Wrap Around on Drinkware
   if ((isWrap || placement === 'wrap') && cylinderRadius && cylinderRadius > 0) {
+    if (rotation !== 0) {
+      texture.center.set(0.5, 0.5);
+      texture.rotation = (rotation * Math.PI) / 180;
+    } else {
+      texture.center.set(0.5, 0.5);
+      texture.rotation = 0;
+    }
+
     const rTop = (cylinderRadiusTop || cylinderRadius) + 0.008;
     const rBot = (cylinderRadiusBottom || cylinderRadius) + 0.008;
     return buildCylinderWrapMesh({
@@ -471,11 +484,21 @@ export function buildDecalImageMesh(options: BuildDecalImageOptions): THREE.Mesh
       y: yOffset,
       spanDegrees: wrapSpan,
       rotationDegrees: wrapRotation + (xOffset ? xOffset * 180 : 0),
+      flipX,
+      flipY,
     });
   }
 
   // 2. Directional Decal on Drinkware (Front, Back, Left, Right)
   if (cylinderRadius && cylinderRadius > 0) {
+    if (rotation !== 0) {
+      texture.center.set(0.5, 0.5);
+      texture.rotation = (rotation * Math.PI) / 180;
+    } else {
+      texture.center.set(0.5, 0.5);
+      texture.rotation = 0;
+    }
+
     const R = cylinderRadius + 0.008;
     let baseTheta = 0;
     if (placement === 'back') baseTheta = Math.PI;
@@ -490,6 +513,8 @@ export function buildDecalImageMesh(options: BuildDecalImageOptions): THREE.Mesh
     const rBot = (cylinderRadiusBottom || cylinderRadius) + 0.008;
 
     const geo = new THREE.CylinderGeometry(rTop, rBot, effH, 32, 2, true, startRad, arc);
+    if (flipX) geo.scale(-1, 1, 1);
+    if (flipY) geo.scale(1, -1, 1);
 
     const mat = new THREE.MeshBasicMaterial({
       map: texture,
@@ -511,24 +536,40 @@ export function buildDecalImageMesh(options: BuildDecalImageOptions): THREE.Mesh
 
   // 3. Apparel / T-Shirt
   if (isShirt) {
-    const geo = new THREE.PlaneGeometry(effW, effH, 16, 16);
+    texture.center.set(0.5, 0.5);
+    texture.rotation = 0;
+
+    const geo = new THREE.PlaneGeometry(effW, effH, 20, 20);
+    if (flipX) geo.scale(-1, 1, 1);
+    if (flipY) geo.scale(1, -1, 1);
+
     const pos = geo.attributes.position;
     const isBack = placement === 'back';
     const pocketShift = placement === 'left' ? -0.22 : placement === 'right' ? 0.22 : 0;
-    const baseZ = zOffset || 0.38;
+    const effBaseZ = Math.abs(zOffset || 0.38);
+
+    // Apply in-plane rotation
+    const rad = (rotation * Math.PI) / 180;
+    const cosR = Math.cos(rad);
+    const sinR = Math.sin(rad);
 
     for (let i = 0; i < pos.count; i++) {
       const lx = pos.getX(i);
       const ly = pos.getY(i);
-      const finalX = lx + pocketShift + xOffset;
 
-      if (isBack) {
-        const curveZ = -baseZ + finalX * finalX * 0.45;
-        pos.setXYZ(i, -finalX, ly, curveZ);
-      } else {
-        const curveZ = baseZ - finalX * finalX * 0.45;
-        pos.setXYZ(i, finalX, ly, curveZ);
-      }
+      const rx = lx * cosR - ly * sinR;
+      const ry = lx * sinR + ly * cosR;
+
+      const finalX = rx + pocketShift + xOffset;
+      // Parabolic drape curve (positive in local coordinates)
+      const curveZ = effBaseZ - (finalX * finalX) * 0.35;
+      pos.setXYZ(i, finalX, ry, curveZ);
+    }
+
+    if (isBack) {
+      // Rotating 180° around Y moves the plane from +Z to -Z (back of shirt)
+      // and orients the face so the image is upright and non-mirrored when viewed from behind.
+      geo.rotateY(Math.PI);
     }
     geo.computeVertexNormals();
 
@@ -551,9 +592,19 @@ export function buildDecalImageMesh(options: BuildDecalImageOptions): THREE.Mesh
   }
 
   // 4. Flat Decal (Tote Bag, Pin, Sticker, Calendar)
+  texture.center.set(0.5, 0.5);
+  texture.rotation = 0;
+
   const geo = new THREE.PlaneGeometry(effW, effH);
+  if (flipX) geo.scale(-1, 1, 1);
+  if (flipY) geo.scale(1, -1, 1);
+
   const isBack = placement === 'back';
-  const effZ = zOffset || 0.02;
+  const effZ = Math.abs(zOffset || 0.02);
+
+  if (rotation !== 0) {
+    geo.rotateZ((rotation * Math.PI) / 180);
+  }
 
   if (isBack) {
     geo.rotateY(Math.PI);
@@ -596,7 +647,6 @@ export function loadUniversalTexture(
 
   if (Platform.OS === 'web') {
     const loader = new THREE.TextureLoader();
-    // Do not apply crossOrigin to base64 data URLs
     if (cleanUri.startsWith('http://') || cleanUri.startsWith('https://')) {
       loader.setCrossOrigin('anonymous');
     }
@@ -636,6 +686,12 @@ export function loadUniversalTexture(
         .then((tex: any) => {
           if (tex) {
             tex.colorSpace = THREE.SRGBColorSpace;
+            // Native EXGL texture fix: EXGL does not support gl.pixelStorei(UNPACK_FLIP_Y_WEBGL)
+            // and expo-three marks isDataTexture = true, which leaves the image upside down.
+            // Flipping in UV space ensures the texture is right-side up on native iOS/Android EXGL.
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.y = -1;
+            tex.offset.y = 1;
             tex.needsUpdate = true;
           }
           onLoaded(tex || null);

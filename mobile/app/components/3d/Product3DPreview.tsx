@@ -208,6 +208,10 @@ export interface Product3DPreviewProps {
   wrapHeight?: number;
   /** Wrap starting rotation angle around product in degrees (0° to 360°) */
   wrapRotation?: number;
+  /** Flip design horizontally */
+  customFlipX?: boolean;
+  /** Flip design vertically */
+  customFlipY?: boolean;
 }
 
 export function Product3DPreview({
@@ -233,6 +237,8 @@ export function Product3DPreview({
   wrapSpan = 270,
   wrapHeight = 0.75,
   wrapRotation = 0,
+  customFlipX = false,
+  customFlipY = false,
 }: Product3DPreviewProps) {
   const [internalColor, setInternalColor] = useState('#FFFFFF');
   const color = controlledColor !== undefined ? controlledColor : internalColor;
@@ -246,8 +252,8 @@ export function Product3DPreview({
   const [loadError, setLoadError] = useState('');
 
   const stateRef = useRef({
-    rotY: 0.5,
-    rotX: 0.1,
+    rotY: 0.15,
+    rotX: 0.08,
     dragging: false,
     lastX: 0,
     lastY: 0,
@@ -468,6 +474,8 @@ export function Product3DPreview({
                 y: effY,
                 spanDegrees: wrapSpan,
                 rotationDegrees: wrapRotation + (customOffsetX ? customOffsetX * 180 : 0),
+                flipX: customFlipX,
+                flipY: customFlipY,
               });
               if (customRotation !== 0) {
                 tex.center.set(0.5, 0.5);
@@ -504,7 +512,7 @@ export function Product3DPreview({
           else if (placement === 'right') baseAngle = Math.PI / 2;
 
           const angle = baseAngle + (customOffsetX ? customOffsetX * Math.PI * 0.6 : 0);
-          const decalW = Math.min(label.height * 0.85, R_mid * 1.3) * customScale;
+          const decalW = Math.min(label.height * 0.95, R_mid * 1.55) * customScale;
           const decalH = decalW;
 
           if (hasText) {
@@ -526,7 +534,7 @@ export function Product3DPreview({
           }
 
           if (hasImage) {
-            const imgH = hasText ? decalH * 0.75 : decalH;
+            const imgH = hasText ? decalH * 0.78 : decalH * 1.15;
             const imgW = imgH;
             const imgY = hasText ? effY + decalH * 0.22 : effY;
 
@@ -542,6 +550,8 @@ export function Product3DPreview({
                 rotation: customRotation,
                 scale: customScale,
                 placement,
+                flipX: customFlipX,
+                flipY: customFlipY,
               });
               decalGroup.add(imgMesh);
             });
@@ -567,8 +577,8 @@ export function Product3DPreview({
 
         if (placement === 'wrap') {
           // ── TORSO WRAP AROUND ──
-          const wrapW = torsoW * 0.88 * Math.min(1.8, Math.max(0.6, (wrapSpan / 360) * 1.5));
-          const wrapH = torsoH * 0.35 * wrapHeight * customScale;
+          const wrapW = torsoW * 0.95 * Math.min(1.8, Math.max(0.6, (wrapSpan / 360) * 1.5));
+          const wrapH = torsoH * 0.42 * wrapHeight * customScale;
 
           if (hasImage) {
             loadUniversalTexture(effectiveImage, (tex) => {
@@ -579,12 +589,14 @@ export function Product3DPreview({
                 height: wrapH,
                 yOffset: effY,
                 xOffset: effX,
-                zOffset: maxZ + 0.012,
+                zOffset: Math.abs(maxZ) + 0.010,
                 rotation: customRotation,
                 scale: customScale,
                 placement: 'wrap',
                 isShirt: true,
                 shirtTorsoW: torsoW,
+                flipX: customFlipX,
+                flipY: customFlipY,
               });
               decalGroup.add(wrapMesh);
             });
@@ -600,7 +612,7 @@ export function Product3DPreview({
               surfaceMeshes: shirtMeshesRef.current,
               yOffset: textY,
               xOffset: effX,
-              zOffset: maxZ + 0.012,
+              zOffset: Math.abs(maxZ) + 0.010,
               rotation: customRotation,
               scale: customScale,
               placement: 'wrap',
@@ -613,7 +625,7 @@ export function Product3DPreview({
           const isPocket = placement === 'left' || placement === 'right';
           const pocketScale = isPocket ? 0.6 : 1.0;
           const effScale = customScale * pocketScale;
-          const zBase = isBack ? minZ - 0.012 : maxZ + 0.012;
+          const zBase = isBack ? -Math.abs(minZ) - 0.010 : Math.abs(maxZ) + 0.010;
 
           if (hasText) {
             const textY = hasImage
@@ -637,7 +649,7 @@ export function Product3DPreview({
           }
 
           if (hasImage) {
-            const imgBaseW = torsoW * (isPocket ? 0.25 : hasText ? 0.38 : 0.50);
+            const imgBaseW = torsoW * (isPocket ? 0.35 : hasText ? 0.52 : 0.72);
             const imgW = imgBaseW * effScale;
             const imgH = imgW;
             const imgY = hasText ? (isPocket ? effY + 0.08 * effScale : effY + 0.12 * effScale) : effY;
@@ -659,6 +671,8 @@ export function Product3DPreview({
                 placement,
                 isShirt: true,
                 shirtTorsoW: torsoW,
+                flipX: customFlipX,
+                flipY: customFlipY,
               });
               decalGroup.add(imgMesh);
             });
@@ -682,7 +696,7 @@ export function Product3DPreview({
             const decal = buildPinDecal(resolvedViewerType, tex);
             decal.userData = { isDecal: true };
             decal.position.set(effX, effY, 0);
-            decal.scale.setScalar(customScale);
+            decal.scale.setScalar(customScale * 1.15);
             if (customRotation !== 0) decal.rotation.z = (customRotation * Math.PI) / 180;
             decal.renderOrder = 9;
             decalGroup.add(decal);
@@ -711,7 +725,7 @@ export function Product3DPreview({
       }
 
       // ─── Bags, Stickers, Calendars ─────────────────────────────────────────
-      const baseW = Math.max(size.x * 0.55, 0.35) * customScale;
+      const baseW = Math.max(size.x * 0.75, 0.50) * customScale;
       const isBack = placement === 'back';
       const effZ = isBack ? box.min.z - 0.015 : box.max.z + 0.015;
       const effY = center.y + customTextYOffset * (size.y * 0.4);
@@ -735,7 +749,7 @@ export function Product3DPreview({
       }
 
       if (hasImage) {
-        const imgW = hasText ? baseW * 0.75 : baseW;
+        const imgW = hasText ? baseW * 0.82 : baseW * 1.15;
         const imgH = imgW;
         const imgY = hasText ? effY + baseW * 0.22 : effY;
 
@@ -751,6 +765,8 @@ export function Product3DPreview({
             rotation: customRotation,
             scale: 1.0,
             placement,
+            flipX: customFlipX,
+            flipY: customFlipY,
           });
           decalGroup.add(imgMesh);
         });
@@ -774,6 +790,8 @@ export function Product3DPreview({
       wrapSpan,
       wrapHeight,
       wrapRotation,
+      customFlipX,
+      customFlipY,
       isShirt,
       isVessel,
       isPin,
@@ -905,13 +923,20 @@ export function Product3DPreview({
       const center = bbox.getCenter(new THREE.Vector3());
       obj.position.sub(center);
       obj.updateMatrixWorld(true);
-      // Compute unrotated local bounding box BEFORE adding to group
-      modelBoxRef.current = new THREE.Box3().setFromObject(obj);
-      group.add(obj);
+
+      // Shirt pivot: rotate 180° so the FRONT (collar scoop, chest) faces +Z directly toward the camera
+      const shirtPivot = new THREE.Group();
+      shirtPivot.add(obj);
+      shirtPivot.rotation.y = Math.PI;
+      shirtPivot.updateMatrixWorld(true);
+
+      // Compute unrotated local bounding box of the correctly-oriented shirt
+      modelBoxRef.current = new THREE.Box3().setFromObject(shirtPivot);
+      group.add(shirtPivot);
 
       // Populate shirtMeshesRef for exact surface raycasting
       const sMeshes: THREE.Mesh[] = [];
-      obj.traverse((o) => {
+      shirtPivot.traverse((o) => {
         if ((o as THREE.Mesh).isMesh) sMeshes.push(o as THREE.Mesh);
       });
       shirtMeshesRef.current = sMeshes;
