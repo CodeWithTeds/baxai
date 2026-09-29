@@ -81,7 +81,7 @@ export default function ProfileModal({ visible, onClose, email: propEmail, name:
           <View style={styles.backendBox}>
             <Ionicons name="cloud-done-outline" size={18} color={BrandColors.primary} />
             <Text style={styles.backendText}>
-              Synced to <Text style={{ fontWeight: '700' }}>{`${getApiBaseUrls()[0] || 'http://192.168.100.184:8081'}/customers`}</Text>
+              Synced to <Text style={{ fontWeight: '700' }}>{`${getApiBaseUrls()[0] ?? ''}/customers`}</Text>
             </Text>
           </View>
 

@@ -161,7 +161,8 @@ export function Product3DPreview({
   // Resolve GLB URL from backend API server with CORS route (only shirts/totes/custom models use GLBs)
   const getEffectiveGlbUrl = (): string => {
     if (modelUrl && modelUrl.trim()) return modelUrl.trim();
-    const baseUrl = getApiBaseUrls()[0] || 'http://192.168.100.184:8082';
+    const baseUrl = getApiBaseUrls()[0] ?? '';
+    if (!baseUrl) return '';
 
     if (isShirt) return `${baseUrl}/api/v1/models/shirt.glb`;
     if (resolvedViewerType === 'tote') return `${baseUrl}/api/v1/models/tote.glb`;

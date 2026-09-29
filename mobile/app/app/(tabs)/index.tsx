@@ -40,7 +40,7 @@ export interface FeaturedItem {
 
 function getProductImage(item: { thumbnail?: string | null; name: string; category?: string }): any {
   if (item.thumbnail) {
-    const baseUrl = getApiBaseUrls()[0] || 'http://192.168.100.184:8081';
+    const baseUrl = getApiBaseUrls()[0] ?? '';
     const uri = item.thumbnail.startsWith('http')
       ? item.thumbnail
       : `${baseUrl}${item.thumbnail.startsWith('/') ? '' : '/'}${item.thumbnail}`;

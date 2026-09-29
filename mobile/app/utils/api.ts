@@ -41,37 +41,37 @@ export interface ApiPrintItem {
 }
 
 /**
- * Dynamically resolves API base URLs prioritized by .env environment settings
+ * Resolves API base URLs from EXPO_PUBLIC_* env vars set in .env
+ *
+ * Priority:
+ *  1. EXPO_PUBLIC_API_URL  — full URL e.g. http://192.168.1.4:8081
+ *  2. EXPO_PUBLIC_API_HOST + EXPO_PUBLIC_API_PORT — e.g. 192.168.1.4 + 8081
+ *
+ * No hardcoded IPs — update your .env file to change the server address.
  */
 export function getApiBaseUrls(): string[] {
-  const envHost = process.env.EXPO_PUBLIC_API_HOST || process.env.EXPO_PUBLIC_HOST || process.env.HOST || '192.168.100.184';
+  const envUrl  = process.env.EXPO_PUBLIC_API_URL;
+  const envHost = process.env.EXPO_PUBLIC_API_HOST;
   const envPort = process.env.EXPO_PUBLIC_API_PORT || '8081';
-  const envUrl = process.env.EXPO_PUBLIC_API_URL;
 
-  const dynamicUrls: string[] = [];
+  const urls: string[] = [];
 
   if (envUrl) {
-    dynamicUrls.push(envUrl.replace(/\/$/, ''));
+    // Full URL wins: strip trailing slash
+    urls.push(envUrl.replace(/\/$/, ''));
   }
 
   if (envHost) {
     const cleanHost = envHost.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    dynamicUrls.push(`http://${cleanHost}:${envPort}`);
-    if (envPort !== '8081') dynamicUrls.push(`http://${cleanHost}:8081`);
-    if (envPort !== '8082') dynamicUrls.push(`http://${cleanHost}:8082`);
-    if (envPort !== '8000') dynamicUrls.push(`http://${cleanHost}:8000`);
+    // Primary port from env
+    urls.push(`http://${cleanHost}:${envPort}`);
+    // Also probe the backend port (8082) in case API and admin are on different ports
+    if (envPort !== '8082') urls.push(`http://${cleanHost}:8082`);
+    if (envPort !== '8081') urls.push(`http://${cleanHost}:8081`);
   }
 
-  // Fallback defaults
-  dynamicUrls.push(
-    'http://192.168.100.184:8081',
-    'http://192.168.100.184:8082',
-    'http://192.168.1.3:8081',
-    'http://localhost:8081',
-    'http://127.0.0.1:8081'
-  );
-
-  return Array.from(new Set(dynamicUrls.filter(Boolean)));
+  // Deduplicate & drop blanks — NO hardcoded fallback IPs
+  return Array.from(new Set(urls.filter(Boolean)));
 }
 
 export const API_BASE_URLS = getApiBaseUrls();
@@ -89,12 +89,10 @@ export async function fetchProducts(): Promise<ApiProduct[]> {
       if (res.ok) {
         const json = await res.json();
         const items = json.data || json;
-        if (Array.isArray(items)) {
-          return items;
-        }
+        if (Array.isArray(items)) return items;
       }
     } catch (err) {
-      console.warn(`[Api] Failed to fetch products from ${baseUrl}:`, err);
+      console.warn(`[Api] fetchProducts failed at ${baseUrl}:`, err);
     }
   }
   return [];
@@ -113,12 +111,10 @@ export async function fetchPrintItems(): Promise<ApiPrintItem[]> {
       if (res.ok) {
         const json = await res.json();
         const items = json.data || json;
-        if (Array.isArray(items)) {
-          return items;
-        }
+        if (Array.isArray(items)) return items;
       }
     } catch (err) {
-      console.warn(`[Api] Failed to fetch print items from ${baseUrl}:`, err);
+      console.warn(`[Api] fetchPrintItems failed at ${baseUrl}:`, err);
     }
   }
   return [];
