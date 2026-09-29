@@ -40,6 +40,7 @@ export default function Product3DPreview({
     designImageUrl,
     variant = 'compact',
     minimal = false,
+    onPreviewClick,
 }: {
     viewerType: string;
     label: string;
@@ -50,6 +51,7 @@ export default function Product3DPreview({
     variant?: 'compact' | 'hero';
     /** Minimal = bare canvas for card grids (hides palette + captions). */
     minimal?: boolean;
+    onPreviewClick?: () => void;
 }) {
     const mountRef = useRef<HTMLDivElement>(null);
     const [color, setColor] = useState('#FFFFFF');

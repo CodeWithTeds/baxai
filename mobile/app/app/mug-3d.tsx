@@ -17,6 +17,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
 import { Product3DPreview } from '@/components/3d/Product3DPreview';
+import {
+  CustomizationPlacement,
+  getProductPlacementOptions,
+} from '@/components/3d/model-customizer';
 import { BrandColors } from '@/constants/theme';
 import { useLanguage } from '@/contexts/language-context';
 
@@ -38,6 +42,15 @@ export const TEXT_PALETTE = [
   { id: 'green', hex: '#059669', label: 'Green' },
   { id: 'pink',  hex: '#EC4899', label: 'Pink' },
   { id: 'purple',hex: '#7C3AED', label: 'Purple' },
+];
+
+export const PRODUCT_BODY_COLORS = [
+  { id: 'white', hex: '#FFFFFF', label: 'White' },
+  { id: 'black', hex: '#111827', label: 'Black' },
+  { id: 'navy',  hex: '#0052CC', label: 'Navy' },
+  { id: 'red',   hex: '#DC2626', label: 'Red' },
+  { id: 'green', hex: '#059669', label: 'Green' },
+  { id: 'gold',  hex: '#D97706', label: 'Amber' },
 ];
 
 export const PRESET_TEXTS = ['Custom Mug', 'Coffee First', 'Placides Co.', 'Best Boss', '☕ Love'];
@@ -197,14 +210,26 @@ export default function Mug3DScreen() {
     : PRESET_TEXTS;
 
   const { t } = useLanguage();
-  const [selectedColor, setSelectedColor]     = useState('#FFFFFF');
-  const [customText, setCustomText]           = useState('');
-  const [selectedFont, setSelectedFont]       = useState(FONT_STYLES[0].family);
+
+  // Dynamic placement options tailored to product's 3D geometry
+  const placementConfig = getProductPlacementOptions(viewerType, category);
+
+  // Customization state
+  const [placement, setPlacement] = useState<CustomizationPlacement>(placementConfig.defaultPlacement);
+  const [selectedColor, setSelectedColor] = useState('#FFFFFF');
+  const [customText, setCustomText] = useState('');
+  const [selectedFont, setSelectedFont] = useState(FONT_STYLES[0].family);
   const [selectedTextColor, setSelectedTextColor] = useState('#111827');
-  const [customFontSize, setCustomFontSize]   = useState(64);
-  const [textYOffset, setTextYOffset]         = useState(0);
-  const [customImageUri, setCustomImageUri]   = useState<string | null>(null);
-  const [pickingImage, setPickingImage]       = useState(false);
+  const [customFontSize, setCustomFontSize] = useState(64);
+  const [textYOffset, setTextYOffset] = useState(0); // -0.45 to 0.45
+  const [offsetX, setOffsetX] = useState(0); // -0.45 to 0.45
+  const [designRotation, setDesignRotation] = useState(0); // 0 to 360
+  const [designScale, setDesignScale] = useState(1.0); // 0.5 to 1.8
+  const [wrapSpan, setWrapSpan] = useState(270); // 90 to 360 degrees
+  const [wrapHeight, setWrapHeight] = useState(0.75); // 0.2 to 1.0
+  const [wrapRotation, setWrapRotation] = useState(0); // 0 to 360 degrees
+  const [customImageUri, setCustomImageUri] = useState<string | null>(null);
+  const [pickingImage, setPickingImage] = useState(false);
 
   // ─── Image picker ─────────────────────────────────────────────────────────
   const handlePickLogo = async () => {
@@ -252,6 +277,7 @@ export default function Mug3DScreen() {
   };
 
   const hasDesign = customText.trim().length > 0 || !!customImageUri;
+  const currentPlacementOption = placementConfig.options.find((o) => o.id === placement) || placementConfig.options[0];
 
   return (
     <View style={styles.root}>
@@ -283,11 +309,9 @@ export default function Mug3DScreen() {
             <View style={styles.liveDesignPill}>
               <View style={styles.liveDot} />
               <Text style={styles.liveDesignLabel} numberOfLines={1}>
-                {customImageUri && customText.trim()
-                  ? `Logo + "${customText.trim()}"`
-                  : customImageUri
-                  ? 'Custom Logo Active'
-                  : `"${customText.trim()}"`}
+                {placement === 'wrap'
+                  ? '🔄 Wrap Around Active'
+                  : `${currentPlacementOption.shortLabel.toUpperCase()} • ${customImageUri && customText.trim() ? 'Logo + Text' : customImageUri ? 'Logo' : `"${customText.trim()}"`}`}
               </Text>
             </View>
           )}
@@ -305,6 +329,13 @@ export default function Mug3DScreen() {
             customFontSize={customFontSize}
             customTextYOffset={textYOffset}
             customImageUri={customImageUri || undefined}
+            placement={placement}
+            customOffsetX={offsetX}
+            customRotation={designRotation}
+            customScale={designScale}
+            wrapSpan={wrapSpan}
+            wrapHeight={wrapHeight}
+            wrapRotation={wrapRotation}
             height={360}
             label={name}
           />
@@ -312,9 +343,324 @@ export default function Mug3DScreen() {
           {/* Drag hint */}
           <View style={styles.hintRow}>
             <Ionicons name="hand-left-outline" size={13} color="#9CA3AF" />
-            <Text style={styles.hintText}>Drag on model to rotate</Text>
+            <Text style={styles.hintText}>Drag on model to rotate in full 3D</Text>
           </View>
         </View>
+
+        {/* ── Printable Placement Selection ─────────────────────────────────── */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="layers-outline" size={17} color={BrandColors.primary} />
+              <Text style={styles.sectionTitle}>Printable Placement</Text>
+            </View>
+            <View style={styles.activePlacementPill}>
+              <Text style={styles.activePlacementPillText}>
+                {currentPlacementOption.label}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.subHintText}>
+            Select where your custom design will be printed on the 3D product surface.
+          </Text>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placementScroll}>
+            {placementConfig.options.map((opt) => {
+              const isSelected = placement === opt.id;
+              const isWrapOpt = opt.id === 'wrap';
+              return (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => setPlacement(opt.id)}
+                  style={[
+                    styles.placementBtn,
+                    isSelected && styles.placementBtnActive,
+                    isWrapOpt && !isSelected && styles.placementBtnWrap,
+                  ]}>
+                  <Ionicons
+                    name={opt.icon as any}
+                    size={18}
+                    color={isSelected ? '#FFFFFF' : isWrapOpt ? BrandColors.primary : '#4B5563'}
+                  />
+                  <Text
+                    style={[
+                      styles.placementBtnText,
+                      isSelected && styles.placementBtnTextActive,
+                      isWrapOpt && !isSelected && styles.placementBtnTextWrap,
+                    ]}>
+                    {opt.shortLabel}
+                  </Text>
+                  {isWrapOpt && (
+                    <View style={[styles.wrapBadge, isSelected && { backgroundColor: '#FFFFFF' }]}>
+                      <Text style={[styles.wrapBadgeText, isSelected && { color: BrandColors.primary }]}>
+                        360°
+                      </Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* ── Flexible Wrap Around Customization ────────────────────────────── */}
+        {placement === 'wrap' && (
+          <View style={[styles.card, styles.wrapCardHighlight]}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="sync-circle" size={19} color={BrandColors.primary} />
+                <Text style={[styles.sectionTitle, { color: BrandColors.primary }]}>
+                  Flexible Wrap Around Controls
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => {
+                  setTextYOffset(0);
+                  setWrapSpan(270);
+                  setWrapHeight(0.75);
+                  setWrapRotation(0);
+                  setDesignScale(1.0);
+                }}
+                hitSlop={8}>
+                <Text style={styles.clearBtn}>Reset Wrap</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.wrapInfoBanner}>
+              <Ionicons name="information-circle-outline" size={16} color="#1D4ED8" />
+              <Text style={styles.wrapInfoText}>
+                The design wraps seamlessly around the 3D surface. Adjust vertical position, band height, and coverage angle below.
+              </Text>
+            </View>
+
+            {/* 1. Vertical Position Slider */}
+            <DragSlider
+              label="Vertical Position (Top / Center / Lower)"
+              value={Math.round(textYOffset * 100)}
+              min={-45}
+              max={45}
+              step={1}
+              onValueChange={(v) => setTextYOffset(v / 100)}
+              leftIcon="arrow-down-outline"
+              rightIcon="arrow-up-outline"
+              formatValue={(v) => (v === 0 ? 'Center' : v > 0 ? `Near Top (+${v}%)` : `Lower (${v}%)`)}
+            />
+            {/* Quick vertical presets */}
+            <View style={styles.quickPresetRow}>
+              <Pressable
+                onPress={() => setTextYOffset(0.25)}
+                style={[styles.quickChip, textYOffset === 0.25 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, textYOffset === 0.25 && styles.quickChipTextActive]}>
+                  Near Top
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setTextYOffset(0)}
+                style={[styles.quickChip, textYOffset === 0 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, textYOffset === 0 && styles.quickChipTextActive]}>
+                  Center
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setTextYOffset(-0.25)}
+                style={[styles.quickChip, textYOffset === -0.25 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, textYOffset === -0.25 && styles.quickChipTextActive]}>
+                  Lower Portion
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* 2. Wrap Coverage / Span Slider */}
+            <DragSlider
+              label="Wrap Around Coverage (Arc Span)"
+              value={wrapSpan}
+              min={90}
+              max={360}
+              step={10}
+              onValueChange={setWrapSpan}
+              leftIcon="pie-chart-outline"
+              rightIcon="refresh-circle-outline"
+              formatValue={(v) => `${v}° ${v >= 355 ? '(Full 360°)' : v >= 265 ? '(Handle-to-Handle)' : '(Half)'}`}
+            />
+            <View style={styles.quickPresetRow}>
+              <Pressable
+                onPress={() => setWrapSpan(180)}
+                style={[styles.quickChip, wrapSpan === 180 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, wrapSpan === 180 && styles.quickChipTextActive]}>
+                  180° Half
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setWrapSpan(270)}
+                style={[styles.quickChip, wrapSpan === 270 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, wrapSpan === 270 && styles.quickChipTextActive]}>
+                  270° Handle-to-Handle
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setWrapSpan(360)}
+                style={[styles.quickChip, wrapSpan === 360 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, wrapSpan === 360 && styles.quickChipTextActive]}>
+                  360° Full Wrap
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* 3. Wrap Band Height Slider */}
+            <DragSlider
+              label="Wrap Band Height / Thickness"
+              value={Math.round(wrapHeight * 100)}
+              min={25}
+              max={100}
+              step={5}
+              onValueChange={(v) => setWrapHeight(v / 100)}
+              leftIcon="resize-outline"
+              rightIcon="expand-outline"
+              formatValue={(v) => `${v}%`}
+            />
+            <View style={styles.quickPresetRow}>
+              <Pressable
+                onPress={() => setWrapHeight(0.40)}
+                style={[styles.quickChip, Math.round(wrapHeight * 100) === 40 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, Math.round(wrapHeight * 100) === 40 && styles.quickChipTextActive]}>
+                  Slim Ribbon (40%)
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setWrapHeight(0.75)}
+                style={[styles.quickChip, Math.round(wrapHeight * 100) === 75 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, Math.round(wrapHeight * 100) === 75 && styles.quickChipTextActive]}>
+                  Standard (75%)
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setWrapHeight(1.0)}
+                style={[styles.quickChip, Math.round(wrapHeight * 100) === 100 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, Math.round(wrapHeight * 100) === 100 && styles.quickChipTextActive]}>
+                  Full Height (100%)
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* 4. Wrap Rotation around object */}
+            <DragSlider
+              label="Rotate Wrap Around Product"
+              value={wrapRotation}
+              min={0}
+              max={360}
+              step={5}
+              onValueChange={setWrapRotation}
+              leftIcon="refresh-outline"
+              rightIcon="sync-outline"
+              formatValue={(v) => `${v}°`}
+            />
+          </View>
+        )}
+
+        {/* ── Directional Placement & Fine Adjustment ───────────────────────── */}
+        {placement !== 'wrap' && (
+          <View style={styles.card}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="move-outline" size={17} color={BrandColors.primary} />
+                <Text style={styles.sectionTitle}>Position & Size</Text>
+              </View>
+              {(textYOffset !== 0 || offsetX !== 0 || designScale !== 1.0 || designRotation !== 0) && (
+                <Pressable
+                  onPress={() => {
+                    setTextYOffset(0);
+                    setOffsetX(0);
+                    setDesignScale(1.0);
+                    setDesignRotation(0);
+                  }}
+                  hitSlop={8}>
+                  <Text style={styles.clearBtn}>Reset</Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Vertical Position */}
+            <DragSlider
+              label="Vertical Position (Up / Down)"
+              value={Math.round(textYOffset * 100)}
+              min={-45}
+              max={45}
+              step={1}
+              onValueChange={(v) => setTextYOffset(v / 100)}
+              leftIcon="arrow-down-outline"
+              rightIcon="arrow-up-outline"
+              formatValue={(v) => (v === 0 ? 'Center' : v > 0 ? `Top (+${v}%)` : `Bottom (${v}%)`)}
+            />
+            <View style={styles.quickPresetRow}>
+              <Pressable
+                onPress={() => setTextYOffset(0.25)}
+                style={[styles.quickChip, textYOffset === 0.25 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, textYOffset === 0.25 && styles.quickChipTextActive]}>Top</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setTextYOffset(0)}
+                style={[styles.quickChip, textYOffset === 0 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, textYOffset === 0 && styles.quickChipTextActive]}>Center</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setTextYOffset(-0.25)}
+                style={[styles.quickChip, textYOffset === -0.25 && styles.quickChipActive]}>
+                <Text style={[styles.quickChipText, textYOffset === -0.25 && styles.quickChipTextActive]}>Bottom</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Horizontal Position / Shift */}
+            <DragSlider
+              label="Horizontal Position (Left / Right)"
+              value={Math.round(offsetX * 100)}
+              min={-45}
+              max={45}
+              step={1}
+              onValueChange={(v) => setOffsetX(v / 100)}
+              leftIcon="arrow-back-outline"
+              rightIcon="arrow-forward-outline"
+              formatValue={(v) => (v === 0 ? 'Center' : v > 0 ? `Right (+${v}%)` : `Left (${v}%)`)}
+            />
+
+            <View style={styles.divider} />
+
+            {/* Scale / Size */}
+            <DragSlider
+              label="Design Scale / Size"
+              value={Math.round(designScale * 100)}
+              min={50}
+              max={180}
+              step={5}
+              onValueChange={(v) => setDesignScale(v / 100)}
+              leftIcon="contract-outline"
+              rightIcon="expand-outline"
+              formatValue={(v) => `${v}%`}
+            />
+
+            <View style={styles.divider} />
+
+            {/* Rotation / Angle */}
+            <DragSlider
+              label="Design Angle / Rotation"
+              value={designRotation}
+              min={0}
+              max={360}
+              step={5}
+              onValueChange={setDesignRotation}
+              leftIcon="refresh-outline"
+              rightIcon="sync-outline"
+              formatValue={(v) => `${v}°`}
+            />
+          </View>
+        )}
 
         {/* ── Text Studio ──────────────────────────────────────────────────── */}
         <View style={styles.card}>
@@ -322,7 +668,7 @@ export default function Mug3DScreen() {
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="text" size={16} color={BrandColors.primary} />
-              <Text style={styles.sectionTitle}>Text</Text>
+              <Text style={styles.sectionTitle}>Custom Text</Text>
             </View>
             {customText ? (
               <Pressable onPress={() => setCustomText('')} hitSlop={8}>
@@ -354,7 +700,7 @@ export default function Mug3DScreen() {
             ))}
           </ScrollView>
 
-          {/* Font style — big tap targets with sample text */}
+          {/* Font style */}
           <Text style={styles.subLabel}>Font Style</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             {FONT_STYLES.map((f) => {
@@ -364,7 +710,7 @@ export default function Mug3DScreen() {
                   key={f.id}
                   onPress={() => setSelectedFont(f.family)}
                   style={[styles.fontCard, isSelected && styles.fontCardActive]}>
-                  <Text style={[styles.fontSample, { fontFamily: undefined }, isSelected && styles.fontSampleActive]}>
+                  <Text style={[styles.fontSample, isSelected && styles.fontSampleActive]}>
                     Aa
                   </Text>
                   <Text style={[styles.fontLabel, isSelected && styles.fontLabelActive]}>{f.label}</Text>
@@ -396,12 +742,11 @@ export default function Mug3DScreen() {
             })}
           </ScrollView>
 
-          {/* ── DRAG SLIDERS ── */}
           <View style={styles.divider} />
 
           {/* Font size slider */}
           <DragSlider
-            label="Text Size"
+            label="Font Size"
             value={customFontSize}
             min={28}
             max={120}
@@ -411,29 +756,6 @@ export default function Mug3DScreen() {
             rightIcon="add-circle-outline"
             formatValue={(v) => `${v}px`}
           />
-
-          {/* Vertical position slider */}
-          <DragSlider
-            label="Position on Product"
-            value={Math.round(textYOffset * 100)}
-            min={-50}
-            max={50}
-            step={1}
-            onValueChange={(v) => setTextYOffset(v / 100)}
-            leftIcon="arrow-down-outline"
-            rightIcon="arrow-up-outline"
-            formatValue={(v) => (v === 0 ? 'Center' : v > 0 ? `+${v}%` : `${v}%`)}
-          />
-
-          {/* Reset position */}
-          {(textYOffset !== 0 || customFontSize !== 64) && (
-            <Pressable
-              onPress={() => { setTextYOffset(0); setCustomFontSize(64); }}
-              style={styles.resetBtn}>
-              <Ionicons name="refresh-outline" size={13} color="#6B7280" />
-              <Text style={styles.resetBtnText}>Reset size & position</Text>
-            </Pressable>
-          )}
         </View>
 
         {/* ── Logo / Artwork ────────────────────────────────────────────────── */}
@@ -448,7 +770,7 @@ export default function Mug3DScreen() {
               <ExpoImage source={{ uri: customImageUri }} style={styles.uploadedThumb} contentFit="contain" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.uploadedTitle}>Artwork applied ✓</Text>
-                <Text style={styles.uploadedSub}>Visible on the 3D model surface</Text>
+                <Text style={styles.uploadedSub}>Visible on the 3D product surface</Text>
               </View>
               <Pressable onPress={() => setCustomImageUri(null)} style={styles.removeBtn}>
                 <Ionicons name="trash-outline" size={16} color="#DC2626" />
@@ -467,13 +789,41 @@ export default function Mug3DScreen() {
                   <Ionicons name="cloud-upload-outline" size={22} color={BrandColors.primary} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.uploadBtnTitle}>Upload Logo or Image</Text>
-                    <Text style={styles.uploadBtnSub}>PNG, JPG, GIF supported</Text>
+                    <Text style={styles.uploadBtnSub}>PNG, JPG, SVG supported</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={BrandColors.primary} />
                 </>
               )}
             </Pressable>
           )}
+        </View>
+
+        {/* ── Product Base Color ────────────────────────────────────────────── */}
+        <View style={styles.card}>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="color-palette-outline" size={17} color={BrandColors.primary} />
+            <Text style={styles.sectionTitle}>Product Base Color</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { gap: 12 }]}>
+            {PRODUCT_BODY_COLORS.map((c) => {
+              const isSelected = selectedColor.toUpperCase() === c.hex.toUpperCase();
+              return (
+                <Pressable
+                  key={c.id}
+                  onPress={() => setSelectedColor(c.hex)}
+                  style={[
+                    styles.colorSwatch,
+                    { backgroundColor: c.hex },
+                    c.hex === '#FFFFFF' && styles.colorSwatchWhite,
+                    isSelected && styles.colorSwatchActive,
+                  ]}>
+                  {isSelected && (
+                    <Ionicons name="checkmark" size={14} color={c.hex === '#FFFFFF' ? '#111827' : '#fff'} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* ── Product Sheet ─────────────────────────────────────────────────── */}
@@ -577,7 +927,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 14,
-    maxWidth: '55%',
+    maxWidth: '65%',
   },
   liveDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#10B981' },
   liveDesignLabel: { color: '#fff', fontSize: 11, fontWeight: '700' },
@@ -622,6 +972,120 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold' },
   clearBtn: { fontSize: 12, color: '#DC2626', fontWeight: '600' },
   subLabel: { fontSize: 12, fontWeight: '600', color: '#4B5563', marginBottom: -4 },
+  subHintText: { fontSize: 12, color: '#6B7280', marginTop: -4, marginBottom: 2 },
+
+  // Placement options
+  activePlacementPill: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  activePlacementPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: BrandColors.primary,
+  },
+  placementScroll: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  placementBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+  },
+  placementBtnActive: {
+    backgroundColor: BrandColors.primary,
+    borderColor: BrandColors.primary,
+    ...Platform.select({
+      web: { boxShadow: '0 2px 8px rgba(0,82,204,0.25)' } as any,
+      default: { shadowColor: BrandColors.primary, shadowOpacity: 0.25, shadowRadius: 6, elevation: 3 },
+    }),
+  },
+  placementBtnWrap: {
+    borderColor: '#93C5FD',
+    backgroundColor: '#F0F9FF',
+  },
+  placementBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  placementBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  placementBtnTextWrap: {
+    color: BrandColors.primary,
+  },
+  wrapBadge: {
+    backgroundColor: '#DBEAFE',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  wrapBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: BrandColors.primary,
+  },
+
+  // Wrap section highlight
+  wrapCardHighlight: {
+    borderColor: '#93C5FD',
+    backgroundColor: '#FAFCFF',
+  },
+  wrapInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 10,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  wrapInfoText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#1E40AF',
+    lineHeight: 16,
+  },
+
+  // Quick preset chips
+  quickPresetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: -2,
+    flexWrap: 'wrap',
+  },
+  quickChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  quickChipActive: {
+    backgroundColor: '#111827',
+    borderColor: '#111827',
+  },
+  quickChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  quickChipTextActive: {
+    color: '#FFFFFF',
+  },
 
   // Text input
   textInput: {
@@ -681,20 +1145,6 @@ const styles = StyleSheet.create({
 
   // Divider
   divider: { height: 1, backgroundColor: '#F3F4F6' },
-
-  // Reset button
-  resetBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  resetBtnText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
 
   // Upload / logo
   uploadBtn: {

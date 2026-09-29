@@ -56,7 +56,9 @@ import {
 import { buildVessel, isVesselType, VesselLabel } from './vessel-builder';
 import {
   build3DTextMesh,
+  buildCylinderWrapMesh,
   buildDecalImageMesh,
+  CustomizationPlacement,
   loadUniversalTexture,
 } from './model-customizer';
 import { createDesignCanvasTexture } from './design-texture';
@@ -190,8 +192,22 @@ export interface Product3DPreviewProps {
   customFontFamily?: string;
   customFontSize?: number;
   customImageUri?: string;
-  /** Y-axis offset for text on vessel/shirt surfaces (-0.5 to 0.5 world units) */
+  /** Y-axis offset for text/design on surfaces (-0.5 to 0.5 world units) */
   customTextYOffset?: number;
+  /** Universal placement: 'front' | 'back' | 'left' | 'right' | 'wrap' */
+  placement?: CustomizationPlacement;
+  /** Horizontal shift / angle offset (-0.5 to 0.5 or degrees) */
+  customOffsetX?: number;
+  /** In-plane design rotation (0° to 360°) */
+  customRotation?: number;
+  /** Design scale multiplier (0.5 to 2.0) */
+  customScale?: number;
+  /** Wrap around angular span in degrees (90° to 360°, default 270°) */
+  wrapSpan?: number;
+  /** Wrap band height multiplier (0.2 to 1.0, default 0.75) */
+  wrapHeight?: number;
+  /** Wrap starting rotation angle around product in degrees (0° to 360°) */
+  wrapRotation?: number;
 }
 
 export function Product3DPreview({
@@ -210,6 +226,13 @@ export function Product3DPreview({
   customFontSize = 64,
   customImageUri,
   customTextYOffset = 0,
+  placement = 'front',
+  customOffsetX = 0,
+  customRotation = 0,
+  customScale = 1.0,
+  wrapSpan = 270,
+  wrapHeight = 0.75,
+  wrapRotation = 0,
 }: Product3DPreviewProps) {
   const [internalColor, setInternalColor] = useState('#FFFFFF');
   const color = controlledColor !== undefined ? controlledColor : internalColor;
@@ -403,48 +426,126 @@ export function Product3DPreview({
       const decalGroup = new THREE.Group();
       decalGroup.userData = { isDecal: true };
 
-      // ─── Drinkware (Mugs, Cups, Tumblers, Demitasse) ───────────────────────
+      // ─── Drinkware (Mugs, Cups, Tumblers, Steins, Demitasse) ───────────────────────
       if (isVessel && vesselLabelRef.current && vcenterRef.current) {
         const label = vesselLabelRef.current;
         const vc = vcenterRef.current;
-        const cylR = (label.rTop + label.rBottom) / 2;
-
         decalGroup.position.set(-vc.x, -vc.y, -vc.z);
 
-        if (hasText) {
-          const textY = hasImage
-            ? label.y - label.height * 0.24 + customTextYOffset
-            : label.y + customTextYOffset;
-          const textScaleFactor = hasImage ? 0.75 : 1.0;
-          const textMesh = build3DTextMesh({
-            text: effectiveText,
-            textColor: customTextColor,
-            fontFamily: customFontFamily,
-            fontSize: customFontSize * textScaleFactor,
-            cylinderRadius: cylR,
-            yOffset: textY,
-          });
-          decalGroup.add(textMesh);
-        }
+        // Effective vertical position in vessel-local coords
+        // Printable range is label.height. customTextYOffset is from -0.5 to 0.5.
+        const effY = label.y + customTextYOffset * (label.height * 0.44);
 
-        if (hasImage) {
-          const imgH = hasText
-            ? Math.min(label.height * 0.48, cylR * 0.9)
-            : Math.min(label.height * 0.82, cylR * 1.4);
-          const imgW = imgH;
-          const imgY = hasText ? label.y + label.height * 0.22 : label.y + customTextYOffset;
+        // Radius calculation along vessel height profile
+        const getVesselRadius = (yVal: number) => {
+          const t = Math.max(0, Math.min(1, (yVal - (label.y - label.height / 2)) / (label.height || 1)));
+          return label.rBottom + t * (label.rTop - label.rBottom);
+        };
 
-          loadUniversalTexture(effectiveImage, (tex) => {
-            if (!tex || !decalGroupRef.current) return;
-            const imgMesh = buildDecalImageMesh({
-              texture: tex,
-              width: imgW,
-              height: imgH,
-              cylinderRadius: cylR,
-              yOffset: imgY,
+        const R_mid = getVesselRadius(effY);
+
+        if (placement === 'wrap') {
+          // ── FLEXIBLE WRAP AROUND CUSTOMIZATION ──
+          // Customer can adjust:
+          // - wrapY (effY): vertical position (top, center, lower portion)
+          // - wrapHeight: band height (thin ribbon to full mug wrap)
+          // - wrapSpan: coverage in degrees (90° to 360°)
+          // - wrapRotation: rotation around vessel (0° to 360°)
+          const H_wrap = Math.max(0.15, Math.min(label.height * 0.96, label.height * 0.55 * wrapHeight * customScale));
+          const yTop = effY + H_wrap / 2;
+          const yBot = effY - H_wrap / 2;
+          const rTop = getVesselRadius(yTop) + 0.007;
+          const rBot = getVesselRadius(yBot) + 0.007;
+
+          if (hasImage) {
+            loadUniversalTexture(effectiveImage, (tex) => {
+              if (!tex || !decalGroupRef.current) return;
+              const wrapMesh = buildCylinderWrapMesh({
+                texture: tex,
+                radiusTop: rTop,
+                radiusBottom: rBot,
+                height: H_wrap,
+                y: effY,
+                spanDegrees: wrapSpan,
+                rotationDegrees: wrapRotation + (customOffsetX ? customOffsetX * 180 : 0),
+              });
+              if (customRotation !== 0) {
+                tex.center.set(0.5, 0.5);
+                tex.rotation = (customRotation * Math.PI) / 180;
+              }
+              decalGroup.add(wrapMesh);
             });
-            decalGroup.add(imgMesh);
-          });
+          }
+
+          if (hasText) {
+            const textScaleFactor = hasImage ? 0.72 : 1.0;
+            const textY = hasImage ? effY - H_wrap * 0.28 : effY;
+            const centerAngle = (wrapRotation * Math.PI) / 180 + (customOffsetX ? customOffsetX * Math.PI : 0);
+
+            const textMesh = build3DTextMesh({
+              text: effectiveText,
+              textColor: customTextColor,
+              fontFamily: customFontFamily,
+              fontSize: customFontSize * textScaleFactor,
+              cylinderRadius: R_mid,
+              yOffset: textY,
+              rotation: customRotation,
+              scale: customScale,
+              placement: 'wrap',
+              angleOffset: centerAngle,
+            });
+            decalGroup.add(textMesh);
+          }
+        } else {
+          // ── DIRECTIONAL PLACEMENTS (Front, Back, Left Side, Right Side) ──
+          let baseAngle = 0;
+          if (placement === 'back') baseAngle = Math.PI;
+          else if (placement === 'left') baseAngle = -Math.PI / 2;
+          else if (placement === 'right') baseAngle = Math.PI / 2;
+
+          const angle = baseAngle + (customOffsetX ? customOffsetX * Math.PI * 0.6 : 0);
+          const decalW = Math.min(label.height * 0.85, R_mid * 1.3) * customScale;
+          const decalH = decalW;
+
+          if (hasText) {
+            const textY = hasImage ? effY - decalH * 0.25 : effY;
+            const textScaleFactor = hasImage ? 0.75 : 1.0;
+            const textMesh = build3DTextMesh({
+              text: effectiveText,
+              textColor: customTextColor,
+              fontFamily: customFontFamily,
+              fontSize: customFontSize * textScaleFactor,
+              cylinderRadius: R_mid,
+              yOffset: textY,
+              xOffset: customOffsetX,
+              rotation: customRotation,
+              scale: customScale,
+              placement,
+            });
+            decalGroup.add(textMesh);
+          }
+
+          if (hasImage) {
+            const imgH = hasText ? decalH * 0.75 : decalH;
+            const imgW = imgH;
+            const imgY = hasText ? effY + decalH * 0.22 : effY;
+
+            loadUniversalTexture(effectiveImage, (tex) => {
+              if (!tex || !decalGroupRef.current) return;
+              const imgMesh = buildDecalImageMesh({
+                texture: tex,
+                width: imgW,
+                height: imgH,
+                cylinderRadius: R_mid,
+                yOffset: imgY,
+                xOffset: customOffsetX,
+                rotation: customRotation,
+                scale: customScale,
+                placement,
+              });
+              decalGroup.add(imgMesh);
+            });
+          }
         }
 
         targetGroup.add(decalGroup);
@@ -455,57 +556,113 @@ export function Product3DPreview({
       // ─── Apparel (T-Shirts) ────────────────────────────────────────────────
       if (isShirt) {
         const torsoW = size.x;
+        const torsoH = size.y;
+        const maxZ = box.max.z;
+        const minZ = box.min.z;
 
-        if (hasText) {
-          const textY = hasImage
-            ? 0.06 + customTextYOffset
-            : 0.18 + customTextYOffset;
-          const textScaleFactor = hasImage ? 0.75 : 1.0;
-          const textMesh = build3DTextMesh({
-            text: effectiveText,
-            textColor: customTextColor,
-            fontFamily: customFontFamily,
-            fontSize: customFontSize * textScaleFactor,
-            surfaceMeshes: shirtMeshesRef.current,
-            yOffset: textY,
-            zOffset: 0.31,
-          });
-          decalGroup.add(textMesh);
-        }
+        // Vertical and horizontal positions
+        const effY = (hasImage && hasText ? 0.08 : 0.16) + customTextYOffset * (torsoH * 0.42);
+        const effX = customOffsetX ? customOffsetX * (torsoW * 0.35) : 0;
+        const isBack = placement === 'back';
 
-        if (hasImage) {
-          const imgW = torsoW * (hasText ? 0.38 : 0.50);
-          const imgH = imgW;
-          const imgY = hasText ? 0.30 + customTextYOffset : 0.18 + customTextYOffset;
+        if (placement === 'wrap') {
+          // ── TORSO WRAP AROUND ──
+          const wrapW = torsoW * 0.88 * Math.min(1.8, Math.max(0.6, (wrapSpan / 360) * 1.5));
+          const wrapH = torsoH * 0.35 * wrapHeight * customScale;
 
-          loadUniversalTexture(effectiveImage, (tex) => {
-            if (!tex || !decalGroupRef.current) return;
-            tex.colorSpace = THREE.SRGBColorSpace;
-            tex.needsUpdate = true;
-
-            const geo = new THREE.PlaneGeometry(imgW, imgH, 12, 12);
-            const pos = geo.attributes.position;
-
-            for (let i = 0; i < pos.count; i++) {
-              const lx = pos.getX(i);
-              const ly = imgY + pos.getY(i);
-              const curveZ = 0.308 - (lx * lx) * 0.95;
-              pos.setXYZ(i, lx, ly, curveZ + 0.003);
-            }
-            geo.computeVertexNormals();
-
-            const mat = new THREE.MeshBasicMaterial({
-              map: tex,
-              transparent: true,
-              side: THREE.DoubleSide,
-              depthTest: true,
-              depthWrite: false,
+          if (hasImage) {
+            loadUniversalTexture(effectiveImage, (tex) => {
+              if (!tex || !decalGroupRef.current) return;
+              const wrapMesh = buildDecalImageMesh({
+                texture: tex,
+                width: wrapW,
+                height: wrapH,
+                yOffset: effY,
+                xOffset: effX,
+                zOffset: maxZ + 0.012,
+                rotation: customRotation,
+                scale: customScale,
+                placement: 'wrap',
+                isShirt: true,
+                shirtTorsoW: torsoW,
+              });
+              decalGroup.add(wrapMesh);
             });
-            const shirtMesh = new THREE.Mesh(geo, mat);
-            shirtMesh.userData = { isDecal: true };
-            shirtMesh.renderOrder = 2;
-            decalGroup.add(shirtMesh);
-          });
+          }
+
+          if (hasText) {
+            const textY = hasImage ? effY - wrapH * 0.28 : effY;
+            const textMesh = build3DTextMesh({
+              text: effectiveText,
+              textColor: customTextColor,
+              fontFamily: customFontFamily,
+              fontSize: customFontSize * (hasImage ? 0.75 : 1.0),
+              surfaceMeshes: shirtMeshesRef.current,
+              yOffset: textY,
+              xOffset: effX,
+              zOffset: maxZ + 0.012,
+              rotation: customRotation,
+              scale: customScale,
+              placement: 'wrap',
+              isShirt: true,
+            });
+            decalGroup.add(textMesh);
+          }
+        } else {
+          // ── FRONT, BACK, LEFT CHEST, RIGHT CHEST ──
+          const isPocket = placement === 'left' || placement === 'right';
+          const pocketScale = isPocket ? 0.6 : 1.0;
+          const effScale = customScale * pocketScale;
+          const zBase = isBack ? minZ - 0.012 : maxZ + 0.012;
+
+          if (hasText) {
+            const textY = hasImage
+              ? (isPocket ? effY - 0.08 * effScale : effY - 0.12 * effScale)
+              : effY;
+            const textMesh = build3DTextMesh({
+              text: effectiveText,
+              textColor: customTextColor,
+              fontFamily: customFontFamily,
+              fontSize: customFontSize * (hasImage ? 0.75 : 1.0),
+              surfaceMeshes: shirtMeshesRef.current,
+              yOffset: textY,
+              xOffset: effX,
+              zOffset: zBase,
+              rotation: customRotation,
+              scale: effScale,
+              placement,
+              isShirt: true,
+            });
+            decalGroup.add(textMesh);
+          }
+
+          if (hasImage) {
+            const imgBaseW = torsoW * (isPocket ? 0.25 : hasText ? 0.38 : 0.50);
+            const imgW = imgBaseW * effScale;
+            const imgH = imgW;
+            const imgY = hasText ? (isPocket ? effY + 0.08 * effScale : effY + 0.12 * effScale) : effY;
+
+            loadUniversalTexture(effectiveImage, (tex) => {
+              if (!tex || !decalGroupRef.current) return;
+              tex.colorSpace = THREE.SRGBColorSpace;
+              tex.needsUpdate = true;
+
+              const imgMesh = buildDecalImageMesh({
+                texture: tex,
+                width: imgW,
+                height: imgH,
+                yOffset: imgY,
+                xOffset: effX,
+                zOffset: zBase,
+                rotation: customRotation,
+                scale: 1.0,
+                placement,
+                isShirt: true,
+                shirtTorsoW: torsoW,
+              });
+              decalGroup.add(imgMesh);
+            });
+          }
         }
 
         targetGroup.add(decalGroup);
@@ -515,12 +672,19 @@ export function Product3DPreview({
 
       // ─── Button Pins ───────────────────────────────────────────────────────
       if (isPin) {
+        const effY = customTextYOffset * 0.4;
+        const effX = customOffsetX ? customOffsetX * 0.4 : 0;
+        const zBase = 0.12 + 0.005;
+
         if (hasImage) {
           loadUniversalTexture(effectiveImage, (tex) => {
             if (!tex || !decalGroupRef.current) return;
             const decal = buildPinDecal(resolvedViewerType, tex);
             decal.userData = { isDecal: true };
-            decal.renderOrder = 2;
+            decal.position.set(effX, effY, 0);
+            decal.scale.setScalar(customScale);
+            if (customRotation !== 0) decal.rotation.z = (customRotation * Math.PI) / 180;
+            decal.renderOrder = 9;
             decalGroup.add(decal);
           });
         }
@@ -531,8 +695,12 @@ export function Product3DPreview({
             textColor: customTextColor,
             fontFamily: customFontFamily,
             fontSize: customFontSize * (hasImage ? 0.6 : 0.85),
-            yOffset: hasImage ? -0.25 : 0,
-            zOffset: 0.12,
+            yOffset: hasImage ? effY - 0.25 * customScale : effY,
+            xOffset: effX,
+            zOffset: zBase,
+            rotation: customRotation,
+            scale: customScale,
+            placement: 'front',
           });
           decalGroup.add(textMesh);
         }
@@ -543,17 +711,25 @@ export function Product3DPreview({
       }
 
       // ─── Bags, Stickers, Calendars ─────────────────────────────────────────
-      const baseW = Math.max(size.x * 0.55, 0.35);
+      const baseW = Math.max(size.x * 0.55, 0.35) * customScale;
+      const isBack = placement === 'back';
+      const effZ = isBack ? box.min.z - 0.015 : box.max.z + 0.015;
+      const effY = center.y + customTextYOffset * (size.y * 0.4);
+      const effX = center.x + (customOffsetX ? customOffsetX * (size.x * 0.35) : 0);
 
       if (hasText) {
-        const textY = hasImage ? center.y - baseW * 0.3 : center.y;
+        const textY = hasImage ? effY - baseW * 0.25 : effY;
         const textMesh = build3DTextMesh({
           text: effectiveText,
           textColor: customTextColor,
           fontFamily: customFontFamily,
           fontSize: customFontSize * (hasImage ? 0.75 : 1.0),
           yOffset: textY,
-          zOffset: maxZ + 0.02,
+          xOffset: effX - center.x,
+          zOffset: effZ,
+          rotation: customRotation,
+          scale: customScale,
+          placement,
         });
         decalGroup.add(textMesh);
       }
@@ -561,23 +737,22 @@ export function Product3DPreview({
       if (hasImage) {
         const imgW = hasText ? baseW * 0.75 : baseW;
         const imgH = imgW;
-        const imgY = hasText ? center.y + baseW * 0.25 : center.y;
+        const imgY = hasText ? effY + baseW * 0.22 : effY;
 
         loadUniversalTexture(effectiveImage, (tex) => {
           if (!tex || !decalGroupRef.current) return;
-          const geo = new THREE.PlaneGeometry(imgW, imgH);
-          const mat = new THREE.MeshBasicMaterial({
-            map: tex,
-            transparent: true,
-            side: THREE.DoubleSide,
-            depthTest: true,
-            depthWrite: false,
+          const imgMesh = buildDecalImageMesh({
+            texture: tex,
+            width: imgW,
+            height: imgH,
+            yOffset: imgY,
+            xOffset: effX - center.x,
+            zOffset: effZ,
+            rotation: customRotation,
+            scale: 1.0,
+            placement,
           });
-          const planeMesh = new THREE.Mesh(geo, mat);
-          planeMesh.userData = { isDecal: true };
-          planeMesh.renderOrder = 2;
-          planeMesh.position.set(center.x, imgY, maxZ + 0.018);
-          decalGroup.add(planeMesh);
+          decalGroup.add(imgMesh);
         });
       }
 
@@ -592,6 +767,13 @@ export function Product3DPreview({
       customTextYOffset,
       customImageUri,
       designImageUrl,
+      placement,
+      customOffsetX,
+      customRotation,
+      customScale,
+      wrapSpan,
+      wrapHeight,
+      wrapRotation,
       isShirt,
       isVessel,
       isPin,
