@@ -32,7 +32,9 @@ if (typeof console !== 'undefined' && console.warn) {
     const text = args.map((a) => (typeof a === 'string' ? a : a?.message || '')).join(' ');
     if (
       text.includes('WebGL 1 support was deprecated') ||
-      text.includes("EXGL: gl.pixelStorei() doesn't support this parameter yet")
+      text.includes("EXGL: gl.pixelStorei() doesn't support this parameter yet") ||
+      text.includes('Scripts "build/three.js"') ||
+      text.includes('build/three.min.js')
     ) {
       return;
     }
@@ -481,23 +483,14 @@ export function Product3DPreview({
             tex.colorSpace = THREE.SRGBColorSpace;
             tex.needsUpdate = true;
 
-            const geo = new THREE.PlaneGeometry(imgW, imgH, 16, 16);
+            const geo = new THREE.PlaneGeometry(imgW, imgH, 12, 12);
             const pos = geo.attributes.position;
-            const ray = new THREE.Raycaster();
-            const meshes = shirtMeshesRef.current;
 
             for (let i = 0; i < pos.count; i++) {
               const lx = pos.getX(i);
               const ly = imgY + pos.getY(i);
-              let sZ = 0.30;
-              if (meshes.length > 0) {
-                ray.set(new THREE.Vector3(lx, ly, 1.5), new THREE.Vector3(0, 0, -1));
-                const hits = ray.intersectObjects(meshes, false);
-                if (hits.length > 0) {
-                  sZ = hits[0].point.z;
-                }
-              }
-              pos.setXYZ(i, lx, ly, sZ + 0.003);
+              const curveZ = 0.308 - (lx * lx) * 0.95;
+              pos.setXYZ(i, lx, ly, curveZ + 0.003);
             }
             geo.computeVertexNormals();
 
