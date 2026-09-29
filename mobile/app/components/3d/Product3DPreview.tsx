@@ -57,6 +57,7 @@ import {
   buildDecalImageMesh,
   loadUniversalTexture,
 } from './model-customizer';
+import { createDesignCanvasTexture } from './design-texture';
 import { getApiBaseUrls } from '@/utils/api';
 
 // Registry of bundled GLB 3D models — matching web admin public/models/*.glb
@@ -240,6 +241,7 @@ export function Product3DPreview({
   const modelBoxRef = useRef<THREE.Box3 | null>(null);
   const vcenterRef = useRef<THREE.Vector3 | null>(null);
   const vesselLabelRef = useRef<VesselLabel | null>(null);
+  const shirtMeshesRef = useRef<THREE.Mesh[]>([]);
 
   const normalizeViewerType = (vt: string): string => {
     const clean = (vt || '').toLowerCase().trim();
@@ -451,44 +453,79 @@ export function Product3DPreview({
       // ─── Apparel (T-Shirts) ────────────────────────────────────────────────
       if (isShirt) {
         const torsoW = size.x;
-        const torsoH = size.y;
 
-        if (hasText) {
-          const textY = hasImage ? 0.05 + customTextYOffset : 0.2 + customTextYOffset;
-          const textMesh = build3DTextMesh({
+        const applyTextureToShirt = (tex: THREE.Texture) => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.needsUpdate = true;
+
+          // Decal dimensions matching web admin design studio (48% of torso width)
+          const decalW = torsoW * 0.48;
+          const decalH = decalW * 1.05;
+          const decalCenterY = 0.18 + customTextYOffset;
+
+          // High subdiv PlaneGeometry so decal conforms smoothly to fabric wrinkles and chest curvature
+          const geo = new THREE.PlaneGeometry(decalW, decalH, 20, 20);
+          const pos = geo.attributes.position;
+          const ray = new THREE.Raycaster();
+          const meshes = shirtMeshesRef.current;
+
+          for (let i = 0; i < pos.count; i++) {
+            const lx = pos.getX(i);
+            const ly = decalCenterY + pos.getY(i);
+            let surfaceZ = 0.30;
+            if (meshes.length > 0) {
+              ray.set(new THREE.Vector3(lx, ly, 1.5), new THREE.Vector3(0, 0, -1));
+              const hits = ray.intersectObjects(meshes, false);
+              if (hits.length > 0) {
+                surfaceZ = hits[0].point.z;
+              }
+            }
+            // Attached directly to the 3D surface with 0.003 (3mm) offset to prevent z-fighting
+            pos.setXYZ(i, lx, ly, surfaceZ + 0.003);
+          }
+          geo.computeVertexNormals();
+
+          const mat = new THREE.MeshStandardMaterial({
+            map: tex,
+            transparent: true,
+            roughness: 0.85,
+            metalness: 0.02,
+            side: THREE.DoubleSide,
+            depthTest: true,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
+          });
+
+          const shirtDecalMesh = new THREE.Mesh(geo, mat);
+          shirtDecalMesh.userData = { isDecal: true };
+          shirtDecalMesh.renderOrder = 3;
+          decalGroup.add(shirtDecalMesh);
+        };
+
+        createDesignCanvasTexture(
+          {
             text: effectiveText,
             textColor: customTextColor,
             fontFamily: customFontFamily,
-            fontSize: customFontSize * (hasImage ? 0.75 : 1.0),
-            yOffset: textY,
-            zOffset: maxZ + 0.02,
-          });
-          decalGroup.add(textMesh);
-        }
-
-        if (hasImage) {
-          const imgW = torsoW * (hasText ? 0.38 : 0.52);
-          const imgH = imgW;
-          const imgY = hasText ? 0.32 + customTextYOffset : 0.2 + customTextYOffset;
-
-          loadUniversalTexture(effectiveImage, (tex) => {
-            if (!tex || !decalGroupRef.current) return;
-            const geo = new THREE.PlaneGeometry(imgW, imgH, 20, 20);
-            applyShirtDecalDrape(geo, { centerY: 0, frontZ: 0, torsoW, torsoH, isBoxyHeavy: false });
-            const mat = new THREE.MeshBasicMaterial({
-              map: tex,
-              transparent: true,
-              side: THREE.DoubleSide,
-              depthTest: true,
-              depthWrite: false,
-            });
-            const shirtMesh = new THREE.Mesh(geo, mat);
-            shirtMesh.userData = { isDecal: true };
-            shirtMesh.renderOrder = 2;
-            shirtMesh.position.set(0, imgY, maxZ + 0.015);
-            decalGroup.add(shirtMesh);
-          });
-        }
+            fontSize: customFontSize,
+            imageUri: effectiveImage || undefined,
+          },
+          (tex) => {
+            if (!decalGroupRef.current) return;
+            if (tex) {
+              applyTextureToShirt(tex);
+            } else if (effectiveImage) {
+              // Direct image texture fallback
+              loadUniversalTexture(effectiveImage, (imgTex) => {
+                if (imgTex && decalGroupRef.current) {
+                  applyTextureToShirt(imgTex);
+                }
+              });
+            }
+          }
+        );
 
         targetGroup.add(decalGroup);
         decalGroupRef.current = decalGroup;
@@ -709,7 +746,16 @@ export function Product3DPreview({
       modelBoxRef.current = new THREE.Box3().setFromObject(obj);
       group.add(obj);
 
-      const trimContrast = fit.ringer ? shirtTrimContrast(activeColor) : null;
+      // Populate shirtMeshesRef for exact surface raycasting
+      const sMeshes: THREE.Mesh[] = [];
+      obj.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) sMeshes.push(o as THREE.Mesh);
+      });
+      shirtMeshesRef.current = sMeshes;
+
+      // Plain white only by default across EVERY part of the shirt!
+      // All meshes (_crayfishdiffuse body, trim, collar, cuffs, hem, sleeves) start pure white
+      const trimContrast = (fit.ringer && activeColor !== '#FFFFFF') ? shirtTrimContrast(activeColor) : null;
       obj.traverse((o) => {
         const mesh = o as THREE.Mesh;
         if (!mesh.isMesh) return;
@@ -721,8 +767,9 @@ export function Product3DPreview({
             sm.color.set(trimContrast);
             sm.roughness = 0.7;
           } else if (sm.name === 'PocketSeam') {
-            // keep stitching
+            sm.color.set(0xcccccc); // subtle light gray stitching
           } else {
+            // Entire shirt body, sleeves, collar, cuffs, hem = activeColor (default pure white #FFFFFF)
             sm.color.set(activeColor);
             if (!fit.heavy) sm.roughness = 0.82;
             sm.metalness = 0.02;
@@ -834,17 +881,13 @@ export function Product3DPreview({
         mats.forEach((m) => {
           const sm = m as THREE.MeshStandardMaterial;
           if ('color' in sm && sm.name !== 'PocketSeam') {
-            if (isShirt && SHIRT_TRIM_MATS.has(sm.name)) {
-              sm.color.set(shirtTrimContrast(color));
-            } else {
-              sm.color.set(color);
-            }
+            sm.color.set(color);
             sm.needsUpdate = true;
           }
         });
       }
     });
-  }, [color, isShirt]);
+  }, [color]);
 
   // ─── Web Implementation ─────────────────────────────────────────────────────
   useEffect(() => {
