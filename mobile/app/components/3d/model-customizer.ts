@@ -51,6 +51,7 @@ export interface Build3DTextOptions {
   cylinderRadius?: number | null; // e.g. 1.025 for mugs
   yOffset?: number;
   zOffset?: number;
+  surfaceMeshes?: THREE.Mesh[]; // Optional meshes to raycast vertices onto (e.g. T-Shirt)
 }
 
 /**
@@ -66,6 +67,7 @@ export function build3DTextMesh(options: Build3DTextOptions): THREE.Group {
     cylinderRadius = null,
     yOffset = 0,
     zOffset = 0,
+    surfaceMeshes = null,
   } = options;
 
   const group = new THREE.Group();
@@ -79,7 +81,7 @@ export function build3DTextMesh(options: Build3DTextOptions): THREE.Group {
 
   // Convert pixel UI size (48-104) to Three.js world scale (0.10 - 0.22)
   const baseSize = Math.max(0.09, Math.min(0.24, (fontSize / 64) * 0.15));
-  const textDepth = 0.018;
+  const textDepth = 0.012;
   const lineHeight = baseSize * 1.35;
   const totalHeight = lines.length * lineHeight;
   const startY = yOffset + (totalHeight / 2) - baseSize * 0.8;
@@ -122,8 +124,24 @@ export function build3DTextMesh(options: Build3DTextOptions): THREE.Group {
       geo.scale(scale, scale, 1);
     }
 
-    // Cylindrical projection wrapping around mug curvature
-    if (cylinderRadius && cylinderRadius > 0) {
+    const currentLineY = startY - idx * lineHeight;
+
+    // 1. Raycast projection onto 3D surface meshes (e.g. T-Shirt contours)
+    if (surfaceMeshes && surfaceMeshes.length > 0) {
+      const pos = geo.attributes.position;
+      const ray = new THREE.Raycaster();
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = currentLineY + pos.getY(i);
+        const z = pos.getZ(i);
+        ray.set(new THREE.Vector3(x, y, 1.5), new THREE.Vector3(0, 0, -1));
+        const hits = ray.intersectObjects(surfaceMeshes, false);
+        const surfaceZ = hits.length > 0 ? hits[0].point.z : (zOffset || 0.30);
+        pos.setXYZ(i, x, pos.getY(i), surfaceZ + 0.003 + z);
+      }
+      geo.computeVertexNormals();
+    } else if (cylinderRadius && cylinderRadius > 0) {
+      // 2. Cylindrical projection wrapping around mug curvature
       const R = cylinderRadius + 0.008;
       const pos = geo.attributes.position;
       for (let i = 0; i < pos.count; i++) {
@@ -135,14 +153,14 @@ export function build3DTextMesh(options: Build3DTextOptions): THREE.Group {
       }
       geo.computeVertexNormals();
     } else {
-      // Flat placement (shirt chest, tote bag, pin)
+      // 3. Flat placement (tote bag, pin)
       geo.translate(0, 0, zOffset);
     }
 
     const mesh = new THREE.Mesh(geo, textMat);
     mesh.userData = { isDecal: true };
     mesh.renderOrder = 3;
-    mesh.position.y = startY - idx * lineHeight;
+    mesh.position.y = currentLineY;
     group.add(mesh);
   });
 

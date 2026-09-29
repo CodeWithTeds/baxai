@@ -454,78 +454,66 @@ export function Product3DPreview({
       if (isShirt) {
         const torsoW = size.x;
 
-        const applyTextureToShirt = (tex: THREE.Texture) => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.needsUpdate = true;
-
-          // Decal dimensions matching web admin design studio (48% of torso width)
-          const decalW = torsoW * 0.48;
-          const decalH = decalW * 1.05;
-          const decalCenterY = 0.18 + customTextYOffset;
-
-          // High subdiv PlaneGeometry so decal conforms smoothly to fabric wrinkles and chest curvature
-          const geo = new THREE.PlaneGeometry(decalW, decalH, 20, 20);
-          const pos = geo.attributes.position;
-          const ray = new THREE.Raycaster();
-          const meshes = shirtMeshesRef.current;
-
-          for (let i = 0; i < pos.count; i++) {
-            const lx = pos.getX(i);
-            const ly = decalCenterY + pos.getY(i);
-            let surfaceZ = 0.30;
-            if (meshes.length > 0) {
-              ray.set(new THREE.Vector3(lx, ly, 1.5), new THREE.Vector3(0, 0, -1));
-              const hits = ray.intersectObjects(meshes, false);
-              if (hits.length > 0) {
-                surfaceZ = hits[0].point.z;
-              }
-            }
-            // Attached directly to the 3D surface with 0.003 (3mm) offset to prevent z-fighting
-            pos.setXYZ(i, lx, ly, surfaceZ + 0.003);
-          }
-          geo.computeVertexNormals();
-
-          const mat = new THREE.MeshStandardMaterial({
-            map: tex,
-            transparent: true,
-            roughness: 0.85,
-            metalness: 0.02,
-            side: THREE.DoubleSide,
-            depthTest: true,
-            depthWrite: false,
-            polygonOffset: true,
-            polygonOffsetFactor: -1,
-            polygonOffsetUnits: -1,
-          });
-
-          const shirtDecalMesh = new THREE.Mesh(geo, mat);
-          shirtDecalMesh.userData = { isDecal: true };
-          shirtDecalMesh.renderOrder = 3;
-          decalGroup.add(shirtDecalMesh);
-        };
-
-        createDesignCanvasTexture(
-          {
+        if (hasText) {
+          const textY = hasImage
+            ? 0.06 + customTextYOffset
+            : 0.18 + customTextYOffset;
+          const textScaleFactor = hasImage ? 0.75 : 1.0;
+          const textMesh = build3DTextMesh({
             text: effectiveText,
             textColor: customTextColor,
             fontFamily: customFontFamily,
-            fontSize: customFontSize,
-            imageUri: effectiveImage || undefined,
-          },
-          (tex) => {
-            if (!decalGroupRef.current) return;
-            if (tex) {
-              applyTextureToShirt(tex);
-            } else if (effectiveImage) {
-              // Direct image texture fallback
-              loadUniversalTexture(effectiveImage, (imgTex) => {
-                if (imgTex && decalGroupRef.current) {
-                  applyTextureToShirt(imgTex);
+            fontSize: customFontSize * textScaleFactor,
+            surfaceMeshes: shirtMeshesRef.current,
+            yOffset: textY,
+            zOffset: 0.31,
+          });
+          decalGroup.add(textMesh);
+        }
+
+        if (hasImage) {
+          const imgW = torsoW * (hasText ? 0.38 : 0.50);
+          const imgH = imgW;
+          const imgY = hasText ? 0.30 + customTextYOffset : 0.18 + customTextYOffset;
+
+          loadUniversalTexture(effectiveImage, (tex) => {
+            if (!tex || !decalGroupRef.current) return;
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.needsUpdate = true;
+
+            const geo = new THREE.PlaneGeometry(imgW, imgH, 16, 16);
+            const pos = geo.attributes.position;
+            const ray = new THREE.Raycaster();
+            const meshes = shirtMeshesRef.current;
+
+            for (let i = 0; i < pos.count; i++) {
+              const lx = pos.getX(i);
+              const ly = imgY + pos.getY(i);
+              let sZ = 0.30;
+              if (meshes.length > 0) {
+                ray.set(new THREE.Vector3(lx, ly, 1.5), new THREE.Vector3(0, 0, -1));
+                const hits = ray.intersectObjects(meshes, false);
+                if (hits.length > 0) {
+                  sZ = hits[0].point.z;
                 }
-              });
+              }
+              pos.setXYZ(i, lx, ly, sZ + 0.003);
             }
-          }
-        );
+            geo.computeVertexNormals();
+
+            const mat = new THREE.MeshBasicMaterial({
+              map: tex,
+              transparent: true,
+              side: THREE.DoubleSide,
+              depthTest: true,
+              depthWrite: false,
+            });
+            const shirtMesh = new THREE.Mesh(geo, mat);
+            shirtMesh.userData = { isDecal: true };
+            shirtMesh.renderOrder = 2;
+            decalGroup.add(shirtMesh);
+          });
+        }
 
         targetGroup.add(decalGroup);
         decalGroupRef.current = decalGroup;
