@@ -360,6 +360,23 @@ export default function ServicesScreen() {
     const nameLower = item.name.toLowerCase();
 
     const isPin = vType.includes('pin') || catLower.includes('pin') || nameLower.includes('pin');
+    const isShirt =
+      vType.includes('shirt') ||
+      catLower.includes('shirt') ||
+      catLower.includes('tshirts') ||
+      catLower.includes('apparel') ||
+      nameLower.includes('shirt') ||
+      nameLower.includes('tee');
+    const isTote = vType.includes('tote') || catLower.includes('bag') || nameLower.includes('tote');
+
+    const defaultViewerType = isShirt
+      ? 'shirt'
+      : isPin
+      ? 'pin_cloud'
+      : isTote
+      ? 'tote'
+      : 'coffee_cup';
+
     const targetRoute = isPin ? '/pin-3d' : '/mug-3d';
 
     router.push({
@@ -369,8 +386,8 @@ export default function ServicesScreen() {
         price: item.price,
         sku: item.sku || '',
         stock: item.stock !== undefined ? String(item.stock) : '30',
-        viewer_type: item.viewerType || (isPin ? 'pin_cloud' : 'coffee_cup'),
-        category: item.category || (isPin ? 'pins' : 'mugs'),
+        viewer_type: item.viewerType || defaultViewerType,
+        category: item.category || (isShirt ? 'apparel' : isPin ? 'pins' : 'mugs'),
         description: item.description || '',
       },
     } as any);

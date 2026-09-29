@@ -185,6 +185,17 @@ export default function Mug3DScreen() {
   const category    = params.category    || 'mugs';
   const description = params.description || 'Custom product with vibrant high-resolution printing.';
 
+  const isShirt =
+    viewerType.includes('shirt') ||
+    category.includes('apparel') ||
+    category.includes('shirt') ||
+    name.toLowerCase().includes('shirt') ||
+    name.toLowerCase().includes('tee');
+
+  const presetList = isShirt
+    ? ['Custom Tee', 'Placides Co.', 'Stay Real', 'Vintage', 'Original']
+    : PRESET_TEXTS;
+
   const { t } = useLanguage();
   const [selectedColor, setSelectedColor]     = useState('#FFFFFF');
   const [customText, setCustomText]           = useState('');
@@ -333,7 +344,7 @@ export default function Mug3DScreen() {
 
           {/* Preset chips */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-            {PRESET_TEXTS.map((p) => (
+            {presetList.map((p) => (
               <Pressable
                 key={p}
                 onPress={() => setCustomText(p)}

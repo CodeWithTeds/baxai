@@ -40,6 +40,8 @@ if (typeof console !== 'undefined' && console.warn) {
   };
 }
 
+import { Asset } from 'expo-asset';
+import * as FileSystem from 'expo-file-system';
 import { buildBag, isBagType } from './bag-builder';
 import { buildPin, buildPinDecal, isPinType } from './pin-builder';
 import {
@@ -57,9 +59,107 @@ import {
 } from './model-customizer';
 import { getApiBaseUrls } from '@/utils/api';
 
+// Registry of bundled GLB 3D models — matching web admin public/models/*.glb
+const BUNDLED_GLB: Record<string, any> = {
+  shirt: require('@/assets/models/shirt.glb'),
+  tote: require('@/assets/models/tote.glb'),
+  pin: require('@/assets/models/pin.glb'),
+  calendar: require('@/assets/models/calendar.glb'),
+  mug: require('@/assets/models/mug.glb'),
+};
+
 export const PALETTE = ['#FFFFFF', '#111827', '#0052CC', '#EF4444', '#22C55E', '#F59E0B'];
 
 const TINTABLE = new Set(['mug', 'tote', 'pin', 'shirt', 'coffee_cup', 'coffee_mugs']);
+
+/**
+ * Universal GLTF model loader for Web and Mobile React Native.
+ * 1. Tries remote backend URL first (e.g. /api/v1/models/shirt.glb or /models/shirt.glb).
+ * 2. Seamlessly falls back to bundled asset so 3D model is guaranteed to render.
+ */
+async function loadGLTFModel(
+  remoteUrl: string | undefined,
+  modelKey: string,
+  onSuccess: (scene: THREE.Group) => void,
+  onFailure: (err: any) => void
+) {
+  const loader = new GLTFLoader();
+
+  const tryBundledFallback = async () => {
+    const bundledAsset = BUNDLED_GLB[modelKey];
+    if (bundledAsset) {
+      try {
+        const asset = Asset.fromModule(bundledAsset);
+        await asset.downloadAsync();
+        const localUri = asset.localUri || asset.uri;
+
+        let ab: ArrayBuffer | null = null;
+        try {
+          const res = await fetch(localUri);
+          if (res.ok) {
+            ab = await res.arrayBuffer();
+          }
+        } catch {}
+
+        if (!ab && Platform.OS !== 'web' && asset.localUri) {
+          const base64 = await FileSystem.readAsStringAsync(asset.localUri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          const binaryString = atob(base64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          ab = bytes.buffer;
+        }
+
+        if (ab) {
+          loader.parse(
+            ab,
+            '',
+            (gltf) => {
+              onSuccess(gltf.scene as unknown as THREE.Group);
+            },
+            (parseErr) => {
+              console.warn(`[GLTFLoader] Parse error for bundled ${modelKey}:`, parseErr);
+              onFailure(parseErr);
+            }
+          );
+          return;
+        }
+      } catch (assetErr) {
+        console.warn(`[GLTFLoader] Local bundled asset failed for ${modelKey}:`, assetErr);
+      }
+    }
+    onFailure(new Error(`Could not load 3D model for ${modelKey}`));
+  };
+
+  if (remoteUrl && remoteUrl.trim()) {
+    try {
+      const res = await fetch(remoteUrl.trim());
+      if (res.ok) {
+        const ab = await res.arrayBuffer();
+        loader.parse(
+          ab,
+          '',
+          (gltf) => {
+            onSuccess(gltf.scene as unknown as THREE.Group);
+          },
+          (parseErr) => {
+            console.warn(`[GLTFLoader] Remote parse error for ${modelKey}, trying bundled fallback:`, parseErr);
+            tryBundledFallback();
+          }
+        );
+        return;
+      }
+    } catch (fetchErr) {
+      console.warn(`[GLTFLoader] Remote fetch failed for ${remoteUrl}, trying bundled fallback:`, fetchErr);
+    }
+  }
+
+  // Fallback to bundled asset
+  await tryBundledFallback();
+}
 
 function buildSticker(color: string): THREE.Group {
   const group = new THREE.Group();
@@ -146,6 +246,17 @@ export function Product3DPreview({
     if (clean === 'mugs' || clean === 'coffee_mugs' || clean === 'coffee_cup') return 'coffee_cup';
     if (clean === 'mug') return 'mug';
     if (clean === 'bag') return 'tote';
+    if (
+      clean === 'tshirt' ||
+      clean === 't-shirt' ||
+      clean === 'tshirts' ||
+      clean === 'apparel' ||
+      clean === 'tees' ||
+      clean === 'tee' ||
+      clean === 'shirt'
+    ) {
+      return 'shirt';
+    }
     return clean;
   };
 
@@ -629,34 +740,29 @@ export function Product3DPreview({
     if (isVessel) {
       finishVessel();
     } else if (isShirt) {
-      if (glbUrl) {
-        setLoading(true);
-        new GLTFLoader().load(
-          glbUrl,
-          (gltf) => {
-            finishShirtFromGLB(gltf.scene as unknown as THREE.Group);
-            setLoading(false);
-          },
-          undefined,
-          (_err) => {
-            // GLB not available — fall back to flat sticker preview silently
-            finish(buildSticker(activeColor));
-            setLoading(false);
-          }
-        );
-      } else {
-        finish(buildSticker(activeColor));
-        setLoading(false);
-      }
-    } else if (resolvedViewerType === 'tote' && glbUrl) {
       setLoading(true);
-      new GLTFLoader().load(
+      loadGLTFModel(
         glbUrl,
-        (gltf) => {
-          finish(gltf.scene);
+        'shirt',
+        (sceneGroup) => {
+          finishShirtFromGLB(sceneGroup);
           setLoading(false);
         },
-        undefined,
+        (err) => {
+          console.warn('[Product3DPreview] Shirt 3D model failed to load:', err);
+          setLoadError('Could not load 3D shirt model.');
+          setLoading(false);
+        }
+      );
+    } else if (resolvedViewerType === 'tote') {
+      setLoading(true);
+      loadGLTFModel(
+        glbUrl,
+        'tote',
+        (sceneGroup) => {
+          finish(sceneGroup);
+          setLoading(false);
+        },
         () => {
           finishBag();
         }
@@ -665,20 +771,49 @@ export function Product3DPreview({
       finishBag();
     } else if (isPin && !glbUrl) {
       finishPin();
-    } else if (glbUrl) {
+    } else if (isPin && glbUrl) {
       setLoading(true);
-      new GLTFLoader().load(
+      loadGLTFModel(
         glbUrl,
-        (gltf) => {
-          finish(gltf.scene);
+        'pin',
+        (sceneGroup) => {
+          finish(sceneGroup);
           setLoading(false);
         },
-        undefined,
+        () => {
+          finishPin();
+        }
+      );
+    } else if (resolvedViewerType === 'calendar') {
+      setLoading(true);
+      loadGLTFModel(
+        glbUrl,
+        'calendar',
+        (sceneGroup) => {
+          finish(sceneGroup);
+          setLoading(false);
+        },
+        () => {
+          setLoadError('Could not load 3D calendar model.');
+          setLoading(false);
+        }
+      );
+    } else if (resolvedViewerType === 'sticker') {
+      finish(buildSticker(activeColor));
+      setLoading(false);
+    } else if (glbUrl) {
+      setLoading(true);
+      loadGLTFModel(
+        glbUrl,
+        resolvedViewerType,
+        (sceneGroup) => {
+          finish(sceneGroup);
+          setLoading(false);
+        },
         (err) => {
           console.warn('[Product3DPreview] GLTF load error:', err);
           setLoadError('Could not load 3D model.');
           setLoading(false);
-          finish(buildSticker(activeColor));
         }
       );
     } else {

@@ -202,9 +202,22 @@ export default function HomeScreen() {
   };
 
   const handleFeaturedPress = (item: FeaturedItem) => {
-    const isMug = item.name.toLowerCase().includes('mug') || item.name.toLowerCase().includes('tumbler');
-    const isPin = item.name.toLowerCase().includes('pin');
-    if (isMug) {
+    const nameLower = item.name.toLowerCase();
+    const isMug = nameLower.includes('mug') || nameLower.includes('tumbler');
+    const isPin = nameLower.includes('pin');
+    const isShirt = nameLower.includes('shirt') || nameLower.includes('tee') || nameLower.includes('apparel');
+
+    if (isShirt) {
+      router.push({
+        pathname: '/mug-3d',
+        params: {
+          name: item.name,
+          price: item.price,
+          viewer_type: 'shirt',
+          category: 'apparel',
+        },
+      } as any);
+    } else if (isMug) {
       router.push('/mug-3d' as any);
     } else if (isPin) {
       router.push('/pin-3d' as any);

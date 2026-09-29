@@ -50,27 +50,20 @@ export interface ApiPrintItem {
  * No hardcoded IPs — update your .env file to change the server address.
  */
 export function getApiBaseUrls(): string[] {
-  const envUrl  = process.env.EXPO_PUBLIC_API_URL;
-  const envHost = process.env.EXPO_PUBLIC_API_HOST;
-  const envPort = process.env.EXPO_PUBLIC_API_PORT || '8081';
+  const envUrl  = process.env.EXPO_PUBLIC_API_URL?.trim();
+  const envHost = process.env.EXPO_PUBLIC_API_HOST?.trim();
+  const envPort = process.env.EXPO_PUBLIC_API_PORT?.trim();
 
   const urls: string[] = [];
 
   if (envUrl) {
-    // Full URL wins: strip trailing slash
-    urls.push(envUrl.replace(/\/$/, ''));
+    urls.push(envUrl.replace(/\/+$/, ''));
+  } else if (envHost) {
+    const cleanHost = envHost.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const port = envPort ? `:${envPort}` : '';
+    urls.push(`http://${cleanHost}${port}`);
   }
 
-  if (envHost) {
-    const cleanHost = envHost.replace(/^https?:\/\//, '').replace(/\/$/, '');
-    // Primary port from env
-    urls.push(`http://${cleanHost}:${envPort}`);
-    // Also probe the backend port (8082) in case API and admin are on different ports
-    if (envPort !== '8082') urls.push(`http://${cleanHost}:8082`);
-    if (envPort !== '8081') urls.push(`http://${cleanHost}:8081`);
-  }
-
-  // Deduplicate & drop blanks — NO hardcoded fallback IPs
   return Array.from(new Set(urls.filter(Boolean)));
 }
 
