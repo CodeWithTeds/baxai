@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -20,7 +21,9 @@ import {
   CustomizationPlacement,
   getProductPlacementOptions,
 } from '@/components/3d/model-customizer';
+import { CartHeaderButton } from '@/components/cart-header-button';
 import { BrandColors } from '@/constants/theme';
+import { useCart } from '@/contexts/cart-context';
 import { useLanguage } from '@/contexts/language-context';
 
 export const FONT_STYLES = [
@@ -449,8 +452,20 @@ export default function Mug3DScreen() {
   const [wrapRotation, setWrapRotation] = useState(0); // 0 to 360 degrees
   const [flipH, setFlipH] = useState(false);
   const [flipV, setFlipV] = useState(false);
+  const { addItem } = useCart();
   const [customImageUri, setCustomImageUri] = useState<string | null>(null);
   const [pickingImage, setPickingImage] = useState(false);
+
+  const hasDesign = Boolean(customText.trim() || customImageUri);
+  const currentPlacementOption =
+    placementConfig.options.find((o) => o.id === placement) || placementConfig.options[0];
+
+  const rawPriceStr = String(price || '99.00').replace(/[^0-9.]/g, '');
+  const basePriceNum = parseFloat(rawPriceStr) || 99.00;
+  const rawAddonStr = String(params.customization_addon_price || '0').replace(/[^0-9.]/g, '');
+  const addonPriceNum = hasDesign ? (parseFloat(rawAddonStr) || 0) : 0;
+  const stockNum = parseInt(String(stock), 10) || 30;
+  const displayTotal = `₱${(basePriceNum + addonPriceNum).toFixed(2)}`;
 
   // ─── Image picker ─────────────────────────────────────────────────────────
   const handlePickLogo = async () => {
@@ -503,8 +518,52 @@ export default function Mug3DScreen() {
     }
   };
 
-  const hasDesign = customText.trim().length > 0 || !!customImageUri;
-  const currentPlacementOption = placementConfig.options.find((o) => o.id === placement) || placementConfig.options[0];
+  const handleAddToCart = () => {
+    if (stockNum <= 0) {
+      Alert.alert('Out of Stock', 'Sorry, this product is currently out of stock.');
+      return;
+    }
+    const maxLen = params.max_text_length ? parseInt(String(params.max_text_length), 10) : 300;
+    if (customText.length > maxLen) {
+      Alert.alert('Text Limit Exceeded', `Custom text must be at most ${maxLen} characters (currently ${customText.length}).`);
+      return;
+    }
+
+    const unitPrice = Number((basePriceNum + addonPriceNum).toFixed(2));
+    addItem({
+      productId: params.id || sku || name,
+      name,
+      category,
+      sku: sku || undefined,
+      bannerImage: params.thumbnail || params.fallback_image || null,
+      viewerType,
+      basePrice: basePriceNum,
+      addonPrice: addonPriceNum,
+      unitPrice,
+      quantity: 1,
+      totalPrice: unitPrice,
+      selectedColor,
+      selectedColorName: selectedColorObj?.label || selectedColor,
+      customization: {
+        text: customText.trim() || undefined,
+        fontFamily: selectedFont,
+        textColor: selectedTextColor,
+        fontSize: customFontSize,
+        imageUri: customImageUri || undefined,
+        rotation: designRotation,
+        flipH,
+        flipV,
+        placement,
+      },
+      stockQuantity: stockNum,
+    });
+
+    router.push('/cart');
+  };
+
+  const selectedColorObj = PRODUCT_BODY_COLORS.find(
+    (c) => c.hex.toLowerCase() === selectedColor.toLowerCase()
+  );
 
   return (
     <View style={styles.root}>
@@ -521,11 +580,7 @@ export default function Mug3DScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           3D Customizer — {name}
         </Text>
-        <Pressable
-          onPress={() => router.push('/(tabs)/services' as any)}
-          style={({ pressed }) => [styles.headerBtn, { backgroundColor: '#EFF6FF' }, pressed && { opacity: 0.6 }]}>
-          <Ionicons name="bag-outline" size={20} color={BrandColors.primary} />
-        </Pressable>
+        <CartHeaderButton tintColor="#111827" />
       </View>
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -1085,10 +1140,10 @@ export default function Mug3DScreen() {
           <View style={styles.actionsRow}>
             <View>
               <Text style={styles.priceLabel}>Total Price</Text>
-              <Text style={styles.priceValue}>{price}</Text>
+              <Text style={styles.priceValue}>{displayTotal}</Text>
             </View>
             <Pressable
-              onPress={() => alert(`Customized ${name} (${price}) added to cart!`)}
+              onPress={handleAddToCart}
               style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.9 }]}>
               <Text style={styles.addBtnText}>Add to Cart</Text>
               <Ionicons name="cart-outline" size={18} color="#fff" />

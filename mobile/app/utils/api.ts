@@ -9,13 +9,31 @@ export interface ApiProduct {
   status?: string;
   base_price?: string | number;
   compare_at_price?: string | number;
+  unit?: string;
+  sku?: string;
+  stock_quantity?: number;
+  low_stock_alert_at?: number | null;
+  is_low_stock?: boolean;
+  track_inventory?: boolean;
   thumbnail?: string | null;
+  gallery_images?: string[];
   fallback_image?: string | null;
   has_3d_preview?: boolean;
   is_customizable?: boolean;
   viewer_type?: string;
-  sku?: string;
-  stock_quantity?: number;
+  model_3d_url?: string | null;
+  allow_color_change?: boolean;
+  available_colors?: string[];
+  allow_custom_text?: boolean;
+  max_text_length?: number;
+  allow_image_upload?: boolean;
+  print_method?: string | null;
+  print_size?: string | null;
+  customization_addon_price?: string | number;
+  has_variants?: boolean;
+  is_featured_home?: boolean;
+  is_featured_services?: boolean;
+  sort_order?: number;
 }
 
 export interface ApiPrintItem {

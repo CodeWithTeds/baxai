@@ -36,6 +36,12 @@ export interface FeaturedItem {
   rating: string;
   reviews: string;
   is3D?: boolean;
+  sku?: string;
+  stock?: number;
+  viewerType?: string;
+  category?: string;
+  customizationAddonPrice?: number | string;
+  maxTextLength?: number;
 }
 
 function getProductImage(item: { thumbnail?: string | null; fallback_image?: string | null; name: string; category?: string }): any {
@@ -114,6 +120,12 @@ export default function HomeScreen() {
           rating: '4.9',
           reviews: '180',
           is3D,
+          sku: p.sku,
+          stock: p.stock_quantity,
+          viewerType: p.viewer_type,
+          category: p.category,
+          customizationAddonPrice: p.customization_addon_price,
+          maxTextLength: p.max_text_length,
         });
       });
 
@@ -129,6 +141,10 @@ export default function HomeScreen() {
           rating: '4.8',
           reviews: '95',
           is3D,
+          sku: pi.item_code,
+          stock: 50,
+          viewerType: pi.name.toLowerCase().includes('pin') ? 'pin_cloud' : 'coffee_cup',
+          category: pi.category?.name,
         });
       });
 
@@ -204,24 +220,38 @@ export default function HomeScreen() {
 
   const handleFeaturedPress = (item: FeaturedItem) => {
     const nameLower = item.name.toLowerCase();
-    const isMug = nameLower.includes('mug') || nameLower.includes('tumbler');
-    const isPin = nameLower.includes('pin');
-    const isShirt = nameLower.includes('shirt') || nameLower.includes('tee') || nameLower.includes('apparel');
+    const vType = (item.viewerType || '').toLowerCase();
+    const catLower = (item.category || '').toLowerCase();
+    const isPin = vType.includes('pin') || catLower.includes('pin') || nameLower.includes('pin');
+    const isShirt =
+      vType.includes('shirt') ||
+      catLower.includes('shirt') ||
+      catLower.includes('apparel') ||
+      nameLower.includes('shirt') ||
+      nameLower.includes('tee');
 
-    if (isShirt) {
+    const defaultViewerType = isShirt
+      ? 'shirt'
+      : isPin
+      ? 'pin_cloud'
+      : 'coffee_cup';
+
+    if (item.is3D || isPin || isShirt || nameLower.includes('mug')) {
+      const targetRoute = isPin ? '/pin-3d' : '/mug-3d';
       router.push({
-        pathname: '/mug-3d',
+        pathname: targetRoute,
         params: {
+          id: item.id,
           name: item.name,
           price: item.price,
-          viewer_type: 'shirt',
-          category: 'apparel',
+          sku: item.sku || '',
+          stock: item.stock !== undefined ? String(item.stock) : '30',
+          viewer_type: item.viewerType || defaultViewerType,
+          category: item.category || (isShirt ? 'apparel' : isPin ? 'pins' : 'mugs'),
+          customization_addon_price: item.customizationAddonPrice !== undefined ? String(item.customizationAddonPrice) : undefined,
+          max_text_length: item.maxTextLength !== undefined ? String(item.maxTextLength) : undefined,
         },
       } as any);
-    } else if (isMug) {
-      router.push('/mug-3d' as any);
-    } else if (isPin) {
-      router.push('/pin-3d' as any);
     } else {
       const cat = getCategoryForItem(item);
       router.push({

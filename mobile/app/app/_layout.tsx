@@ -10,6 +10,7 @@ import { LogBox } from 'react-native';
 
 import { AuthProvider } from '@/contexts/auth-context';
 import { LanguageProvider } from '@/contexts/language-context';
+import { CartProvider } from '@/contexts/cart-context';
 
 // Silence noisy but harmless warnings:
 // - Reanimated opacity layout conflict (FadeIn + opacity style)
@@ -78,18 +79,21 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <LanguageProvider>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false, animation: 'fade' }} />
-            <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
-            <Stack.Screen name="register" options={{ headerShown: false, animation: 'slide_from_right' }} />
-            <Stack.Screen name="login" options={{ headerShown: false, animation: 'slide_from_right' }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="order/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
-            <Stack.Screen name="mug-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
-            <Stack.Screen name="pin-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </Stack>
-          <StatusBar style="auto" />
+          <CartProvider>
+            <Stack>
+              <Stack.Screen name="index" options={{ headerShown: false, animation: 'fade' }} />
+              <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
+              <Stack.Screen name="register" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="login" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="order/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="mug-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="pin-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="cart" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            </Stack>
+            <StatusBar style="auto" />
+          </CartProvider>
         </LanguageProvider>
       </AuthProvider>
     </SafeAreaProvider>

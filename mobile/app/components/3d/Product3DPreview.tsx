@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   PanResponder,
@@ -177,6 +177,49 @@ function buildSticker(color: string): THREE.Group {
   return group;
 }
 
+function createProduct3DPanResponder(
+  stateRef: React.MutableRefObject<{
+    rotY: number;
+    rotX: number;
+    dragging: boolean;
+    lastX: number;
+    lastY: number;
+  }>,
+  prevDx: React.MutableRefObject<number>,
+  prevDy: React.MutableRefObject<number>
+) {
+  return PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      stateRef.current.dragging = true;
+      prevDx.current = 0;
+      prevDy.current = 0;
+    },
+    onPanResponderMove: (_, gestureState) => {
+      const dx = gestureState.dx - prevDx.current;
+      const dy = gestureState.dy - prevDy.current;
+      stateRef.current.rotY += dx * 0.012;
+      stateRef.current.rotX = Math.max(
+        -0.4,
+        Math.min(0.6, stateRef.current.rotX + dy * 0.008)
+      );
+      prevDx.current = gestureState.dx;
+      prevDy.current = gestureState.dy;
+    },
+    onPanResponderRelease: () => {
+      stateRef.current.dragging = false;
+      prevDx.current = 0;
+      prevDy.current = 0;
+    },
+    onPanResponderTerminate: () => {
+      stateRef.current.dragging = false;
+      prevDx.current = 0;
+      prevDy.current = 0;
+    },
+  });
+}
+
 export interface Product3DPreviewProps {
   viewerType: string;
   label?: string;
@@ -266,7 +309,6 @@ export function Product3DPreview({
   const groupRef = useRef<THREE.Group | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rafRef = useRef<number | null>(null);
-  const isShirtRef = useRef(false);
   const decalGroupRef = useRef<THREE.Group | null>(null);
   const shadowDiscRef = useRef<THREE.Mesh | null>(null);
   const modelBoxRef = useRef<THREE.Box3 | null>(null);
@@ -298,7 +340,6 @@ export function Product3DPreview({
   const isBag = isBagType(resolvedViewerType);
   const isShirt = isShirtType(resolvedViewerType);
   const isPin = isPinType(resolvedViewerType);
-  isShirtRef.current = isShirt;
 
   const canTint = TINTABLE.has(resolvedViewerType) || isVessel || isBag || isShirt || isPin;
 
@@ -1177,38 +1218,7 @@ export function Product3DPreview({
   const prevDx = useRef(0);
   const prevDy = useRef(0);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        stateRef.current.dragging = true;
-        prevDx.current = 0;
-        prevDy.current = 0;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        const dx = gestureState.dx - prevDx.current;
-        const dy = gestureState.dy - prevDy.current;
-        stateRef.current.rotY += dx * 0.012;
-        stateRef.current.rotX = Math.max(
-          -0.4,
-          Math.min(0.6, stateRef.current.rotX + dy * 0.008)
-        );
-        prevDx.current = gestureState.dx;
-        prevDy.current = gestureState.dy;
-      },
-      onPanResponderRelease: () => {
-        stateRef.current.dragging = false;
-        prevDx.current = 0;
-        prevDy.current = 0;
-      },
-      onPanResponderTerminate: () => {
-        stateRef.current.dragging = false;
-        prevDx.current = 0;
-        prevDy.current = 0;
-      },
-    })
-  ).current;
+  const [panResponder] = useState(() => createProduct3DPanResponder(stateRef, prevDx, prevDy));
 
   const resetToFront = () => {
     stateRef.current.rotY = 0;

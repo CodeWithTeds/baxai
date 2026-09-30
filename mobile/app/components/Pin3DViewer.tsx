@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
@@ -249,6 +249,47 @@ function buildRoundButtonPin(capMat: THREE.Material, rimMat: THREE.Material, bac
   return g;
 }
 
+function createPin3DPanResponder(
+  isDraggingRef: React.MutableRefObject<boolean>,
+  prevDxRef: React.MutableRefObject<number>,
+  autoRotateSpeedRef: React.MutableRefObject<number>,
+  pinGroupRef: React.MutableRefObject<THREE.Group | null>
+) {
+  return PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      isDraggingRef.current = true;
+      prevDxRef.current = 0;
+      autoRotateSpeedRef.current = 0;
+    },
+    onPanResponderMove: (_, g) => {
+      const dx = g.dx - prevDxRef.current;
+      prevDxRef.current = g.dx;
+      if (pinGroupRef.current) {
+        pinGroupRef.current.rotation.y += dx * 0.012;
+        pinGroupRef.current.rotation.x = Math.max(
+          0.05,
+          Math.min(1.15, pinGroupRef.current.rotation.x - g.vy * 0.004)
+        );
+      }
+    },
+    onPanResponderRelease: (_, g) => {
+      isDraggingRef.current = false;
+      prevDxRef.current = 0;
+      const vx = g.vx;
+      autoRotateSpeedRef.current = Math.max(-0.025, Math.min(0.025, vx * 0.015 || 0.006));
+      if (Math.abs(autoRotateSpeedRef.current) < 0.002) autoRotateSpeedRef.current = 0.006;
+      setTimeout(() => (autoRotateSpeedRef.current = 0.006), 900);
+    },
+    onPanResponderTerminate: () => {
+      isDraggingRef.current = false;
+      prevDxRef.current = 0;
+      autoRotateSpeedRef.current = 0.006;
+    },
+  });
+}
+
 // ─── Reusable viewer ───────────────────────────────────────────────────────
 type Props = {
   shape: PinShape;
@@ -268,7 +309,9 @@ export function Pin3DViewer({ shape, color, height = 380, autoRotate = true, onL
   const autoRotateSpeedRef = useRef(0.006);
 
   const shapeRef = useRef(shape);
-  shapeRef.current = shape;
+  useEffect(() => {
+    shapeRef.current = shape;
+  }, [shape]);
 
   const buildPinMesh = useCallback((currentShape: PinShape) => {
     const capMat = new THREE.MeshStandardMaterial({
@@ -426,38 +469,9 @@ export function Pin3DViewer({ shape, color, height = 380, autoRotate = true, onL
     };
   }, []);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        isDraggingRef.current = true;
-        prevDxRef.current = 0;
-        autoRotateSpeedRef.current = 0;
-      },
-      onPanResponderMove: (_, g) => {
-        const dx = g.dx - prevDxRef.current;
-        prevDxRef.current = g.dx;
-        if (pinGroupRef.current) {
-          pinGroupRef.current.rotation.y += dx * 0.012;
-          pinGroupRef.current.rotation.x = Math.max(0.05, Math.min(1.15, pinGroupRef.current.rotation.x - g.vy * 0.004));
-        }
-      },
-      onPanResponderRelease: (_, g) => {
-        isDraggingRef.current = false;
-        prevDxRef.current = 0;
-        const vx = g.vx;
-        autoRotateSpeedRef.current = Math.max(-0.025, Math.min(0.025, vx * 0.015 || 0.006));
-        if (Math.abs(autoRotateSpeedRef.current) < 0.002) autoRotateSpeedRef.current = 0.006;
-        setTimeout(() => (autoRotateSpeedRef.current = 0.006), 900);
-      },
-      onPanResponderTerminate: () => {
-        isDraggingRef.current = false;
-        prevDxRef.current = 0;
-        autoRotateSpeedRef.current = 0.006;
-      },
-    })
-  ).current;
+  const [panResponder] = useState(() =>
+    createPin3DPanResponder(isDraggingRef, prevDxRef, autoRotateSpeedRef, pinGroupRef)
+  );
 
   const isMouseDownRef = useRef(false);
   const lastMouseXRef = useRef(0);

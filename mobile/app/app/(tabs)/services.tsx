@@ -44,6 +44,12 @@ export type ServiceItem = {
   stock?: number;
   sku?: string;
   viewerType?: string;
+  customizationAddonPrice?: number | string;
+  maxTextLength?: number;
+  allowImageUpload?: boolean;
+  allowCustomText?: boolean;
+  allowColorChange?: boolean;
+  availableColors?: string[];
 };
 
 export type CategoryCardItem = {
@@ -280,6 +286,12 @@ export default function ServicesScreen() {
             stock: p.stock_quantity ?? 30,
             sku: p.sku || '',
             viewerType: vType,
+            customizationAddonPrice: p.customization_addon_price,
+            maxTextLength: p.max_text_length,
+            allowImageUpload: p.allow_image_upload,
+            allowCustomText: p.allow_custom_text,
+            allowColorChange: p.allow_color_change,
+            availableColors: p.available_colors,
             image: getProductImage(p),
             badge: p.badge || (p.stock_quantity !== undefined ? `Stock: ${p.stock_quantity}` : 'Customizable'),
             badgeColor: p.badge ? BrandColors.primary : '#059669',
@@ -383,6 +395,7 @@ export default function ServicesScreen() {
     router.push({
       pathname: targetRoute,
       params: {
+        id: item.id,
         name: item.name,
         price: item.price,
         sku: item.sku || '',
@@ -390,6 +403,8 @@ export default function ServicesScreen() {
         viewer_type: item.viewerType || defaultViewerType,
         category: item.category || (isShirt ? 'apparel' : isPin ? 'pins' : 'mugs'),
         description: item.description || '',
+        customization_addon_price: item.customizationAddonPrice !== undefined ? String(item.customizationAddonPrice) : undefined,
+        max_text_length: item.maxTextLength !== undefined ? String(item.maxTextLength) : undefined,
       },
     } as any);
   };

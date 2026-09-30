@@ -2,15 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { BrandColors } from '@/constants/theme';
 import { PIN_SHAPES, Pin3DViewer, type PinShape } from '@/components/Pin3DViewer';
-import { useLanguage } from '@/contexts/language-context';
+import { CartHeaderButton } from '@/components/cart-header-button';
+import { useCart } from '@/contexts/cart-context';
 
 export default function Pin3DScreen() {
   const router = useRouter();
+  const { addItem } = useCart();
   const params = useLocalSearchParams<{
     name?: string;
     price?: string;
@@ -19,6 +21,9 @@ export default function Pin3DScreen() {
     viewer_type?: string;
     category?: string;
     description?: string;
+    customization_addon_price?: string;
+    thumbnail?: string;
+    fallback_image?: string;
   }>();
 
   const name = params.name || 'Button Pins';
@@ -28,6 +33,12 @@ export default function Pin3DScreen() {
   const viewerType = (params.viewer_type || 'pin_cloud').toLowerCase();
   const category = params.category || 'pins';
   const description = params.description || 'Durable metal button pin with soft enamel finish.';
+
+  const rawPriceStr = String(price || '99.00').replace(/[^0-9.]/g, '');
+  const basePriceNum = parseFloat(rawPriceStr) || 99.00;
+  const rawAddonStr = String(params.customization_addon_price || '0').replace(/[^0-9.]/g, '');
+  const addonPriceNum = parseFloat(rawAddonStr) || 0;
+  const stockNum = parseInt(String(stock), 10) || 30;
 
   const initialShape: PinShape = viewerType.includes('cloud')
     ? 'rounded'
@@ -44,6 +55,35 @@ export default function Pin3DScreen() {
 
   const active = PIN_SHAPES.find((p) => p.id === shape) ?? PIN_SHAPES[0];
 
+  const handleAddToCart = () => {
+    if (stockNum <= 0) {
+      Alert.alert('Out of Stock', 'Sorry, this pin is currently out of stock.');
+      return;
+    }
+
+    const unitPrice = Number((basePriceNum + addonPriceNum).toFixed(2));
+    addItem({
+      productId: sku || name,
+      name,
+      category,
+      sku: sku || undefined,
+      bannerImage: params.thumbnail || params.fallback_image || null,
+      viewerType: `pin_${shape}`,
+      basePrice: basePriceNum,
+      addonPrice: addonPriceNum,
+      unitPrice,
+      quantity: 1,
+      totalPrice: unitPrice,
+      selectedSize: active.label,
+      customization: {
+        placement: active.label,
+      },
+      stockQuantity: stockNum,
+    });
+
+    router.push('/cart');
+  };
+
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
@@ -54,9 +94,7 @@ export default function Pin3DScreen() {
           <Ionicons name="chevron-back" size={22} color="#111827" />
         </Pressable>
         <Text style={styles.headerTitle}>{name}</Text>
-        <Pressable onPress={() => router.push('/(tabs)/services' as any)} style={({ pressed }) => [styles.headerCart, pressed && { opacity: 0.6 }]}>
-          <Ionicons name="bag-outline" size={20} color={BrandColors.primary} />
-        </Pressable>
+        <CartHeaderButton tintColor="#111827" />
       </View>
 
       {/* 3D Stage */}
@@ -146,9 +184,9 @@ export default function Pin3DScreen() {
             <Text style={styles.price}>{price}</Text>
           </View>
           <Pressable
-            onPress={() => alert(`Added ${name} (${price}) to cart!`)}
+            onPress={handleAddToCart}
             style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }]}>
-            <Text style={styles.primaryText}>Add to Order</Text>
+            <Text style={styles.primaryText}>Add to Cart</Text>
             <Ionicons name="cart-outline" size={18} color="#fff" />
           </Pressable>
         </View>

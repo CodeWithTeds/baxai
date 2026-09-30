@@ -7,6 +7,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { BrandColors } from '@/constants/theme';
 import { useLanguage } from '@/contexts/language-context';
 import ProfileModal from '@/components/profile-modal';
+import { CartHeaderButton } from '@/components/cart-header-button';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,8 @@ interface ScreenHeaderProps {
   title?: string;
   /** Hide the search bar entirely */
   hideSearch?: boolean;
+  /** Hide the cart button */
+  hideCart?: boolean;
   /** Placeholder text inside the search input */
   searchPlaceholder?: string;
   /** Current search value */
@@ -34,6 +37,7 @@ interface ScreenHeaderProps {
 export default function ScreenHeader({
   title = 'NUYDA ENTERPRISE',
   hideSearch = false,
+  hideCart = false,
   searchPlaceholder,
   searchValue,
   onSearchChange,
@@ -64,9 +68,12 @@ export default function ScreenHeader({
 
           <Text style={styles.brandName}>{title}</Text>
 
-          <Pressable hitSlop={8} style={styles.avatarBtn} onPress={handleAvatarPress}>
-            <Ionicons name="person-circle-outline" size={32} color={BrandColors.primary} />
-          </Pressable>
+          <View style={styles.rightActions}>
+            {!hideCart && <CartHeaderButton tintColor={BrandColors.primary} />}
+            <Pressable hitSlop={8} style={styles.avatarBtn} onPress={handleAvatarPress}>
+              <Ionicons name="person-circle-outline" size={32} color={BrandColors.primary} />
+            </Pressable>
+          </View>
         </View>
       </SafeAreaView>
 
@@ -122,6 +129,11 @@ const styles = StyleSheet.create({
   },
   avatarBtn: {
     padding: 2,
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   searchWrap: {
     flexDirection: 'row',
