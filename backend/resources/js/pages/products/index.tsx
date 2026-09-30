@@ -464,7 +464,6 @@ export default function ProductsIndex({
                                             viewerType={p.viewer_type}
                                             label={p.name}
                                             modelUrl={p.model_3d_url ?? ''}
-                                            designImageUrl={p.thumbnail ?? ''}
                                             minimal
                                             onPreviewClick={() => setViewId(p.id)}
                                         />

@@ -29,13 +29,15 @@ class ProductResource extends JsonResource
             'low_stock_alert_at' => $this->low_stock_alert_at,
             'is_low_stock' => $this->when(! is_null($this->low_stock_alert_at), $this->is_low_stock),
             'track_inventory' => $this->track_inventory,
-            'thumbnail' => $this->thumbnail,
-            'gallery_images' => $this->gallery_images,
+            'thumbnail' => $this->resolveImageUrl($this->thumbnail),
+            'gallery_images' => is_array($this->gallery_images)
+                ? array_map(fn ($img) => is_string($img) ? $this->resolveImageUrl($img) : $img, $this->gallery_images)
+                : $this->gallery_images,
             'has_3d_preview' => $this->has_3d_preview,
             'is_customizable' => $this->is_customizable,
             'viewer_type' => $this->viewer_type,
             'model_3d_url' => $this->model_3d_url,
-            'fallback_image' => $this->fallback_image,
+            'fallback_image' => $this->resolveImageUrl($this->fallback_image),
             'allow_color_change' => $this->allow_color_change,
             'available_colors' => $this->available_colors,
             'allow_custom_text' => $this->allow_custom_text,
@@ -51,5 +53,18 @@ class ProductResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
+    }
+
+    protected function resolveImageUrl(?string $path): ?string
+    {
+        if (empty($path)) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, 'data:')) {
+            return $path;
+        }
+
+        return url($path);
     }
 }

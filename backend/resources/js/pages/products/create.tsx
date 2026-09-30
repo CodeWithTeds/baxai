@@ -22,6 +22,7 @@ import { ShirtFlatIcon } from '@/components/shirt-flat';
 import Product3DPreview from '@/components/product-3d-preview';
 import { VESSEL_VIEWERS } from '@/components/vessel-builder';
 import { cn } from '@/lib/utils';
+import { Check, Trash2, Upload } from 'lucide-react';
 
 const CATEGORIES = [
     { value: 'mugs', label: 'Mugs' },
@@ -166,6 +167,9 @@ export function ProductForm({
 any) {
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState('');
+    const [previewUrl, setPreviewUrl] = useState<string>(initial?.thumbnail || data.thumbnail || '');
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const errorBoxRef = useRef<HTMLDivElement>(null);
     const errorEntries = Object.entries((errors ?? {}) as Record<string, string>);
@@ -176,6 +180,22 @@ any) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [errors]);
 
+    // Keep preview in sync if initial thumbnail changes
+    useEffect(() => {
+        if (initial?.thumbnail && !previewUrl) {
+            setPreviewUrl(initial.thumbnail);
+        }
+    }, [initial]);
+
+    // Cleanup created blob URLs on unmount
+    useEffect(() => {
+        return () => {
+            if (previewUrl && previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(previewUrl);
+            }
+        };
+    }, [previewUrl]);
+
     // Auto-generate SKU on create when name is typed and SKU is still empty
     useEffect(() => {
         if (initial) return;
@@ -185,6 +205,25 @@ any) {
         setData('sku', next as never);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.name, data.category]);
+
+    const handleFileSelect = (file: File) => {
+        setData('reference_image', file as never);
+        const objectUrl = URL.createObjectURL(file);
+        setPreviewUrl(objectUrl);
+    };
+
+    const handleRemoveImage = () => {
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(previewUrl);
+        }
+        setData('reference_image', null as never);
+        setData('thumbnail', '' as never);
+        setData('fallback_image', '' as never);
+        setPreviewUrl('');
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
 
     const generateWithAi = async () => {
         if (!data.name?.trim()) {
@@ -254,7 +293,7 @@ any) {
             )}
 
             <div className="grid items-start gap-3 xl:grid-cols-2">
-                {/* LEFT — basic + pricing */}
+                {/* LEFT — basic + picture + pricing */}
                 <div className="space-y-3">
                     <Section title="Basic info">
                         <button
@@ -289,7 +328,7 @@ any) {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {CATEGORIES.map((c) => (
-                                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                             <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -330,6 +369,114 @@ any) {
                         </div>
                     </Section>
 
+                    <Section title="Product banner / picture (Mobile App)">
+                        <div className="space-y-2.5">
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/jpg"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleFileSelect(file);
+                                }}
+                            />
+
+                            {previewUrl ? (
+                                <div className="rounded-lg border border-[#E5E7EB] bg-[#F8F9FC] p-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-[#E5E7EB] bg-white">
+                                            <img
+                                                src={previewUrl}
+                                                alt="Product banner preview"
+                                                className="h-full w-full object-contain"
+                                            />
+                                        </div>
+                                        <div className="min-w-0 flex-1 space-y-1">
+                                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
+                                                <Check size={13} className="shrink-0" />
+                                                <span>Banner / Picture ready for mobile app display</span>
+                                            </div>
+                                            <p className="truncate text-[10px] text-[#6B7280]">
+                                                {data.reference_image?.name ? data.reference_image.name : previewUrl}
+                                            </p>
+                                            <div className="flex gap-2 pt-1">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-7 px-2.5 text-[11px] font-normal"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                >
+                                                    <Upload size={12} className="mr-1.5" /> Change picture
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-7 px-2.5 text-[11px] font-normal text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                    onClick={handleRemoveImage}
+                                                >
+                                                    <Trash2 size={12} className="mr-1.5" /> Remove
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        setIsDragging(true);
+                                    }}
+                                    onDragLeave={() => setIsDragging(false)}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        setIsDragging(false);
+                                        const file = e.dataTransfer.files?.[0];
+                                        if (file) handleFileSelect(file);
+                                    }}
+                                    className={cn(
+                                        'flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-4 text-center transition-colors',
+                                        isDragging
+                                            ? 'border-[#1A1C1E] bg-gray-50'
+                                            : 'border-[#D1D5DB] bg-white hover:border-[#9CA3AF] hover:bg-gray-50/50',
+                                    )}
+                                >
+                                    <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4A4E5A]">
+                                        <Upload size={16} />
+                                    </div>
+                                    <p className="text-[11px] font-medium text-[#1A1C1E]">
+                                        Click to upload mobile banner / picture or drag and drop
+                                    </p>
+                                    <p className="mt-0.5 text-[10px] text-[#8A8FA3]">
+                                        PNG, JPG, or WEBP up to 5MB (Used on mobile app cards & banners)
+                                    </p>
+                                </div>
+                            )}
+
+                            {errors.reference_image && <InputError message={errors.reference_image} />}
+                            {errors.thumbnail && <InputError message={errors.thumbnail} />}
+
+                            <div className="pt-1">
+                                <Field label="Or paste image URL (optional)" error={errors.thumbnail}>
+                                    <Input
+                                        value={data.thumbnail && typeof data.thumbnail === 'string' && !data.thumbnail.startsWith('blob:') ? data.thumbnail : ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setData('reference_image', null as never);
+                                            setData('thumbnail', val as never);
+                                            setPreviewUrl(val);
+                                        }}
+                                        placeholder="https://example.com/product-image.jpg"
+                                        className={inputCls}
+                                    />
+                                </Field>
+                            </div>
+                        </div>
+                    </Section>
+
                     <Section title="Pricing & inventory">
                         <div className="grid gap-2 sm:grid-cols-3">
                             <Field label="Base ₱ *" error={errors.base_price}>
@@ -361,7 +508,6 @@ any) {
                             viewerType={data.viewer_type ?? 'none'}
                             label={data.name ?? ''}
                             modelUrl={data.model_3d_url ?? ''}
-                            designImageUrl={data.thumbnail ?? ''}
                         />
                         <div className="mt-3">
                             <Field label="3D vessel / template — plain only, same white layout" error={errors.viewer_type}>

@@ -4,7 +4,8 @@ import { dashboard } from '@/routes';
 import { ProductForm } from './create';
 
 export default function EditProduct({ product }: { product: any }) {
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, post, processing, errors } = useForm({
+        _method: 'put',
         name: product.name ?? '',
         slug: product.slug ?? '',
         category: product.category ?? 'mugs',
@@ -44,7 +45,7 @@ export default function EditProduct({ product }: { product: any }) {
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/products/${product.id}`);
+        post(`/products/${product.id}`);
     };
 
     return (

@@ -35,7 +35,6 @@ export default function ShowProduct({ product }: { product: any }) {
                                         viewerType={product.viewer_type}
                                         label={product.name}
                                         modelUrl={product.model_3d_url}
-                                        designImageUrl={product.thumbnail}
                                     />
                                 </div>
                             )}

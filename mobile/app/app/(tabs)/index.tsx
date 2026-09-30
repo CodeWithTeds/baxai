@@ -38,12 +38,13 @@ export interface FeaturedItem {
   is3D?: boolean;
 }
 
-function getProductImage(item: { thumbnail?: string | null; name: string; category?: string }): any {
-  if (item.thumbnail) {
+function getProductImage(item: { thumbnail?: string | null; fallback_image?: string | null; name: string; category?: string }): any {
+  const img = item.thumbnail || item.fallback_image;
+  if (img) {
     const baseUrl = getApiBaseUrls()[0] ?? '';
-    const uri = item.thumbnail.startsWith('http')
-      ? item.thumbnail
-      : `${baseUrl}${item.thumbnail.startsWith('/') ? '' : '/'}${item.thumbnail}`;
+    const uri = img.startsWith('http')
+      ? img
+      : `${baseUrl}${img.startsWith('/') ? '' : '/'}${img}`;
     return { uri };
   }
   const nameLower = item.name.toLowerCase();

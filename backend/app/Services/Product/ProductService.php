@@ -94,7 +94,7 @@ class ProductService
     {
         if (isset($attributes['reference_image']) && $attributes['reference_image'] instanceof UploadedFile) {
             $path = $attributes['reference_image']->store('products/references', 'public');
-            $url = Storage::url($path);
+            $url = Storage::disk('public')->url($path);
 
             $attributes['thumbnail'] = $url;
             if (empty($attributes['fallback_image'] ?? null)) {
@@ -112,6 +112,14 @@ class ProductService
         if (array_key_exists('is_customizable', $attributes) && ! $attributes['is_customizable']) {
             $attributes['viewer_type'] = 'none';
             $attributes['has_3d_preview'] = false;
+        }
+
+        if (array_key_exists('thumbnail', $attributes) && $attributes['thumbnail'] === '') {
+            $attributes['thumbnail'] = null;
+        }
+
+        if (array_key_exists('fallback_image', $attributes) && $attributes['fallback_image'] === '') {
+            $attributes['fallback_image'] = null;
         }
 
         foreach (['stock_quantity' => 0, 'sort_order' => 0, 'unit' => 'piece'] as $key => $default) {
