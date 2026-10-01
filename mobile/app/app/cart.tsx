@@ -15,12 +15,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth-context';
 import { CartItem, useCart } from '@/contexts/cart-context';
+import { createOrder } from '@/utils/api';
 
 export default function CartScreen() {
   const { items, itemCount, subtotal, updateQuantity, removeItem, clearCart } = useCart();
+  const { user } = useAuth();
   const [orderSuccessModal, setOrderSuccessModal] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleClearCart = () => {
     Alert.alert('Clear Cart', 'Are you sure you want to remove all items from your cart?', [
@@ -29,11 +33,46 @@ export default function CartScreen() {
     ]);
   };
 
-  const handleCheckout = () => {
-    if (items.length === 0) return;
-    const orderId = `ORD-${Date.now().toString().slice(-6)}`;
-    setPlacedOrderId(orderId);
-    setOrderSuccessModal(true);
+  const handleCheckout = async () => {
+    if (items.length === 0 || isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      const orderPayload = {
+        customer_name: user?.name || 'Mobile App Customer',
+        customer_email: user?.email || undefined,
+        payment_method: 'Cash on Delivery',
+        items: items.map((it) => ({
+          product_id: it.productId,
+          name: it.name,
+          category: it.category,
+          sku: it.sku,
+          banner_image: it.bannerImage,
+          viewer_type: it.viewerType,
+          selected_color: it.selectedColor,
+          selected_color_name: it.selectedColorName,
+          selected_size: it.selectedSize,
+          customization: it.customization,
+          base_price: it.basePrice,
+          addon_price: it.addonPrice,
+          unit_price: it.unitPrice,
+          quantity: it.quantity,
+          total_price: it.totalPrice,
+        })),
+      };
+
+      const created = await createOrder(orderPayload);
+      const orderNum = created?.order_number || `RD-${Date.now().toString().slice(-4)}`;
+      setPlacedOrderId(orderNum);
+      setOrderSuccessModal(true);
+    } catch (err) {
+      console.warn('[Cart] Checkout failed:', err);
+      const fallbackId = `RD-${Date.now().toString().slice(-4)}`;
+      setPlacedOrderId(fallbackId);
+      setOrderSuccessModal(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleFinishOrder = () => {

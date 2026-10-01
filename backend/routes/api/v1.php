@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DiscountController as ApiDiscountController;
 use App\Http\Controllers\Api\GroqController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PrintCategoryController;
 use App\Http\Controllers\Api\PrintItemController;
 use App\Http\Controllers\Api\ProductAiController;
@@ -57,6 +58,10 @@ Route::post('customers/bulk-destroy', [CustomerController::class, 'bulkDestroy']
 Route::post('print-items/ai-recognize', [\App\Http\Controllers\Api\PrintItemAiController::class, 'recognize']);
 Route::apiResource('print-items', PrintItemController::class);
 Route::apiResource('print-categories', PrintCategoryController::class);
+
+// Orders API
+Route::apiResource('orders', OrderController::class);
+Route::post('orders/{id}/status', [OrderController::class, 'updateStatus']);
 
 // Discounts & Coupons API
 Route::get('discounts', [ApiDiscountController::class, 'index']);

@@ -1,11 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { Image as ExpoImage } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -13,12 +17,22 @@ import {
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ALL_ORDERS, STATUS_CONFIG, type LineItem, type TrackingStep } from '@/constants/orders-data';
+import {
+  ALL_ORDERS,
+  STATUS_CONFIG,
+  type Order,
+  type OrderStatus,
+  type TrackingStep,
+} from '@/constants/orders-data';
 import { BrandColors } from '@/constants/theme';
+import { useLanguage } from '@/contexts/language-context';
+import { ApiOrder, fetchOrderDetails } from '@/utils/api';
 
 // ─── Tracking timeline ────────────────────────────────────────────────────────
 
 function Timeline({ steps }: { steps: TrackingStep[] }) {
+  if (!steps || steps.length === 0) return null;
+
   return (
     <View style={tl.wrap}>
       {steps.map((step, i) => {
@@ -73,7 +87,7 @@ function Timeline({ steps }: { steps: TrackingStep[] }) {
                 ]}>
                 {step.label}
               </Text>
-              {step.subtitle.length > 0 && (
+              {Boolean(step.subtitle && step.subtitle.length > 0) && (
                 <Text
                   style={[
                     tl.stepSub,
@@ -90,21 +104,73 @@ function Timeline({ steps }: { steps: TrackingStep[] }) {
   );
 }
 
-// ─── Line item row ────────────────────────────────────────────────────────────
+// ─── Dynamic Line item row ────────────────────────────────────────────────────
 
-function LineItemRow({ item }: { item: LineItem }) {
+function DynamicLineItemRow({ item }: { item: any }) {
+  const previewUri = item.banner_image || item.image || item.customization?.imageUri;
+  const unitPriceFormatted = item.price || (item.unit_price ? `₱${Number(item.unit_price).toFixed(2)}` : '₱0.00');
+  const totalPriceFormatted = item.total || (item.total_price ? `₱${Number(item.total_price).toFixed(2)}` : unitPriceFormatted);
+  const qty = item.quantity || item.qty || 1;
+
+  const customization = item.customization || {};
+
   return (
     <View style={li.row}>
       <View style={li.imgWrap}>
-        <Image source={item.image as any} style={li.img} contentFit="cover" />
+        {previewUri ? (
+          <ExpoImage source={{ uri: previewUri }} style={li.img} contentFit="cover" />
+        ) : (
+          <View style={li.fallbackImg}>
+            <Ionicons name="cube" size={28} color="#9CA3AF" />
+          </View>
+        )}
       </View>
       <View style={li.info}>
-        <Text style={li.name}>{item.name}</Text>
-        <Text style={li.spec}>{item.spec}</Text>
+        <Text style={li.name}>{item.name || item.product_name || 'Custom Product'}</Text>
+        {item.sku ? <Text style={li.sku}>SKU: {item.sku}</Text> : null}
+
+        {/* Customization Chips */}
+        <View style={li.chipsRow}>
+          {item.selected_color && (
+            <View style={li.chip}>
+              <View style={[li.colorDot, { backgroundColor: item.selected_color }]} />
+              <Text style={li.chipText}>{item.selected_color_name || item.selected_color}</Text>
+            </View>
+          )}
+
+          {item.selected_size && (
+            <View style={li.chip}>
+              <Text style={li.chipText}>{item.selected_size}</Text>
+            </View>
+          )}
+
+          {customization.placement && (
+            <View style={li.chip}>
+              <Text style={li.chipText}>Placement: {customization.placement}</Text>
+            </View>
+          )}
+
+          {customization.text ? (
+            <View style={[li.chip, li.customTextChip]}>
+              <Ionicons name="text" size={10} color={BrandColors.primary} />
+              <Text style={[li.chipText, { color: BrandColors.primary }]} numberOfLines={1}>
+                {`"${customization.text}"`}
+              </Text>
+            </View>
+          ) : null}
+
+          {customization.imageUri ? (
+            <View style={[li.chip, li.artworkChip]}>
+              <Ionicons name="image-outline" size={10} color="#7C3AED" />
+              <Text style={[li.chipText, { color: '#7C3AED' }]}>Custom Artwork</Text>
+            </View>
+          ) : null}
+        </View>
+
         <View style={li.bottom}>
-          <Text style={li.price}>{item.price}</Text>
+          <Text style={li.price}>{totalPriceFormatted}</Text>
           <View style={li.qtyBadge}>
-            <Text style={li.qtyText}>Qty: {item.qty}</Text>
+            <Text style={li.qtyText}>Qty: {qty}</Text>
           </View>
         </View>
       </View>
@@ -114,26 +180,102 @@ function LineItemRow({ item }: { item: LineItem }) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-import { useLanguage } from '@/contexts/language-context';
-
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useLanguage();
-  const order = ALL_ORDERS.find((o) => o.id === id);
 
-  if (!order) {
+  const [order, setOrder] = useState<ApiOrder | Order | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadOrder() {
+      if (!id) return;
+      setLoading(true);
+
+      // Check fallback first for immediate responsiveness
+      const fallback = ALL_ORDERS.find((o) => o.id === id || o.orderNumber === id);
+      if (fallback && isMounted) {
+        setOrder(fallback);
+      }
+
+      // Fetch dynamic order from backend API
+      try {
+        const dynamicOrder = await fetchOrderDetails(id);
+        if (dynamicOrder && isMounted) {
+          setOrder(dynamicOrder);
+        }
+      } catch (err) {
+        console.warn('[OrderDetailScreen] fetchOrderDetails error:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadOrder();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
+
+  const handleShare = async () => {
+    if (!order) return;
+    const orderNum = order.orderNumber || (order as any).order_number || order.id;
+    try {
+      await Share.share({
+        message: `Placides Order #${orderNum} - Status: ${order.status.toUpperCase()} (Total: ${(order as any).total_formatted || order.total})`,
+      });
+    } catch {}
+  };
+
+  const handleTrackOrderAlert = () => {
+    if (!order) return;
+    const orderNum = order.orderNumber || (order as any).order_number || order.id;
+    Alert.alert(
+      'Live Tracking 🚚',
+      `Order #${orderNum} is scheduled for delivery on ${(order as any).expectedDelivery || (order as any).expected_delivery || '3 business days'}. Production and packing are progressing on schedule.`,
+      [{ text: 'Got it' }]
+    );
+  };
+
+  if (!order && !loading) {
     return (
       <SafeAreaView style={styles.notFound}>
         <Ionicons name="receipt-outline" size={48} color="#D1D5DB" />
         <Text style={styles.notFoundText}>Order not found</Text>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>{t.back}</Text>
+          <Text style={styles.backBtnText}>{t.back || 'Go Back'}</Text>
         </Pressable>
       </SafeAreaView>
     );
   }
 
-  const cfg = STATUS_CONFIG[order.status];
+  if (!order) {
+    return (
+      <SafeAreaView style={styles.notFound}>
+        <ActivityIndicator size="large" color={BrandColors.primary} />
+        <Text style={styles.loadingText}>Fetching order details…</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const statusKey = (order.status || 'in_progress') as OrderStatus;
+  const cfg = STATUS_CONFIG[statusKey] || STATUS_CONFIG.in_progress;
+  const orderNum = order.orderNumber || (order as any).order_number || order.id;
+  const placedDate = order.placedOn || (order as any).placed_at || 'Recently';
+  const expectedDelivery = (order as any).expectedDelivery || (order as any).expected_delivery || '3–5 business days';
+
+  const lineItems = (order as any).lineItems || (order as any).items || [];
+  const trackingSteps = (order as any).trackingSteps || (order as any).tracking_steps || [];
+
+  const subtotalFormatted = (order as any).subtotal_formatted || (typeof order.subtotal === 'number' ? `₱${order.subtotal.toFixed(2)}` : String(order.subtotal));
+  const shippingFormatted = (order as any).shipping_fee_formatted || order.delivery || 'Free';
+  const totalFormatted = (order as any).total_formatted || (order as any).total_display || (typeof order.total === 'number' ? `₱${order.total.toFixed(2)}` : String(order.total));
+  const customizationFeeFormatted = (order as any).customization_total_formatted || ((order as any).customization_total > 0 ? `+₱${Number((order as any).customization_total).toFixed(2)}` : null);
+
+  const shippingAddress = (order as any).shipping_address;
 
   return (
     <View style={styles.root}>
@@ -148,8 +290,8 @@ export default function OrderDetailScreen() {
             style={({ pressed }) => [styles.backIconBtn, pressed && { opacity: 0.6 }]}>
             <Ionicons name="chevron-back" size={22} color={BrandColors.primary} />
           </Pressable>
-          <Text style={styles.topBarTitle}>{t.orderDetails}</Text>
-          <Pressable hitSlop={12} style={styles.shareBtn}>
+          <Text style={styles.topBarTitle}>{t.orderDetails || 'Order Details'}</Text>
+          <Pressable hitSlop={12} onPress={handleShare} style={styles.shareBtn}>
             <Ionicons name="share-outline" size={20} color={BrandColors.primary} />
           </Pressable>
         </View>
@@ -161,11 +303,11 @@ export default function OrderDetailScreen() {
 
         {/* ── Order number + date ──────────────────────────────── */}
         <Animated.View entering={FadeInUp.duration(400)} style={styles.heroSection}>
-          <Text style={styles.heroLabel}>{t.orderNumberPrefix.toUpperCase()}</Text>
-          <Text style={styles.heroNumber}>#{order.orderNumber}</Text>
+          <Text style={styles.heroLabel}>{(t.orderNumberPrefix || 'ORDER').toUpperCase()}</Text>
+          <Text style={styles.heroNumber}>#{orderNum}</Text>
           <View style={styles.heroBadgeRow}>
             <Ionicons name="calendar-outline" size={13} color="#9CA3AF" />
-            <Text style={styles.heroDate}>{t.placedOn} {order.placedOn}</Text>
+            <Text style={styles.heroDate}>{t.placedOn || 'Placed on'} {placedDate}</Text>
           </View>
         </Animated.View>
 
@@ -173,11 +315,11 @@ export default function OrderDetailScreen() {
         <Animated.View entering={FadeInDown.delay(80).duration(500)} style={styles.card}>
           <View style={styles.deliveryRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.deliveryLabel}>{t.estimatedDelivery}</Text>
-              <Text style={styles.deliveryDate}>{order.expectedDelivery}</Text>
+              <Text style={styles.deliveryLabel}>{t.estimatedDelivery || 'Estimated Delivery'}</Text>
+              <Text style={styles.deliveryDate}>{expectedDelivery}</Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
-              <Ionicons name="bus-outline" size={13} color={cfg.color} style={{ marginRight: 4 }} />
+              <Ionicons name={cfg.icon} size={13} color={cfg.color} style={{ marginRight: 4 }} />
               <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
             </View>
           </View>
@@ -185,62 +327,97 @@ export default function OrderDetailScreen() {
           <View style={styles.cardDivider} />
 
           {/* Tracking timeline */}
-          <Timeline steps={order.trackingSteps} />
+          <Timeline steps={trackingSteps} />
         </Animated.View>
 
         {/* ── Items in order ───────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(160).duration(500)}>
-          <Text style={styles.sectionTitle}>{t.itemsOrdered}</Text>
+          <Text style={styles.sectionTitle}>{t.itemsOrdered || 'Items in Order'} ({lineItems.length})</Text>
 
           <View style={styles.card}>
-            {order.lineItems.map((item, i) => (
-              <View key={item.id}>
-                <LineItemRow item={item} />
-                {i < order.lineItems.length - 1 && <View style={styles.cardDivider} />}
+            {lineItems.map((item: any, i: number) => (
+              <View key={item.id || i}>
+                <DynamicLineItemRow item={item} />
+                {i < lineItems.length - 1 && <View style={styles.cardDivider} />}
               </View>
             ))}
           </View>
         </Animated.View>
 
+        {/* ── Shipping Address (if dynamic) ────────────────────── */}
+        {shippingAddress && (
+          <Animated.View entering={FadeInDown.delay(200).duration(500)}>
+            <Text style={styles.sectionTitle}>Delivery Details</Text>
+            <View style={styles.card}>
+              <View style={styles.addressWrap}>
+                <View style={styles.addressIconCircle}>
+                  <Ionicons name="location" size={18} color={BrandColors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.addressRecipient}>{shippingAddress.recipient || (order as any).customer_name || 'Customer'}</Text>
+                  <Text style={styles.addressLine}>{shippingAddress.address || 'Standard Delivery'}</Text>
+                  {shippingAddress.city ? <Text style={styles.addressLine}>{shippingAddress.city}, {shippingAddress.postal_code}</Text> : null}
+                  <Text style={styles.paymentMethodTag}>
+                    Payment: {(order as any).payment_method || 'Cash on Delivery'} ({(order as any).payment_status || 'Pending'})
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Animated.View>
+        )}
+
         {/* ── Price summary ────────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(240).duration(500)} style={styles.card}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>{t.subtotal}</Text>
-            <Text style={styles.summaryValue}>{order.subtotal}</Text>
+            <Text style={styles.summaryLabel}>{t.subtotal || 'Subtotal'}</Text>
+            <Text style={styles.summaryValue}>{subtotalFormatted}</Text>
           </View>
+
+          {customizationFeeFormatted && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Customization Fees</Text>
+              <Text style={[styles.summaryValue, { color: '#059669' }]}>{customizationFeeFormatted}</Text>
+            </View>
+          )}
+
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>{t.shippingFee}</Text>
-            <Text style={[styles.summaryValue, order.delivery === 'Free' && styles.summaryFree]}>
-              {order.delivery}
+            <Text style={styles.summaryLabel}>{t.shippingFee || 'Delivery'}</Text>
+            <Text style={[styles.summaryValue, shippingFormatted === 'Free' && styles.summaryFree]}>
+              {shippingFormatted}
             </Text>
           </View>
           <View style={styles.cardDivider} />
           <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>{t.total}</Text>
-            <Text style={styles.totalValue}>{order.total}</Text>
+            <Text style={styles.totalLabel}>{t.total || 'Total'}</Text>
+            <Text style={styles.totalValue}>{totalFormatted}</Text>
           </View>
         </Animated.View>
 
         {/* ── Actions ──────────────────────────────────────────── */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.actions}>
-          {(order.status === 'in_progress' || order.status === 'processing') && (
+          {(statusKey === 'in_progress' || statusKey === 'processing') && (
             <Pressable
+              onPress={handleTrackOrderAlert}
               style={({ pressed }) => [styles.actionBtnPrimary, pressed && { opacity: 0.8 }]}>
               <Ionicons name="location-outline" size={18} color="#fff" />
-              <Text style={styles.actionBtnPrimaryText}>{t.trackOrder}</Text>
+              <Text style={styles.actionBtnPrimaryText}>{t.trackOrder || 'Track Order'}</Text>
             </Pressable>
           )}
-          {order.status === 'delivered' && (
+
+          {statusKey === 'delivered' && (
             <Pressable
+              onPress={() => router.push('/(tabs)/services')}
               style={({ pressed }) => [styles.actionBtnPrimary, pressed && { opacity: 0.8 }]}>
               <Ionicons name="repeat-outline" size={18} color="#fff" />
-              <Text style={styles.actionBtnPrimaryText}>{t.trackOrder}</Text>
+              <Text style={styles.actionBtnPrimaryText}>Reorder / Customize Again</Text>
             </Pressable>
           )}
+
           <Pressable
+            onPress={() => router.push('/(tabs)/ai-hub')}
             style={({ pressed }) => [styles.actionBtnSecondary, pressed && { opacity: 0.7 }]}>
             <Ionicons name="chatbubble-outline" size={18} color={BrandColors.primary} />
-            <Text style={styles.actionBtnSecondaryText}>{t.qaTalkAgent}</Text>
+            <Text style={styles.actionBtnSecondaryText}>{t.qaTalkAgent || 'Chat with AI Support'}</Text>
           </Pressable>
         </Animated.View>
 
@@ -345,16 +522,23 @@ const li = StyleSheet.create({
     paddingHorizontal: 16,
   },
   imgWrap: {
-    width: 70,
-    height: 70,
+    width: 72,
+    height: 72,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#F3F4F6',
     flexShrink: 0,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   img: {
     width: '100%',
     height: '100%',
+  },
+  fallbackImg: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   info: {
     flex: 1,
@@ -367,10 +551,45 @@ const li = StyleSheet.create({
     color: '#111827',
     fontFamily: 'Manrope_700Bold',
   },
-  spec: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    fontFamily: 'Inter_400Regular',
+  sku: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 3,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  customTextChip: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 0.5,
+    borderColor: '#BFDBFE',
+  },
+  artworkChip: {
+    backgroundColor: '#F5F3FF',
+    borderWidth: 0.5,
+    borderColor: '#DDD6FE',
+  },
+  colorDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  chipText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#374151',
   },
   bottom: {
     flexDirection: 'row',
@@ -379,7 +598,7 @@ const li = StyleSheet.create({
     marginTop: 6,
   },
   price: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: BrandColors.primary,
     fontFamily: 'Manrope_700Bold',
@@ -415,7 +634,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
 
-  // top bar
   topSafe: {
     backgroundColor: '#FFFFFF',
     ...Platform.select({
@@ -462,7 +680,6 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  // hero
   heroSection: {
     alignItems: 'center',
     paddingVertical: 24,
@@ -500,7 +717,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
   },
 
-  // cards
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
@@ -515,7 +731,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
 
-  // delivery row
   deliveryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -548,18 +763,47 @@ const styles = StyleSheet.create({
     fontFamily: 'Manrope_700Bold',
   },
 
-  // section title
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: '#111827',
     fontFamily: 'Manrope_700Bold',
-    marginTop: 24,
+    marginTop: 22,
     marginBottom: 0,
     marginHorizontal: 16,
   },
 
-  // price summary
+  addressWrap: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
+    alignItems: 'flex-start',
+  },
+  addressIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addressRecipient: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  addressLine: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  paymentMethodTag: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '600',
+    marginTop: 6,
+  },
+
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -594,7 +838,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Manrope_700Bold',
   },
 
-  // action buttons
   actions: {
     paddingHorizontal: 16,
     marginTop: 20,
@@ -631,7 +874,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Manrope_700Bold',
   },
 
-  // not found
   notFound: {
     flex: 1,
     alignItems: 'center',
@@ -643,6 +885,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
     fontFamily: 'Inter_400Regular',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6B7280',
   },
   backBtn: {
     backgroundColor: BrandColors.primary,

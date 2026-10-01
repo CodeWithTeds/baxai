@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,28 +17,34 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import ScreenHeader from '@/components/screen-header';
 import {
-  ACTIVE_ORDERS,
-  PAST_ORDERS,
   STATUS_CONFIG,
   type Order,
+  type OrderStatus,
 } from '@/constants/orders-data';
 import { BrandColors } from '@/constants/theme';
-
+import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
+import { ApiOrder, fetchOrders } from '@/utils/api';
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-function OrderCard({ item, index }: { item: Order; index: number }) {
+function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
   const { t } = useLanguage();
-  const cfg = STATUS_CONFIG[item.status];
+  const statusKey = (item.status || 'in_progress') as OrderStatus;
+  const cfg = STATUS_CONFIG[statusKey] || STATUS_CONFIG.in_progress;
 
   const getStatusLabel = () => {
-    switch (item.status) {
-      case 'in_progress': return t.statusInProgress;
-      case 'processing': return t.statusProcessing;
-      case 'delivered': return t.statusCompleted;
-      case 'cancelled': return t.statusCancelled;
-      default: return cfg.label;
+    switch (statusKey) {
+      case 'in_progress':
+        return t.statusInProgress || 'In Progress';
+      case 'processing':
+        return t.statusProcessing || 'Processing';
+      case 'delivered':
+        return t.statusCompleted || 'Delivered';
+      case 'cancelled':
+        return t.statusCancelled || 'Cancelled';
+      default:
+        return cfg.label;
     }
   };
 
@@ -44,8 +52,21 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
     router.push(`/order/${item.id}` as any);
   };
 
+  const orderNum = item.orderNumber || (item as any).order_number || String(item.id);
+  const placedDate = item.placedOn || (item as any).placed_at || 'Recently';
+  const totalDisplay = (item as any).total_formatted || (item as any).total_display || (typeof item.total === 'number' ? `₱${item.total.toFixed(2)}` : String(item.total));
+
+  // Determine line items & total item count
+  const lineItems = (item as any).lineItems || (item as any).items || [];
+  const totalItemQty = lineItems.length > 0
+    ? lineItems.reduce((sum: number, li: any) => sum + (li.quantity || li.qty || 1), 0)
+    : 1;
+
+  // Resolve preview image (custom design or banner image or fallback)
+  const previewImage = (item as any).image || (lineItems[0]?.banner_image) || (lineItems[0]?.customization?.imageUri);
+
   return (
-    <Animated.View entering={FadeInDown.delay(index * 80).duration(500)}>
+    <Animated.View entering={FadeInDown.delay(index * 60).duration(400)}>
       <Pressable
         onPress={handlePress}
         style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
@@ -53,8 +74,8 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
         {/* ── Card header ─────────────────────────────── */}
         <View style={styles.cardHeader}>
           <View>
-            <Text style={styles.orderNumber}>#{item.orderNumber}</Text>
-            <Text style={styles.orderDate}>{t.placedOn} {item.placedOn}</Text>
+            <Text style={styles.orderNumber}>#{orderNum}</Text>
+            <Text style={styles.orderDate}>{t.placedOn} {placedDate}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
             <Ionicons name={cfg.icon} size={13} color={cfg.color} style={{ marginRight: 4 }} />
@@ -68,23 +89,29 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
         {/* ── Product row ─────────────────────────────── */}
         <View style={styles.productRow}>
           <View style={styles.imgWrap}>
-            <Image
-              source={item.image as any}
-              style={styles.productImg}
-              contentFit="cover"
-            />
+            {previewImage ? (
+              <ExpoImage
+                source={{ uri: previewImage }}
+                style={styles.productImg}
+                contentFit="cover"
+              />
+            ) : (
+              <View style={styles.imgFallback}>
+                <Ionicons name="cube" size={28} color="#9CA3AF" />
+              </View>
+            )}
           </View>
           <View style={styles.productInfo}>
             <Text style={styles.productName} numberOfLines={2}>
-              {item.productName}
+              {item.productName || lineItems[0]?.product_name || 'Custom Product'}
             </Text>
             <View style={styles.productMeta}>
               <View style={styles.qtyBadge}>
                 <Text style={styles.qtyText}>
-                  {t.qtyPrefix}: {item.lineItems.reduce((s, li) => s + li.qty, 0)}
+                  {t.qtyPrefix || 'Qty'}: {totalItemQty}
                 </Text>
               </View>
-              <Text style={styles.totalText}>{item.total}</Text>
+              <Text style={styles.totalText}>{totalDisplay}</Text>
             </View>
           </View>
         </View>
@@ -99,7 +126,7 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
             <Text style={styles.footerBtnText}>{t.viewDetails}</Text>
           </Pressable>
 
-          {(item.status === 'in_progress' || item.status === 'processing') && (
+          {(statusKey === 'in_progress' || statusKey === 'processing') && (
             <Pressable
               hitSlop={8}
               onPress={handlePress}
@@ -113,9 +140,10 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
             </Pressable>
           )}
 
-          {item.status === 'delivered' && (
+          {statusKey === 'delivered' && (
             <Pressable
               hitSlop={8}
+              onPress={handlePress}
               style={({ pressed }) => [
                 styles.footerBtn,
                 styles.footerBtnSecondary,
@@ -135,9 +163,11 @@ function OrderCard({ item, index }: { item: Order; index: number }) {
 
 function TabToggle({
   active,
+  activeCount,
   onChange,
 }: {
   active: 'active' | 'past';
+  activeCount: number;
   onChange: (v: 'active' | 'past') => void;
 }) {
   const { t } = useLanguage();
@@ -149,10 +179,10 @@ function TabToggle({
         <Text style={[styles.toggleText, active === 'active' && styles.toggleTextActive]}>
           {t.activeOrders}
         </Text>
-        {ACTIVE_ORDERS.length > 0 && (
+        {activeCount > 0 && (
           <View style={[styles.toggleCount, active === 'active' && styles.toggleCountActive]}>
             <Text style={[styles.toggleCountText, active === 'active' && styles.toggleCountTextActive]}>
-              {ACTIVE_ORDERS.length}
+              {activeCount}
             </Text>
           </View>
         )}
@@ -173,8 +203,45 @@ function TabToggle({
 
 export default function OrdersScreen() {
   const [tab, setTab] = useState<'active' | 'past'>('active');
-  const { t } = useLanguage();
-  const orders = tab === 'active' ? ACTIVE_ORDERS : PAST_ORDERS;
+  const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const { user } = useAuth();
+  const userEmail = user?.email;
+
+  const loadOrders = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const data = await fetchOrders(userEmail);
+      if (Array.isArray(data) && data.length > 0) {
+        setOrders(data);
+      }
+    } catch (err) {
+      console.warn('[OrdersScreen] Error fetching orders:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [userEmail]);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  const onRefresh = () => {
+    loadOrders(true);
+  };
+
+  const activeOrders = orders.filter(
+    (o) => o.status === 'in_progress' || o.status === 'processing'
+  );
+  const pastOrders = orders.filter(
+    (o) => o.status === 'delivered' || o.status === 'cancelled'
+  );
+
+  const displayedOrders = tab === 'active' ? activeOrders : pastOrders;
 
   return (
     <View style={styles.root}>
@@ -182,35 +249,54 @@ export default function OrdersScreen() {
 
       {/* ── Header + Search ──────────────────────────────────── */}
       <ScreenHeader
-        title={t.ordersTitle}
+        title={t.ordersTitle || 'My Orders'}
         hideSearch
       />
 
       {/* ── Tab toggle ───────────────────────────────────────── */}
       <View style={styles.toggleContainer}>
-        <TabToggle active={tab} onChange={setTab} />
+        <TabToggle
+          active={tab}
+          activeCount={activeOrders.length}
+          onChange={setTab}
+        />
       </View>
 
       {/* ── Orders list ──────────────────────────────────────── */}
       <ScrollView
         contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BrandColors.primary]} />
+        }>
 
-        {orders.length === 0 ? (
+        {loading && !refreshing ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={BrandColors.primary} />
+            <Text style={styles.loadingText}>Loading dynamic orders…</Text>
+          </View>
+        ) : displayedOrders.length === 0 ? (
           <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyWrap}>
             <View style={styles.emptyIconWrap}>
               <Ionicons name="receipt-outline" size={48} color="#D1D5DB" />
             </View>
-            <Text style={styles.emptyTitle}>No orders yet</Text>
+            <Text style={styles.emptyTitle}>
+              {tab === 'active' ? 'No active orders' : 'No past orders'}
+            </Text>
             <Text style={styles.emptySubtitle}>
               {tab === 'active'
-                ? 'Your active orders will appear here.'
-                : 'Your completed orders will appear here.'}
+                ? 'Orders you place will dynamically update here with live tracking.'
+                : 'Your completed or delivered orders will be archived here.'}
             </Text>
+            <Pressable
+              onPress={() => router.push('/(tabs)/services')}
+              style={styles.exploreBtn}>
+              <Text style={styles.exploreBtnText}>Browse Customizable Products</Text>
+            </Pressable>
           </Animated.View>
         ) : (
-          orders.map((order, i) => (
-            <OrderCard key={order.id} item={order} index={i} />
+          displayedOrders.map((order, i) => (
+            <OrderCard key={order.id || order.orderNumber || i} item={order} index={i} />
           ))
         )}
 
@@ -379,10 +465,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#F9FAFB',
     flexShrink: 0,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   productImg: {
     width: '100%',
     height: '100%',
+  },
+  imgFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   productInfo: {
     flex: 1,
@@ -447,9 +540,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
   },
 
+  loadingWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+
   emptyWrap: {
     alignItems: 'center',
-    marginTop: 80,
+    marginTop: 60,
     gap: 12,
   },
   emptyIconWrap: {
@@ -468,11 +573,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Manrope_700Bold',
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#9CA3AF',
     fontFamily: 'Inter_400Regular',
     textAlign: 'center',
     paddingHorizontal: 32,
+    lineHeight: 18,
+  },
+  exploreBtn: {
+    marginTop: 12,
+    backgroundColor: '#111827',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  exploreBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   bottomSpacer: {
