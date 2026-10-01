@@ -25,6 +25,8 @@ export type TabConfig = {
   name: string;
   label: string;
   icon: IoniconsName;
+  color?: string;
+  activeColor?: string;
 };
 
 type Props = {
@@ -46,6 +48,9 @@ function TabItem({
   focused: boolean;
   onPress: () => void;
 }) {
+  const activeColor = config.activeColor || BrandColors.primary;
+  const iconColor = config.color || '#6B7280';
+
   const scale = useSharedValue(focused ? 1 : 0.85);
   const progress = useSharedValue(focused ? 1 : 0);
 
@@ -59,7 +64,7 @@ function TabItem({
     backgroundColor: interpolateColor(
       progress.value,
       [0, 1],
-      ['transparent', BrandColors.primary],
+      ['transparent', activeColor],
     ),
     // border always white, only visible when focused
     borderColor: '#FFFFFF',
@@ -67,8 +72,8 @@ function TabItem({
   }));
 
   const labelStyle = useAnimatedStyle(() => ({
-    fontWeight: focused ? '700' : '400',
-    color: focused ? BrandColors.primary : '#9CA3AF',
+    fontWeight: focused ? '700' : '500',
+    color: focused ? activeColor : '#6B7280',
   }));
 
   return (
@@ -83,7 +88,7 @@ function TabItem({
           <Ionicons
             name={config.icon}
             size={26}
-            color={focused ? '#FFFFFF' : '#9CA3AF'}
+            color={focused ? '#FFFFFF' : iconColor}
           />
         </Animated.View>
       </View>

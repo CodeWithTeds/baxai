@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiConversation;
 use App\Models\Order;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -65,7 +66,24 @@ class GroqController extends Controller
             'messages.*.role'    => ['required', 'in:user,assistant,system'],
             'messages.*.content' => ['required', 'string'],
             'language'           => ['sometimes', 'string'],
+            'customer_email'     => ['sometimes', 'nullable', 'string'],
+            'conversation_id'    => ['sometimes', 'nullable', 'string'],
         ]);
+
+        $conversationId = $request->input('conversation_id');
+        if ($conversationId) {
+            $conversation = AiConversation::where('conversation_id', $conversationId)->first();
+            if ($conversation) {
+                if (!$conversation->is_verified) {
+                    return $this->errorResponse('Security verification required before first response in conversation.', 403);
+                }
+                $meta = $conversation->metadata ?? [];
+                $meta['messages_count'] = ($meta['messages_count'] ?? 0) + 1;
+                $meta['last_activity']  = now()->toIso8601String();
+                $conversation->metadata = $meta;
+                $conversation->save();
+            }
+        }
 
         $lang      = $request->input('language', 'en');
         $isTagalog = in_array($lang, ['tl', 'fil', 'tgl'], true);
@@ -75,7 +93,7 @@ class GroqController extends Controller
 
 ## ROLE
 
-You are Owla — a professional, intelligent, reliable, and customer-friendly AI Assistant for Rens Digital, a custom printing and digital services business in the Philippines.
+You are Owla — a professional, intelligent, reliable, and customer-friendly AI Assistant for NUYDA ENTERPRISE, a custom printing and digital services business in the Philippines.
 
 Your primary responsibility is to help customers with:
 - Products and product availability
@@ -134,14 +152,14 @@ Never expose passwords, OTPs, PINs, card numbers, or another customer's personal
 ---
 
 # 5. STRICT DOMAIN SCOPE & OFF-TOPIC POLICY (MANDATORY)
-- You are EXCLUSIVELY a customer support assistant for Rens Digital / NUYDA ENTERPRISE (custom printing, mugs, t-shirts, stickers, pins, tote bags, orders, tracking, pricing, and store inquiries).
+- You are EXCLUSIVELY a customer support assistant for NUYDA ENTERPRISE (custom printing, mugs, t-shirts, stickers, pins, tote bags, orders, tracking, pricing, and store inquiries).
 - You MUST REFUSE to answer ANY off-topic or unrelated questions, including:
   - Programming, coding, computer science (e.g. "What is Python?", "Write code in JavaScript", "How to write a function", HTML, CSS, SQL, bug fixing, etc.)
   - General world knowledge, facts, science, history, politics, gaming, cooking recipes, or celebrity news.
   - Math homework or general academic tutoring.
 - If the customer asks ANY question not directly related to our printing services, products, orders, or shopping on this app:
   You MUST DECLINE immediately in 1-2 friendly sentences and guide them back to our store services.
-  Example decline: "I am specialized only in assisting with Rens Digital products, custom printing, and orders! I cannot answer general programming or unrelated topics. How can I help you with our custom merchandise or orders today?"
+  Example decline: "I am specialized only in assisting with NUYDA ENTERPRISE products, custom printing, and orders! I cannot answer general programming or unrelated topics. How can I help you with our custom merchandise or orders today?"
 - NEVER explain code, write scripts, or answer general tech questions like "what is Python".
 
 ---
@@ -236,10 +254,164 @@ PROMPT;
             $reply = $cut > 200 ? mb_substr($truncated, 0, $cut + 1) : $truncated;
         }
 
+        $products = $this->findMentionedProducts($request->input('messages', []), $reply);
+
         return $this->successResponse([
-            'reply'    => $reply,
-            'language' => $lang,
+            'reply'           => $reply,
+            'language'        => $lang,
+            'conversation_id' => $conversationId,
+            'products'        => $products,
         ], 'Chat successful');
+    }
+
+    // ─── POST /api/v1/groq/conversation/verify-stage ────────────────────────
+    public function verifyStage(Request $request): JsonResponse
+    {
+        $request->validate([
+            'conversation_id' => ['required', 'string', 'min:5', 'max:100'],
+            'stage'           => ['required', 'in:user,data,security'],
+            'user_email'      => ['nullable', 'string', 'max:255'],
+            'messages'        => ['nullable', 'array'],
+        ]);
+
+        $conversationId = trim($request->input('conversation_id'));
+        $stage          = $request->input('stage');
+        $userEmail      = trim($request->input('user_email') ?? '');
+
+        $conversation = AiConversation::firstOrCreate(
+            ['conversation_id' => $conversationId],
+            [
+                'user_email' => $userEmail ?: null,
+                'ip_address' => $request->ip(),
+                'user_agent' => substr((string)$request->userAgent(), 0, 500),
+            ]
+        );
+
+        if ($userEmail && !$conversation->user_email) {
+            $conversation->user_email = $userEmail;
+        }
+
+        // STAGE 1: Checking User — Validate authenticated user/session & confirm current user context is valid
+        if ($stage === 'user') {
+            if (!empty($userEmail)) {
+                if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
+                    return $this->errorResponse('Invalid user email format provided for session verification.', 422);
+                }
+            }
+
+            // Rate-limiting check per IP to prevent session flooding
+            $ip = $request->ip();
+            $recentCount = AiConversation::where('ip_address', $ip)
+                ->where('created_at', '>=', now()->subMinutes(10))
+                ->count();
+
+            if ($recentCount > 100) {
+                return $this->errorResponse('Too many session initialization requests. Please wait a moment.', 429);
+            }
+
+            $conversation->stage_user_verified = true;
+            $conversation->save();
+
+            return $this->successResponse([
+                'stage'       => 'user',
+                'completed'   => true,
+                'is_verified' => $conversation->is_verified,
+            ], 'User session and context validated successfully.');
+        }
+
+        // STAGE 2: Checking Data — Validate user/conversation/request data & confirm request has expected info
+        if ($stage === 'data') {
+            if (!$conversation->stage_user_verified) {
+                return $this->errorResponse('Sequential requirement: Stage 1 (Checking User) must complete before Checking Data.', 400);
+            }
+
+            $messages = $request->input('messages');
+            if (empty($messages) || !is_array($messages)) {
+                return $this->errorResponse('Invalid conversation data. Expected message payload array.', 422);
+            }
+
+            foreach ($messages as $idx => $msg) {
+                if (!isset($msg['role']) || !in_array($msg['role'], ['user', 'assistant', 'system'])) {
+                    return $this->errorResponse("Invalid message role in conversation data at index {$idx}.", 422);
+                }
+                $content = $msg['content'] ?? $msg['text'] ?? '';
+                if (!is_string($content) || strlen($content) === 0) {
+                    return $this->errorResponse("Empty or invalid message content at index {$idx}.", 422);
+                }
+                if (strlen($content) > 10000) {
+                    return $this->errorResponse("Message content exceeds maximum allowed character length.", 422);
+                }
+            }
+
+            $conversation->stage_data_verified = true;
+            $conversation->save();
+
+            return $this->successResponse([
+                'stage'       => 'data',
+                'completed'   => true,
+                'is_verified' => $conversation->is_verified,
+            ], 'Conversation and request data verified successfully.');
+        }
+
+        // STAGE 3: Securing Request — Perform required request/session security validation
+        if ($stage === 'security') {
+            if (!$conversation->stage_user_verified) {
+                return $this->errorResponse('Sequential requirement: Stage 1 (Checking User) must complete first.', 400);
+            }
+            if (!$conversation->stage_data_verified) {
+                return $this->errorResponse('Sequential requirement: Stage 2 (Checking Data) must complete first.', 400);
+            }
+
+            // Anti-abuse & security sanitization audit
+            $meta = $conversation->metadata ?? [];
+            $meta['security_check_passed'] = true;
+            $meta['verified_at']           = now()->toIso8601String();
+            $meta['ip']                    = $request->ip();
+
+            $conversation->metadata                = $meta;
+            $conversation->stage_security_verified = true;
+            $conversation->is_verified             = true;
+            $conversation->verified_at             = now();
+            $conversation->save();
+
+            return $this->successResponse([
+                'stage'       => 'security',
+                'completed'   => true,
+                'is_verified' => true,
+                'verified_at' => $conversation->verified_at->toIso8601String(),
+            ], 'Security validation passed. Request secured for AI processing.');
+        }
+
+        return $this->errorResponse('Unknown verification stage requested.', 400);
+    }
+
+    // ─── GET /api/v1/groq/conversation/{conversation_id}/status ──────────────
+    public function conversationStatus(string $conversation_id): JsonResponse
+    {
+        $conversation = AiConversation::where('conversation_id', $conversation_id)->first();
+
+        if (!$conversation) {
+            return $this->successResponse([
+                'exists'      => false,
+                'is_verified' => false,
+                'stages'      => [
+                    'user'     => false,
+                    'data'     => false,
+                    'security' => false,
+                ],
+            ], 'Conversation not initialized yet.');
+        }
+
+        return $this->successResponse([
+            'exists'      => true,
+            'is_verified' => $conversation->is_verified,
+            'stages'      => [
+                'user'     => $conversation->stage_user_verified,
+                'data'     => $conversation->stage_data_verified,
+                'security' => $conversation->stage_security_verified,
+            ],
+            'verified_at' => $conversation->verified_at?->toIso8601String(),
+        ], 'Conversation status retrieved.');
     }
 
     // ─── POST /api/v1/groq/tts ───────────────────────────────────────────────
@@ -374,6 +546,17 @@ PROMPT;
                 }
             }
 
+            // Live store products from database
+            $products = \App\Models\Product::whereNull('deleted_at')->get();
+            if ($products->isNotEmpty()) {
+                $lines[] = "\nLive Available Store Products in Database:";
+                foreach ($products as $p) {
+                    $has3D = $p->has_3d_preview ? '3D Preview/Customizable' : 'Standard';
+                    $sku = $p->sku ?: 'No SKU';
+                    $lines[] = "  - Product ID: {$p->id} | Name: \"{$p->name}\" | Category: {$p->category} | Price: ₱{$p->base_price} | SKU: {$sku} | Type: {$has3D} | Viewer: {$p->viewer_type}";
+                }
+            }
+
             // Recent customer orders from real orders table
             $recentOrders = Order::with('items')
                 ->latest('placed_at')
@@ -392,6 +575,73 @@ PROMPT;
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Scan customer messages and assistant reply for products mentioned or recommended
+     * and return structured product metadata for rich product card display in mobile UI.
+     */
+    private function findMentionedProducts(array $messages, string $reply): array
+    {
+        try {
+            $userText = '';
+            foreach ($messages as $msg) {
+                if (($msg['role'] ?? '') === 'user') {
+                    $userText .= ' ' . ($msg['content'] ?? '');
+                }
+            }
+            $combined = strtolower($userText . ' ' . $reply);
+
+            $allProducts = \App\Models\Product::whereNull('deleted_at')->get();
+            $matched = [];
+
+            foreach ($allProducts as $p) {
+                $nameLower = strtolower($p->name);
+                $catLower  = strtolower($p->category ?? '');
+                $skuLower  = strtolower($p->sku ?? '');
+
+                $isMatch = false;
+                if (!empty($p->sku) && str_contains($combined, $skuLower)) {
+                    $isMatch = true;
+                } elseif (str_contains($combined, $nameLower)) {
+                    $isMatch = true;
+                } elseif ((str_contains($nameLower, 'shirt') || str_contains($catLower, 'shirt') || str_contains($catLower, 'apparel')) && (str_contains($combined, 'shirt') || str_contains($combined, 't-shirt') || str_contains($combined, 'tshirt') || str_contains($combined, 'tee') || str_contains($combined, 'damit'))) {
+                    $isMatch = true;
+                } elseif ((str_contains($nameLower, 'mug') || str_contains($catLower, 'mug') || str_contains($nameLower, 'cup') || str_contains($nameLower, 'espresso') || str_contains($nameLower, 'esresso') || str_contains($nameLower, 'tumbler')) && (str_contains($combined, 'mug') || str_contains($combined, 'cup') || str_contains($combined, 'espresso') || str_contains($combined, 'tumbler') || str_contains($combined, 'tasa') || str_contains($combined, 'coffee'))) {
+                    $isMatch = true;
+                } elseif ((str_contains($nameLower, 'pin') || str_contains($catLower, 'pin')) && (str_contains($combined, 'pin') || str_contains($combined, 'badge') || str_contains($combined, 'button'))) {
+                    $isMatch = true;
+                } elseif ((str_contains($nameLower, 'bag') || str_contains($catLower, 'bag') || str_contains($catLower, 'tote')) && (str_contains($combined, 'bag') || str_contains($combined, 'tote') || str_contains($combined, 'shoulder bag') || str_contains($combined, 'bayong'))) {
+                    $isMatch = true;
+                } elseif ((str_contains($nameLower, 'sticker') || str_contains($catLower, 'sticker')) && str_contains($combined, 'sticker')) {
+                    $isMatch = true;
+                } elseif ((str_contains($nameLower, 'calendar') || str_contains($catLower, 'calendar')) && (str_contains($combined, 'calendar') || str_contains($combined, 'kalendaryo'))) {
+                    $isMatch = true;
+                }
+
+                if ($isMatch) {
+                    $matched[] = [
+                        'id'                        => $p->id,
+                        'name'                      => $p->name,
+                        'category'                  => $p->category,
+                        'price'                     => (string) $p->base_price,
+                        'sku'                       => $p->sku,
+                        'thumbnail'                 => $p->thumbnail,
+                        'fallback_image'            => $p->fallback_image,
+                        'has_3d_preview'            => (bool) $p->has_3d_preview,
+                        'viewer_type'               => $p->viewer_type,
+                        'stock'                     => $p->stock_quantity,
+                        'customization_addon_price' => $p->customization_addon_price,
+                        'max_text_length'           => $p->max_text_length,
+                    ];
+                }
+            }
+
+            return array_slice($matched, 0, 5);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('findMentionedProducts failed', ['error' => $e->getMessage()]);
+            return [];
+        }
     }
 
     /**

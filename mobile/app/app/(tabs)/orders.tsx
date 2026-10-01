@@ -23,7 +23,7 @@ import {
   type Order,
   type OrderStatus,
 } from '@/constants/orders-data';
-import { BrandColors } from '@/constants/theme';
+import { BrandColors, IconColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
 import { ApiOrder, fetchOrders } from '@/utils/api';
@@ -111,10 +111,10 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
               <Ionicons
                 name={copied ? 'checkmark-circle' : 'copy-outline'}
                 size={13}
-                color={copied ? '#059669' : '#9CA3AF'}
+                color={copied ? IconColors.success : IconColors.copy}
                 style={{ marginLeft: 5 }}
               />
-              {copied && <Text style={styles.orderCopiedText}>Copied!</Text>}
+              {copied && <Text style={[styles.orderCopiedText, { color: IconColors.success }]}>Copied!</Text>}
             </Pressable>
             <Text style={styles.orderDate}>{t.placedOn}  {placedDate}</Text>
           </View>
@@ -130,8 +130,8 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
             {previewImage ? (
               <ExpoImage source={{ uri: previewImage }} style={styles.productImg} contentFit="cover" />
             ) : (
-              <View style={styles.imgFallback}>
-                <Text style={{ fontSize: 28 }}>📦</Text>
+              <View style={[styles.imgFallback, { backgroundColor: IconColors.ordersBg }]}>
+                <Ionicons name="cube" size={26} color={IconColors.orders} />
               </View>
             )}
           </View>
@@ -144,7 +144,7 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
             <Text style={styles.totalText}>{totalDisplay}</Text>
           </View>
 
-          <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
+          <Ionicons name="chevron-forward" size={18} color={IconColors.orders} />
         </View>
 
         {/* ── Footer CTA row ──────────────────────────────── */}
@@ -154,8 +154,10 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
             hitSlop={8}
             style={({ pressed }) => [styles.footerBtn, pressed && { opacity: 0.7 }]}
           >
-            <Ionicons name="document-text-outline" size={14} color={BrandColors.primary} />
-            <Text style={styles.footerBtnText}>{t.viewDetails}</Text>
+            <View style={[styles.btnIconBadge, { backgroundColor: IconColors.aiBg }]}>
+              <Ionicons name="document-text" size={12} color={IconColors.ai} />
+            </View>
+            <Text style={[styles.footerBtnText, { color: IconColors.ai }]}>{t.viewDetails}</Text>
           </Pressable>
 
           {(statusKey === 'in_progress' || statusKey === 'processing') && (
@@ -164,8 +166,10 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
               onPress={handlePress}
               style={({ pressed }) => [styles.footerBtn, styles.footerBtnGray, pressed && { opacity: 0.7 }]}
             >
-              <Ionicons name="location-outline" size={14} color="#6B7280" />
-              <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>{t.trackOrder}</Text>
+              <View style={[styles.btnIconBadge, { backgroundColor: IconColors.trackingBg }]}>
+                <Ionicons name="location" size={12} color={IconColors.tracking} />
+              </View>
+              <Text style={[styles.footerBtnText, { color: IconColors.tracking }]}>{t.trackOrder}</Text>
             </Pressable>
           )}
 
@@ -175,8 +179,10 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
               onPress={() => router.push('/(tabs)/services')}
               style={({ pressed }) => [styles.footerBtn, styles.footerBtnGray, pressed && { opacity: 0.7 }]}
             >
-              <Ionicons name="repeat-outline" size={14} color="#6B7280" />
-              <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>Reorder</Text>
+              <View style={[styles.btnIconBadge, { backgroundColor: IconColors.servicesBg }]}>
+                <Ionicons name="repeat" size={12} color={IconColors.services} />
+              </View>
+              <Text style={[styles.footerBtnText, { color: IconColors.services }]}>Reorder</Text>
             </Pressable>
           )}
         </View>
@@ -303,7 +309,22 @@ export default function OrdersScreen() {
           </View>
         ) : filteredOrders.length === 0 ? (
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyEmoji}>{searchQuery ? '🔍' : tab === 'active' ? '🛍️' : '📦'}</Text>
+            <View style={[
+              styles.emptyIconCircle,
+              {
+                backgroundColor: searchQuery
+                  ? IconColors.searchBg
+                  : tab === 'active'
+                  ? IconColors.cartBg
+                  : IconColors.aiBg,
+              }
+            ]}>
+              <Ionicons
+                name={searchQuery ? 'search' : tab === 'active' ? 'bag-handle' : 'archive'}
+                size={38}
+                color={searchQuery ? IconColors.search : tab === 'active' ? IconColors.cart : IconColors.ai}
+              />
+            </View>
             <Text style={styles.emptyTitle}>
               {searchQuery ? 'No matching orders' : tab === 'active' ? 'No active orders' : 'No past orders'}
             </Text>
@@ -317,15 +338,15 @@ export default function OrdersScreen() {
             {searchQuery ? (
               <Pressable
                 onPress={() => setSearchQuery('')}
-                style={({ pressed }) => [styles.exploreBtn, pressed && { opacity: 0.85 }]}
+                style={({ pressed }) => [styles.exploreBtn, { backgroundColor: IconColors.danger }, pressed && { opacity: 0.85 }]}
               >
-                <Ionicons name="close" size={16} color="#fff" />
+                <Ionicons name="close-circle" size={16} color="#fff" />
                 <Text style={styles.exploreBtnText}>Clear Search</Text>
               </Pressable>
             ) : (
               <Pressable
                 onPress={() => router.push('/(tabs)/services')}
-                style={({ pressed }) => [styles.exploreBtn, pressed && { opacity: 0.85 }]}
+                style={({ pressed }) => [styles.exploreBtn, { backgroundColor: IconColors.home }, pressed && { opacity: 0.85 }]}
               >
                 <Ionicons name="sparkles" size={16} color="#fff" />
                 <Text style={styles.exploreBtnText}>Browse Products</Text>
@@ -490,19 +511,39 @@ const styles = StyleSheet.create({
   footerBtnGray: { backgroundColor: '#F3F4F6' },
   footerBtnText: { fontSize: 12, fontWeight: '600', color: BrandColors.primary, fontFamily: 'Inter_600SemiBold' },
 
+  btnIconBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 2,
+  },
+
   // Loading / empty
   loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 80, gap: 14 },
   loadingText: { fontSize: 13, color: '#6B7280', fontFamily: 'Inter_400Regular' },
 
   emptyWrap: {
     alignItems: 'center',
-    marginTop: 60,
+    marginTop: 48,
     paddingHorizontal: 32,
     gap: 10,
   },
-  emptyEmoji:    { fontSize: 52, marginBottom: 4 },
-  emptyTitle:    { fontSize: 19, fontWeight: '800', color: '#374151', fontFamily: 'Manrope_700Bold', textAlign: 'center' },
-  emptySubtitle: { fontSize: 13, color: '#9CA3AF', fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 19 },
+  emptyIconCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+    ...Platform.select({
+      ios:     { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
+      android: { elevation: 2 },
+    }),
+  },
+  emptyTitle:    { fontSize: 19, fontWeight: '800', color: '#1F2937', fontFamily: 'Manrope_700Bold', textAlign: 'center' },
+  emptySubtitle: { fontSize: 13, color: '#6B7280', fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 19 },
   exploreBtn: {
     flexDirection: 'row',
     alignItems: 'center',

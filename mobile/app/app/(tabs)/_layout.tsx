@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 
 import BubbleTabBar, { TabConfig } from '@/components/bubble-tab-bar';
 import { useLanguage } from '@/contexts/language-context';
+import { IconColors } from '@/constants/theme';
 
 const ROUTE_TO_INDEX: Record<string, number> = {
   index:    0,
@@ -20,10 +21,10 @@ export default function TabLayout() {
 
   const tabs: TabConfig[] = useMemo(
     () => [
-      { name: 'index',    label: t.navHome,     icon: 'home-outline' },
-      { name: 'services', label: t.navServices, icon: 'print-outline' },
-      { name: 'orders',   label: t.navOrders,   icon: 'cube-outline' },
-      { name: 'ai-hub',   label: t.navAiHub,    icon: 'sparkles-outline' },
+      { name: 'index',    label: t.navHome,     icon: 'home-outline',     color: IconColors.home,     activeColor: IconColors.home },
+      { name: 'services', label: t.navServices, icon: 'print-outline',    color: IconColors.services, activeColor: IconColors.services },
+      { name: 'orders',   label: t.navOrders,   icon: 'cube-outline',     color: IconColors.orders,   activeColor: IconColors.orders },
+      { name: 'ai-hub',   label: t.navAiHub,    icon: 'sparkles-outline', color: IconColors.ai,       activeColor: IconColors.ai },
     ],
     [t]
   );

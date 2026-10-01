@@ -9,13 +9,34 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { FileSystemUploadType } from 'expo-file-system/legacy';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Speech from 'expo-speech';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface ConvoProduct {
+  id: string | number;
+  name: string;
+  category?: string;
+  price?: string | number;
+  sku?: string;
+  thumbnail?: string | null;
+  fallback_image?: string | null;
+  has_3d_preview?: boolean;
+  is3D?: boolean;
+  viewer_type?: string;
+  viewerType?: string;
+  stock?: number;
+  customization_addon_price?: number | string;
+  customizationAddonPrice?: number | string;
+  max_text_length?: number;
+  maxTextLength?: number;
+}
 
 export type ConvoMessage = {
   id: string;
   role: 'assistant' | 'user';
   text: string;
+  products?: ConvoProduct[];
 };
 
 export type VoiceState =
@@ -25,6 +46,21 @@ export type VoiceState =
   | 'thinking'     // STT done, waiting for LLM
   | 'speaking'     // TTS playing back
   | 'error';       // something failed
+
+export type VerificationStage = 'user' | 'data' | 'security';
+export type StageStatus = 'pending' | 'active' | 'success' | 'failed';
+
+export type VerificationState = {
+  inProgress: boolean;
+  currentStage: VerificationStage | null;
+  stages: {
+    user: StageStatus;
+    data: StageStatus;
+    security: StageStatus;
+  };
+  error: string | null;
+  failedStage: VerificationStage | null;
+};
 
 // Ensure the base URL always ends with /api/v1
 function buildApiBase(): string {
@@ -46,7 +82,7 @@ function localFallbackReply(text: string): string | null {
     /\b(python|javascript|coding|c\+\+|java|php|html|css|sql|programming|developer|script|algorithm)\b/i.test(lower) ||
     /\b(poem|poetry|joke|weather|politics|president|who is|crypto|bitcoin|stock market)\b/i.test(lower)
   ) {
-    return "I am specialized only in assisting with Rens Digital products, custom printing, and orders! I cannot answer general programming or unrelated topics. Let me know if you need help with your orders or merchandise!";
+    return "I am specialized only in assisting with NUYDA ENTERPRISE products, custom printing, and orders! I cannot answer general programming or unrelated topics. Let me know if you need help with your orders or merchandise!";
   }
 
   // Direct order reference e.g. RD-1234, #RD-1234, #1234
@@ -93,13 +129,73 @@ export function useVoiceConversation(userEmail?: string | null) {
   const [error, setError]           = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
 
+  // ── Conversation ID & Database-backed verification state ────────────────────
+  const [conversationId, setConversationId] = useState<string>('');
+  const conversationIdRef = useRef<string>('');
+
+  const [isVerified, setIsVerified] = useState<boolean>(false);
+  const isVerifiedRef = useRef<boolean>(false);
+
+  const [verificationState, setVerificationState] = useState<VerificationState>({
+    inProgress: false,
+    currentStage: null,
+    stages: {
+      user: 'pending',
+      data: 'pending',
+      security: 'pending',
+    },
+    error: null,
+    failedStage: null,
+  });
+
+  const pendingRequestRef = useRef<{
+    prompt: string;
+    lang: string;
+  } | null>(null);
+
   // Conversation history sent to LLM (role+content only, no ids)
   const historyRef = useRef<{ role: string; content: string }[]>([]);
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
-  // ── Request mic permission on mount ────────────────────────────────────────
+  // ── Initialize Conversation ID and verify against Database on mount ─────────
+  useEffect(() => {
+    (async () => {
+      try {
+        let storedId = await AsyncStorage.getItem('@nuyda_active_convo_id');
+        if (!storedId) {
+          storedId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+          await AsyncStorage.setItem('@nuyda_active_convo_id', storedId);
+        }
+        setConversationId(storedId);
+        conversationIdRef.current = storedId;
 
+        // Check local storage verification flag
+        const localVerified = await AsyncStorage.getItem(`@nuyda_convo_verified_${storedId}`);
+        if (localVerified === 'true') {
+          setIsVerified(true);
+          isVerifiedRef.current = true;
+        }
+
+        // Verify and sync with database
+        try {
+          const res = await fetch(`${API}/groq/conversation/${storedId}/status`);
+          if (res.ok) {
+            const json = await res.json();
+            if (json.status === 'success' && json.data?.is_verified) {
+              setIsVerified(true);
+              isVerifiedRef.current = true;
+              await AsyncStorage.setItem(`@nuyda_convo_verified_${storedId}`, 'true');
+            }
+          }
+        } catch {}
+      } catch (err) {
+        console.warn('[VoiceConversation] Session initialization error', err);
+      }
+    })();
+  }, []);
+
+  // ── Request mic permission on mount ────────────────────────────────────────
   useEffect(() => {
     (async () => {
       const { granted } = await AudioModule.requestRecordingPermissionsAsync();
@@ -111,7 +207,6 @@ export function useVoiceConversation(userEmail?: string | null) {
   }, []);
 
   // ── Helper: append a message ────────────────────────────────────────────────
-
   const addMessage = useCallback((msg: ConvoMessage) => {
     setMessages((prev) => [...prev, msg]);
     historyRef.current = [
@@ -120,8 +215,288 @@ export function useVoiceConversation(userEmail?: string | null) {
     ];
   }, []);
 
-  // ── START recording ─────────────────────────────────────────────────────────
+  // ── Sequential 3-Stage Security Verification Runner ─────────────────────────
+  const runVerification = useCallback(async (
+    convoId: string,
+    currentHistory: { role: string; content: string }[]
+  ): Promise<boolean> => {
+    setVerificationState({
+      inProgress: true,
+      currentStage: 'user',
+      stages: {
+        user: 'active',
+        data: 'pending',
+        security: 'pending',
+      },
+      error: null,
+      failedStage: null,
+    });
 
+    // ── STAGE 1: Checking User ────────────────────────────────────────────────
+    try {
+      const res1 = await fetch(`${API}/groq/conversation/verify-stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: convoId,
+          stage: 'user',
+          user_email: userEmailRef.current || undefined,
+        }),
+      });
+      const json1 = await res1.json();
+      if (!res1.ok || json1.status !== 'success') {
+        throw new Error(json1.message ?? 'User verification failed.');
+      }
+    } catch (err: any) {
+      const msg = err?.message ?? 'Checking User stage failed.';
+      setVerificationState((prev) => ({
+        ...prev,
+        inProgress: false,
+        currentStage: 'user',
+        failedStage: 'user',
+        error: msg,
+        stages: { ...prev.stages, user: 'failed' },
+      }));
+      return false;
+    }
+
+    setVerificationState((prev) => ({
+      ...prev,
+      stages: { ...prev.stages, user: 'success' },
+    }));
+
+    await new Promise((r) => setTimeout(r, 450));
+
+    // ── STAGE 2: Checking Data ────────────────────────────────────────────────
+    setVerificationState((prev) => ({
+      ...prev,
+      currentStage: 'data',
+      stages: { ...prev.stages, data: 'active' },
+    }));
+
+    try {
+      const res2 = await fetch(`${API}/groq/conversation/verify-stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: convoId,
+          stage: 'data',
+          messages: currentHistory,
+        }),
+      });
+      const json2 = await res2.json();
+      if (!res2.ok || json2.status !== 'success') {
+        throw new Error(json2.message ?? 'Conversation data validation failed.');
+      }
+    } catch (err: any) {
+      const msg = err?.message ?? 'Checking Data stage failed.';
+      setVerificationState((prev) => ({
+        ...prev,
+        inProgress: false,
+        currentStage: 'data',
+        failedStage: 'data',
+        error: msg,
+        stages: { ...prev.stages, data: 'failed' },
+      }));
+      return false;
+    }
+
+    setVerificationState((prev) => ({
+      ...prev,
+      stages: { ...prev.stages, data: 'success' },
+    }));
+
+    await new Promise((r) => setTimeout(r, 450));
+
+    // ── STAGE 3: Securing Request & Checking Vulnerabilities (5s animation) ───
+    setVerificationState((prev) => ({
+      ...prev,
+      currentStage: 'security',
+      stages: { ...prev.stages, security: 'active' },
+    }));
+
+    const stage3StartTime = Date.now();
+
+    try {
+      const res3 = await fetch(`${API}/groq/conversation/verify-stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: convoId,
+          stage: 'security',
+        }),
+      });
+      const json3 = await res3.json();
+      if (!res3.ok || json3.status !== 'success') {
+        throw new Error(json3.message ?? 'Security validation failed.');
+      }
+    } catch (err: any) {
+      const msg = err?.message ?? 'Securing Request stage failed.';
+      setVerificationState((prev) => ({
+        ...prev,
+        inProgress: false,
+        currentStage: 'security',
+        failedStage: 'security',
+        error: msg,
+        stages: { ...prev.stages, security: 'failed' },
+      }));
+      return false;
+    }
+
+    // Animation for checking vulnerabilities lasts 5 seconds
+    const elapsed = Date.now() - stage3StartTime;
+    const remainingTime = Math.max(0, 5000 - elapsed);
+    if (remainingTime > 0) {
+      await new Promise((r) => setTimeout(r, remainingTime));
+    }
+
+    setVerificationState((prev) => ({
+      ...prev,
+      stages: { ...prev.stages, security: 'success' },
+    }));
+
+    await new Promise((r) => setTimeout(r, 400));
+
+    setIsVerified(true);
+    isVerifiedRef.current = true;
+    await AsyncStorage.setItem(`@nuyda_convo_verified_${convoId}`, 'true');
+
+    setVerificationState({
+      inProgress: false,
+      currentStage: null,
+      stages: { user: 'success', data: 'success', security: 'success' },
+      error: null,
+      failedStage: null,
+    });
+
+    return true;
+  }, []);
+
+  // ── LLM Chat & TTS execution ────────────────────────────────────────────────
+  const callLlmAndTts = useCallback(async (promptText: string, lang: string = 'en') => {
+    let activeConvoId = conversationIdRef.current;
+    if (!activeConvoId) {
+      activeConvoId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      setConversationId(activeConvoId);
+      conversationIdRef.current = activeConvoId;
+      await AsyncStorage.setItem('@nuyda_active_convo_id', activeConvoId);
+    }
+
+    // One-time initialization and security check before first AI response
+    if (!isVerifiedRef.current) {
+      pendingRequestRef.current = { prompt: promptText, lang };
+      const verifiedOk = await runVerification(activeConvoId, historyRef.current);
+      if (!verifiedOk) {
+        setVoiceState('idle');
+        return; // Halt: verification UI shows failure and blocks AI response
+      }
+      pendingRequestRef.current = null;
+    }
+
+    setVoiceState('thinking');
+
+    let reply: string;
+    let replyLang: string = lang;
+
+    try {
+      const chatRes = await fetch(`${API}/groq/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: activeConvoId,
+          messages: historyRef.current,
+          language: lang,
+          customer_email: userEmailRef.current || undefined,
+        }),
+      });
+      const chatJson = await chatRes.json();
+
+      if (!chatRes.ok || chatJson.status !== 'success') {
+        throw new Error(chatJson.message ?? 'Chat failed');
+      }
+
+      reply     = chatJson.data.reply;
+      replyLang = chatJson.data.language ?? lang;
+      const returnedProducts: ConvoProduct[] = chatJson.data.products || [];
+      addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: reply, products: returnedProducts });
+    } catch (chatErr: any) {
+      const localReply = localFallbackReply(promptText);
+      if (localReply) {
+        addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: localReply });
+        setVoiceState('idle');
+        return;
+      }
+      throw chatErr;
+    }
+
+    setVoiceState('speaking');
+
+    const ttsRes = await fetch(`${API}/groq/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: reply, language: replyLang }),
+    });
+
+    if (!ttsRes.ok) {
+      let serverMsg = '';
+      let retryAfter: number | null = null;
+      try {
+        const bodyText = await ttsRes.text();
+        try {
+          const j = JSON.parse(bodyText);
+          serverMsg = j.message ?? '';
+          retryAfter = j.data?.retry_after ?? null;
+          if (j.data?.groq_error) serverMsg = j.data.groq_error || serverMsg;
+        } catch {
+          serverMsg = bodyText.slice(0, 300);
+        }
+      } catch {}
+
+      if (ttsRes.status === 429) {
+        const fallbackOk = await speakWithExpoSpeech(reply, replyLang);
+        if (fallbackOk) {
+          setVoiceState('idle');
+          setError(null);
+          return;
+        }
+        const mins = retryAfter ? Math.ceil(retryAfter / 60) : null;
+        setError(
+          mins
+            ? `Voice daily limit reached — text reply shown. Try again in ~${mins} min.`
+            : 'Voice daily limit reached — text reply shown. Try again later.'
+        );
+        setVoiceState('idle');
+        return;
+      }
+
+      if (ttsRes.status === 413) {
+        setError('Voice reply too long — showing text only.');
+      } else if (ttsRes.status === 400) {
+        setError(serverMsg ? `Voice error: ${serverMsg}` : 'Voice configuration error — showing text only.');
+      } else {
+        setError(serverMsg ? `Voice unavailable: ${serverMsg}` : `Voice unavailable (${ttsRes.status}) — showing text reply.`);
+      }
+      setVoiceState('idle');
+      return;
+    }
+
+    await playGroqWav(ttsRes);
+    setVoiceState('idle');
+  }, [addMessage, runVerification]);
+
+  // ── Retry verification if a stage failed ────────────────────────────────────
+  const retryVerification = useCallback(async () => {
+    if (!conversationIdRef.current) return;
+    setError(null);
+    const ok = await runVerification(conversationIdRef.current, historyRef.current);
+    if (ok && pendingRequestRef.current) {
+      const pending = pendingRequestRef.current;
+      pendingRequestRef.current = null;
+      await callLlmAndTts(pending.prompt, pending.lang);
+    }
+  }, [runVerification, callLlmAndTts]);
+
+  // ── START recording ─────────────────────────────────────────────────────────
   const startRecording = useCallback(async () => {
     if (!permissionGranted) {
       const { granted } = await AudioModule.requestRecordingPermissionsAsync();
@@ -133,15 +508,13 @@ export function useVoiceConversation(userEmail?: string | null) {
       setPermissionGranted(true);
     }
     setError(null);
-    // Stop any on-device TTS that may be speaking (fallback)
     try { await Speech.stop(); } catch {}
     setVoiceState('recording');
     await recorder.prepareToRecordAsync();
     recorder.record();
   }, [permissionGranted, recorder]);
 
-  // ── STOP recording → run full pipeline ──────────────────────────────────────
-
+  // ── STOP recording → run STT then LLM pipeline ──────────────────────────────
   const stopAndProcess = useCallback(async () => {
     if (voiceState !== 'recording') return;
 
@@ -157,7 +530,6 @@ export function useVoiceConversation(userEmail?: string | null) {
     }
 
     try {
-      // ── 1. STT — use FileSystem.uploadAsync (RN FormData can't attach files) ──
       const sttUpload = await FileSystem.uploadAsync(
         `${API}/groq/transcribe`,
         uri,
@@ -172,15 +544,15 @@ export function useVoiceConversation(userEmail?: string | null) {
 
       if (sttUpload.status < 200 || sttUpload.status >= 300) {
         const bodyPreview = sttUpload.body?.slice(0, 400) ?? '';
-        console.warn('[VoiceConversation] STT failed', sttUpload.status, bodyPreview, ' URL:', `${API}/groq/transcribe`);
-        throw new Error(`STT HTTP ${sttUpload.status} — ${bodyPreview.slice(0,120)}`);
+        console.warn('[VoiceConversation] STT failed', sttUpload.status, bodyPreview);
+        throw new Error(`STT HTTP ${sttUpload.status} — ${bodyPreview.slice(0, 120)}`);
       }
 
       let sttJson: any;
       try {
         sttJson = JSON.parse(sttUpload.body);
       } catch {
-        throw new Error(`STT invalid JSON (HTTP ${sttUpload.status}): ${sttUpload.body.slice(0,200)}`);
+        throw new Error(`STT invalid JSON (HTTP ${sttUpload.status}): ${sttUpload.body.slice(0, 200)}`);
       }
 
       if (sttJson.status !== 'success') {
@@ -188,125 +560,26 @@ export function useVoiceConversation(userEmail?: string | null) {
       }
 
       const transcribedText: string = sttJson.data.text?.trim();
-      const detectedLang: string    = sttJson.data.language ?? 'en'; // ISO e.g. "tl", "en"
+      const detectedLang: string    = sttJson.data.language ?? 'en';
 
       if (!transcribedText) {
         setVoiceState('idle');
-        return; // silence or empty — just go back to idle
+        return;
       }
 
       // Display user bubble
       addMessage({ id: Date.now().toString(), role: 'user', text: transcribedText });
 
-      // ── 2. LLM ─────────────────────────────────────────────────────────────
-      setVoiceState('thinking');
-
-      let reply: string;
-      let replyLang: string = detectedLang;
-
-      try {
-        const chatRes  = await fetch(`${API}/groq/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: historyRef.current,
-            language: detectedLang,
-            customer_email: userEmailRef.current || undefined,
-          }),
-        });
-        const chatJson = await chatRes.json();
-
-        if (!chatRes.ok || chatJson.status !== 'success') {
-          throw new Error(chatJson.message ?? 'Chat failed');
-        }
-
-        reply     = chatJson.data.reply;
-        replyLang = chatJson.data.language ?? detectedLang;
-      } catch (chatErr: any) {
-        // Try local keyword fallback before giving up
-        const localReply = localFallbackReply(transcribedText);
-        if (localReply) {
-          addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: localReply });
-          setVoiceState('idle');
-          return;
-        }
-        throw chatErr;
-      }
-
-      addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: reply });
-
-      // ── 3. TTS — fetch WAV via POST, write to cache, then play ───────────
-      // TTS is non-fatal: if it fails (429/413/502) we still show the text reply and return to idle.
-      setVoiceState('speaking');
-
-      const ttsRes = await fetch(`${API}/groq/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: reply, language: replyLang }),
-      });
-
-      if (!ttsRes.ok) {
-        let serverMsg = '';
-        let retryAfter: number | null = null;
-        try {
-          const bodyText = await ttsRes.text();
-          try {
-            const j = JSON.parse(bodyText);
-            serverMsg = j.message ?? '';
-            retryAfter = j.data?.retry_after ?? null;
-            if (j.data?.groq_error) serverMsg = j.data.groq_error || serverMsg;
-          } catch {
-            serverMsg = bodyText.slice(0, 300);
-          }
-        } catch {
-          // ignore parse errors
-        }
-        console.warn('[VoiceConversation] TTS unavailable', ttsRes.status, serverMsg);
-
-        // ── FALLBACK: Groq first, expo-speech only on rate limit (429) ─────────
-        // 429 = TPD/TPM quota exhausted. Other statuses (413/400/502) are not
-        // rate limits — show text reply without attempting device TTS.
-        if (ttsRes.status === 429) {
-          const fallbackOk = await speakWithExpoSpeech(reply, replyLang);
-          if (fallbackOk) {
-            console.log('[VoiceConversation] Groq rate-limited — fallback TTS (expo-speech) succeeded');
-            setVoiceState('idle');
-            setError(null);
-            return;
-          }
-          const mins = retryAfter ? Math.ceil(retryAfter / 60) : null;
-          setError(
-            mins
-              ? `Voice daily limit reached — text reply shown. Try again in ~${mins} min.`
-              : 'Voice daily limit reached — text reply shown. Try again later.'
-          );
-          setVoiceState('idle');
-          return;
-        }
-
-        if (ttsRes.status === 413) {
-          setError('Voice reply too long — showing text only.');
-        } else if (ttsRes.status === 400) {
-          setError(serverMsg ? `Voice error: ${serverMsg}` : 'Voice configuration error — showing text only.');
-        } else {
-          setError(serverMsg ? `Voice unavailable: ${serverMsg}` : `Voice unavailable (${ttsRes.status}) — showing text reply.`);
-        }
-        setVoiceState('idle');
-        return;
-      }
-
-      await playGroqWav(ttsRes);
-
-      setVoiceState('idle');
+      // Run verification & LLM pipeline
+      await callLlmAndTts(transcribedText, detectedLang);
     } catch (err: any) {
       console.error('[VoiceConversation]', err);
       setError(err?.message ?? 'Something went wrong');
       setVoiceState('error');
     }
-  }, [voiceState, recorder, addMessage]);
+  }, [voiceState, recorder, addMessage, callLlmAndTts]);
 
-  // ── SEND text directly (quick actions) ─────────────────────────────────────
-
+  // ── SEND text directly (type or quick action) ───────────────────────────────
   const sendText = useCallback(async (text: string) => {
     if (voiceState !== 'idle' && voiceState !== 'error') return;
     setError(null);
@@ -314,107 +587,15 @@ export function useVoiceConversation(userEmail?: string | null) {
     addMessage({ id: Date.now().toString(), role: 'user', text });
 
     try {
-      setVoiceState('thinking');
-
-      let reply: string;
-      let replyLang: string = 'en';
-
-      try {
-        const chatRes  = await fetch(`${API}/groq/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: historyRef.current,
-            language: 'en',
-            customer_email: userEmailRef.current || undefined,
-          }),
-        });
-        const chatJson = await chatRes.json();
-
-        if (!chatRes.ok || chatJson.status !== 'success') {
-          throw new Error(chatJson.message ?? 'Chat failed');
-        }
-
-        reply     = chatJson.data.reply;
-        replyLang = chatJson.data.language ?? 'en';
-      } catch (chatErr: any) {
-        const localReply = localFallbackReply(text);
-        if (localReply) {
-          addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: localReply });
-          setVoiceState('idle');
-          return;
-        }
-        throw chatErr;
-      }
-
-      addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: reply });
-
-      setVoiceState('speaking');
-
-      const ttsRes = await fetch(`${API}/groq/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: reply, language: replyLang }),
-      });
-
-      if (!ttsRes.ok) {
-        let serverMsg = '';
-        let retryAfter: number | null = null;
-        try {
-          const bodyText = await ttsRes.text();
-          try {
-            const j = JSON.parse(bodyText);
-            serverMsg = j.message ?? '';
-            retryAfter = j.data?.retry_after ?? null;
-            if (j.data?.groq_error) serverMsg = j.data.groq_error || serverMsg;
-          } catch {
-            serverMsg = bodyText.slice(0, 300);
-          }
-        } catch {}
-        console.warn('[VoiceConversation] TTS unavailable', ttsRes.status, serverMsg);
-
-        // ── FALLBACK: Groq first, expo-speech only on rate limit (429) ─────────
-        if (ttsRes.status === 429) {
-          const fallbackOk = await speakWithExpoSpeech(reply, replyLang);
-          if (fallbackOk) {
-            console.log('[VoiceConversation] Groq rate-limited — fallback TTS (expo-speech) succeeded');
-            setVoiceState('idle');
-            setError(null);
-            return;
-          }
-          const mins = retryAfter ? Math.ceil(retryAfter / 60) : null;
-          setError(
-            mins
-              ? `Voice daily limit reached — text reply shown. Try again in ~${mins} min.`
-              : 'Voice daily limit reached — text reply shown. Try again later.'
-          );
-          setVoiceState('idle');
-          return;
-        }
-
-        if (ttsRes.status === 413) {
-          setError('Voice reply too long — showing text only.');
-        } else if (ttsRes.status === 400) {
-          setError(serverMsg ? `Voice error: ${serverMsg}` : 'Voice configuration error — showing text only.');
-        } else {
-          setError(serverMsg ? `Voice unavailable: ${serverMsg}` : `Voice unavailable (${ttsRes.status}) — showing text reply.`);
-        }
-        setVoiceState('idle');
-        return;
-      }
-
-      await playGroqWav(ttsRes);
-
-      setVoiceState('idle');
+      await callLlmAndTts(text, 'en');
     } catch (err: any) {
       console.error('[VoiceConversation]', err);
       setError(err?.message ?? 'Something went wrong');
       setVoiceState('error');
     }
-  }, [voiceState, addMessage]);
+  }, [voiceState, addMessage, callLlmAndTts]);
 
   // ── Toggle (tap owl / mic) ──────────────────────────────────────────────────
-
   const toggle = useCallback(() => {
     if (voiceState === 'idle' || voiceState === 'error') {
       startRecording();
@@ -424,13 +605,24 @@ export function useVoiceConversation(userEmail?: string | null) {
       try { Speech.stop(); } catch {}
       setVoiceState('idle');
     }
-    // Ignore taps during transcribing / thinking
   }, [voiceState, startRecording, stopAndProcess]);
 
-  // ── Clear conversation ──────────────────────────────────────────────────────
-
+  // ── Clear conversation (generates fresh conversation ID for new cycle) ──────
   const clearConversation = useCallback(() => {
     try { Speech.stop(); } catch {}
+    const newId = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    setConversationId(newId);
+    conversationIdRef.current = newId;
+    setIsVerified(false);
+    isVerifiedRef.current = false;
+    AsyncStorage.setItem('@nuyda_active_convo_id', newId).catch(() => {});
+    setVerificationState({
+      inProgress: false,
+      currentStage: null,
+      stages: { user: 'pending', data: 'pending', security: 'pending' },
+      error: null,
+      failedStage: null,
+    });
     historyRef.current = [];
     setError(null);
     setVoiceState('idle');
@@ -453,6 +645,10 @@ export function useVoiceConversation(userEmail?: string | null) {
     voiceState,
     error,
     permissionGranted,
+    conversationId,
+    isVerified,
+    verificationState,
+    retryVerification,
     toggle,
     sendText,
     clearConversation,

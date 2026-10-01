@@ -17,6 +17,52 @@ export const BrandColors = {
   title: '#1A1C1E',
 } as const;
 
+export const IconColors = {
+  // Brand & AI
+  ai: '#7C3AED',         // Vivid Violet
+  aiBg: '#EDE9FE',
+  sparkle: '#8B5CF6',    // Purple
+  sparkleBg: '#F3E8FF',
+
+  // Actions & Navigation
+  home: '#4F46E5',       // Indigo
+  homeBg: '#EEF2FF',
+  services: '#D97706',   // Warm Amber / Print
+  servicesBg: '#FEF3C7',
+  orders: '#0284C7',     // Sky Blue / Box
+  ordersBg: '#E0F2FE',
+  cart: '#EA580C',       // Orange / Shopping
+  cartBg: '#FFEDD5',
+
+  // Functional Purpose
+  tracking: '#0284C7',   // Delivery / Truck / Location
+  trackingBg: '#E0F2FE',
+  pricing: '#10B981',    // Money / Tags / Pricing
+  pricingBg: '#D1FAE5',
+  support: '#06B6D4',    // Customer Care / Headset
+  supportBg: '#CFFAFE',
+  design: '#EC4899',     // Creative / Art / Palette
+  designBg: '#FCE7F3',
+  security: '#6366F1',   // Shield / Verified / Lock
+  securityBg: '#EEF2FF',
+  user: '#0EA5E9',       // User / Account
+  userBg: '#E0F2FE',
+  data: '#F59E0B',       // Server / Data
+  dataBg: '#FEF3C7',
+  success: '#10B981',    // Emerald Check
+  successBg: '#D1FAE5',
+  warning: '#F59E0B',    // Amber Alert
+  warningBg: '#FEF3C7',
+  danger: '#EF4444',     // Crimson Trash / Error / Close
+  dangerBg: '#FEE2E2',
+  copy: '#0284C7',       // Clipboard / Copy
+  copyBg: '#E0F2FE',
+  share: '#3B82F6',      // Share
+  shareBg: '#DBEAFE',
+  search: '#6366F1',     // Search
+  searchBg: '#EEF2FF',
+} as const;
+
 const tintColorLight = '#0a7ea4';
 const tintColorDark = '#fff';
 

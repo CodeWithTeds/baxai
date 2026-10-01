@@ -193,16 +193,72 @@ export default function HomeScreen() {
   };
 
   const categories = [
-    { id: 'mugs', label: t.catMugs, icon: 'cafe-outline' as const },
-    { id: 'pins', label: t.catPins, icon: 'pricetag-outline' as const },
-    { id: 'apparel', label: t.prodTshirt || 'T-Shirts', icon: 'shirt-outline' as const },
-    { id: 'calendars', label: t.catCalendars, icon: 'calendar-outline' as const },
-    { id: 'totes', label: t.catTotes, icon: 'bag-outline' as const },
+    {
+      id: 'mugs',
+      label: t.catMugs,
+      icon: 'cafe' as const,
+      color: '#0284C7',
+      bg: '#E0F2FE',
+      borderColor: '#0284C7',
+      is3D: true,
+    },
+    {
+      id: 'pins',
+      label: t.catPins,
+      icon: 'pricetag' as const,
+      color: '#7C3AED',
+      bg: '#F5F3FF',
+      borderColor: '#7C3AED',
+      is3D: true,
+    },
+    {
+      id: 'apparel',
+      label: t.prodTshirt || 'T-Shirts',
+      icon: 'shirt' as const,
+      color: '#2563EB',
+      bg: '#EFF6FF',
+      borderColor: '#2563EB',
+      is3D: true,
+    },
+    {
+      id: 'calendars',
+      label: t.catCalendars,
+      icon: 'calendar' as const,
+      color: '#DC2626',
+      bg: '#FEF2F2',
+      borderColor: '#DC2626',
+      is3D: false,
+    },
+    {
+      id: 'totes',
+      label: t.catTotes,
+      icon: 'bag' as const,
+      color: '#059669',
+      bg: '#ECFDF5',
+      borderColor: '#059669',
+      is3D: false,
+    },
   ];
 
   const wideCategories = [
-    { id: 'stickers', label: t.catStickers, sublabel: 'Custom', icon: 'layers-outline' as const },
-    { id: 'printing', label: t.catPrinting, sublabel: 'General', icon: 'print-outline' as const },
+    {
+      id: 'stickers',
+      label: t.catStickers,
+      sublabel: 'Custom',
+      icon: 'layers' as const,
+      color: '#D97706',
+      bg: '#FEF3C7',
+      borderColor: '#D97706',
+    },
+    {
+      id: 'printing',
+      label: t.catPrinting,
+      sublabel: 'General',
+      icon: 'print' as const,
+      color: '#9333EA',
+      bg: '#FAF5FF',
+      borderColor: '#9333EA',
+    },
   ];
 
   const handleCategoryPress = (id: string) => {
@@ -210,6 +266,16 @@ export default function HomeScreen() {
       router.push('/mug-3d' as any);
     } else if (id === 'pins') {
       router.push('/pin-3d' as any);
+    } else if (id === 'apparel') {
+      router.push({
+        pathname: '/(tabs)/services',
+        params: { category: 'tshirts' },
+      } as any);
+    } else if (id === 'totes') {
+      router.push({
+        pathname: '/(tabs)/services',
+        params: { category: 'tote_bags' },
+      } as any);
     } else {
       router.push({
         pathname: '/(tabs)/services',
@@ -316,30 +382,30 @@ export default function HomeScreen() {
 
           {/* Icon grid row */}
           <View style={styles.catRow}>
-            {categories.map((cat) => {
-              const is3D = cat.id === 'mugs' || cat.id === 'pins';
-              return (
-                <Pressable
-                  key={cat.id}
-                  onPress={() => handleCategoryPress(cat.id)}
-                  style={({ pressed }) => [styles.catItem, pressed && styles.catItemPressed]}>
-                  <View style={[styles.catIconBox, is3D && styles.catIconBox3D, cat.id === 'pins' && { borderColor: '#7C3AED', backgroundColor: '#F5F3FF' }]}>
-                    <Ionicons name={cat.icon} size={28} color={cat.id === 'pins' ? '#7C3AED' : BrandColors.primary} />
-                    {cat.id === 'mugs' && (
-                      <View style={styles.cat3DBadge}>
-                        <Text style={styles.cat3DText}>3D</Text>
-                      </View>
-                    )}
-                    {cat.id === 'pins' && (
-                      <View style={[styles.cat3DBadge, { backgroundColor: '#7C3AED' }]}>
-                        <Text style={styles.cat3DText}>3D</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.catLabel}>{cat.label}</Text>
-                </Pressable>
-              );
-            })}
+            {categories.map((cat) => (
+              <Pressable
+                key={cat.id}
+                onPress={() => handleCategoryPress(cat.id)}
+                style={({ pressed }) => [styles.catItem, pressed && styles.catItemPressed]}>
+                <View
+                  style={[
+                    styles.catIconBox,
+                    {
+                      backgroundColor: cat.bg,
+                      borderColor: cat.borderColor,
+                      borderWidth: 1.5,
+                    },
+                  ]}>
+                  <Ionicons name={cat.icon} size={28} color={cat.color} />
+                  {cat.is3D && (
+                    <View style={[styles.cat3DBadge, { backgroundColor: cat.color }]}>
+                      <Text style={styles.cat3DText}>3D</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.catLabel}>{cat.label}</Text>
+              </Pressable>
+            ))}
           </View>
 
           {/* Wide tiles row */}
@@ -347,13 +413,20 @@ export default function HomeScreen() {
             {wideCategories.map((cat) => (
               <Pressable
                 key={cat.id}
-                onPress={() => router.push('/(tabs)/services' as any)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(tabs)/services',
+                    params: { category: cat.id },
+                  } as any)
+                }
                 style={({ pressed }) => [styles.wideCatItem, pressed && styles.wideCatItemPressed]}>
                 <View style={styles.wideCatTextGroup}>
                   <Text style={styles.wideCatSublabel}>{cat.sublabel}</Text>
-                  <Text style={styles.wideCatLabel}>{cat.label}</Text>
+                  <Text style={[styles.wideCatLabel, { color: cat.color }]}>{cat.label}</Text>
                 </View>
-                <Ionicons name={cat.icon} size={32} color="#D1D5DB" style={styles.wideCatIcon} />
+                <View style={[styles.wideCatIconBox, { backgroundColor: cat.bg, borderColor: cat.borderColor }]}>
+                  <Ionicons name={cat.icon} size={22} color={cat.color} />
+                </View>
               </Pressable>
             ))}
           </View>
@@ -653,8 +726,13 @@ const styles = StyleSheet.create({
     color: '#111827',
     fontFamily: 'Manrope_700Bold',
   },
-  wideCatIcon: {
-    opacity: 0.7,
+  wideCatIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Featured Scroll

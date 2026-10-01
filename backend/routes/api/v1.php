@@ -77,4 +77,6 @@ Route::prefix('groq')->group(function () {
     Route::post('/transcribe', [GroqController::class, 'transcribe']);
     Route::post('/chat',       [GroqController::class, 'chat']);
     Route::post('/tts',        [GroqController::class, 'tts']);
+    Route::post('/conversation/verify-stage', [GroqController::class, 'verifyStage']);
+    Route::get('/conversation/{conversation_id}/status', [GroqController::class, 'conversationStatus']);
 });

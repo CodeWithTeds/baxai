@@ -25,7 +25,7 @@ import {
   type OrderStatus,
   type TrackingStep,
 } from '@/constants/orders-data';
-import { BrandColors } from '@/constants/theme';
+import { BrandColors, IconColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
 import { ApiOrder, fetchOrderDetails } from '@/utils/api';
@@ -322,7 +322,7 @@ export default function OrderDetailScreen() {
           </Pressable>
           <Text style={styles.topBarTitle}>{t.orderDetails || 'Order Details'}</Text>
           <Pressable hitSlop={12} onPress={handleShare} style={styles.shareBtn}>
-            <Ionicons name="share-outline" size={20} color={BrandColors.primary} />
+            <Ionicons name="share-outline" size={20} color={IconColors.share} />
           </Pressable>
         </View>
       </SafeAreaView>
@@ -344,7 +344,7 @@ export default function OrderDetailScreen() {
               <Ionicons
                 name={copied ? 'checkmark' : 'copy-outline'}
                 size={13}
-                color={copied ? '#059669' : BrandColors.primary}
+                color={copied ? IconColors.success : IconColors.copy}
               />
               <Text style={[styles.copyPillText, copied && styles.copyPillTextSuccess]}>
                 {copied ? 'Copied!' : 'Copy'}
@@ -352,7 +352,7 @@ export default function OrderDetailScreen() {
             </View>
           </Pressable>
           <View style={styles.heroBadgeRow}>
-            <Ionicons name="calendar-outline" size={13} color="#9CA3AF" />
+            <Ionicons name="calendar" size={13} color={IconColors.services} />
             <Text style={styles.heroDate}>{t.placedOn || 'Placed on'} {placedDate}</Text>
           </View>
         </View>
@@ -392,7 +392,7 @@ export default function OrderDetailScreen() {
               ))
             ) : (
               <View style={styles.noItemsRow}>
-                <Ionicons name="cube-outline" size={28} color="#D1D5DB" />
+                <Ionicons name="cube" size={28} color={IconColors.orders} />
                 <Text style={styles.noItemsText}>Item details will appear once synced.</Text>
               </View>
             )}
@@ -405,8 +405,8 @@ export default function OrderDetailScreen() {
             <Text style={styles.sectionTitle}>Delivery Details</Text>
             <View style={styles.card}>
               <View style={styles.addressWrap}>
-                <View style={styles.addressIconCircle}>
-                  <Ionicons name="location" size={18} color={BrandColors.primary} />
+                <View style={[styles.addressIconCircle, { backgroundColor: IconColors.cartBg }]}>
+                  <Ionicons name="location" size={18} color={IconColors.cart} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.addressRecipient}>{shippingAddress.recipient || (order as any).customer_name || 'Customer'}</Text>
@@ -454,7 +454,7 @@ export default function OrderDetailScreen() {
             <Pressable
               onPress={handleTrackOrderAlert}
               style={({ pressed }) => [styles.actionBtnPrimary, pressed && { opacity: 0.8 }]}>
-              <Ionicons name="location-outline" size={18} color="#fff" />
+              <Ionicons name="location" size={18} color="#fff" />
               <Text style={styles.actionBtnPrimaryText}>{t.trackOrder || 'Track Order'}</Text>
             </Pressable>
           )}
@@ -463,7 +463,7 @@ export default function OrderDetailScreen() {
             <Pressable
               onPress={() => router.push('/(tabs)/services')}
               style={({ pressed }) => [styles.actionBtnPrimary, pressed && { opacity: 0.8 }]}>
-              <Ionicons name="repeat-outline" size={18} color="#fff" />
+              <Ionicons name="repeat" size={18} color="#fff" />
               <Text style={styles.actionBtnPrimaryText}>Reorder / Customize Again</Text>
             </Pressable>
           )}
@@ -471,8 +471,8 @@ export default function OrderDetailScreen() {
           <Pressable
             onPress={() => router.push('/(tabs)/ai-hub')}
             style={({ pressed }) => [styles.actionBtnSecondary, pressed && { opacity: 0.7 }]}>
-            <Ionicons name="chatbubble-outline" size={18} color={BrandColors.primary} />
-            <Text style={styles.actionBtnSecondaryText}>{t.qaTalkAgent || 'Chat with AI Support'}</Text>
+            <Ionicons name="sparkles" size={18} color={IconColors.ai} />
+            <Text style={[styles.actionBtnSecondaryText, { color: IconColors.ai }]}>{t.qaTalkAgent || 'Chat with AI Support'}</Text>
           </Pressable>
         </View>
 

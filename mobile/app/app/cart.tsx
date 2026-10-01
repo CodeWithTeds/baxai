@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BrandColors } from '@/constants/theme';
+import { BrandColors, IconColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { CartItem, useCart } from '@/contexts/cart-context';
 import { createOrder } from '@/utils/api';
@@ -170,8 +170,8 @@ export default function CartScreen() {
       {/* ── Main Content ──────────────────────────────────────── */}
       {items.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconCircle}>
-            <Ionicons name="cart-outline" size={56} color="#9CA3AF" />
+          <View style={[styles.emptyIconCircle, { backgroundColor: IconColors.cartBg }]}>
+            <Ionicons name="cart" size={54} color={IconColors.cart} />
           </View>
           <Text style={styles.emptyTitle}>Your cart is empty</Text>
           <Text style={styles.emptySubtitle}>
@@ -179,7 +179,7 @@ export default function CartScreen() {
           </Text>
           <Pressable
             onPress={() => router.replace('/(tabs)/services')}
-            style={({ pressed }) => [styles.browseBtn, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.browseBtn, { backgroundColor: IconColors.home }, pressed && { opacity: 0.85 }]}
           >
             <Ionicons name="sparkles" size={18} color="#FFFFFF" />
             <Text style={styles.browseBtnText}>Browse Products</Text>
@@ -277,8 +277,8 @@ export default function CartScreen() {
             onPress={() => router.push('/(tabs)/services')}
             style={({ pressed }) => [styles.continueBtn, pressed && { opacity: 0.7 }]}
           >
-            <Ionicons name="add-circle-outline" size={18} color="#374151" />
-            <Text style={styles.continueBtnText}>Add More Products</Text>
+            <Ionicons name="add-circle" size={18} color={IconColors.home} />
+            <Text style={[styles.continueBtnText, { color: IconColors.home }]}>Add More Products</Text>
           </Pressable>
         </ScrollView>
       )}
@@ -311,10 +311,10 @@ export default function CartScreen() {
                 <Ionicons
                   name={copiedRef ? 'checkmark-circle' : 'copy-outline'}
                   size={14}
-                  color={copiedRef ? '#059669' : BrandColors.primary}
+                  color={copiedRef ? IconColors.success : IconColors.copy}
                 />
                 {copiedRef && (
-                  <Text style={{ fontSize: 11, color: '#059669', fontWeight: '700', fontFamily: 'Manrope_700Bold' }}>
+                  <Text style={{ fontSize: 11, color: IconColors.success, fontWeight: '700', fontFamily: 'Manrope_700Bold' }}>
                     Copied!
                   </Text>
                 )}
@@ -379,8 +379,8 @@ function CartItemCard({
           {previewUri ? (
             <ExpoImage source={{ uri: previewUri }} style={styles.itemImage} contentFit="cover" />
           ) : (
-            <View style={styles.imgFallback}>
-              <Ionicons name="cube" size={28} color="#9CA3AF" />
+            <View style={[styles.imgFallback, { backgroundColor: IconColors.ordersBg }]}>
+              <Ionicons name="cube" size={28} color={IconColors.orders} />
             </View>
           )}
         </View>
@@ -389,7 +389,7 @@ function CartItemCard({
           <View style={styles.nameRow}>
             <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
             <Pressable onPress={onRemove} hitSlop={8} style={styles.removeBtn}>
-              <Ionicons name="close" size={18} color="#9CA3AF" />
+              <Ionicons name="trash-outline" size={17} color={IconColors.danger} />
             </Pressable>
           </View>
 

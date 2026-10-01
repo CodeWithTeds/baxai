@@ -95,15 +95,21 @@ function getProductImage(item: { thumbnail?: string | null; fallback_image?: str
   return require('@/assets/images/custom-mugs.jpeg');
 }
 
-const CATEGORY_TABS: { id: CategoryId; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'all', label: 'All Categories', icon: 'grid-outline' },
-  { id: 'mugs', label: 'Mugs', icon: 'cafe-outline' },
-  { id: 'pins', label: 'Pins', icon: 'pricetag-outline' },
-  { id: 'tshirts', label: 'T-Shirts', icon: 'shirt-outline' },
-  { id: 'stickers', label: 'Stickers', icon: 'layers-outline' },
-  { id: 'tote_bags', label: 'Tote Bags', icon: 'bag-outline' },
-  { id: 'calendars', label: 'Calendars', icon: 'calendar-outline' },
-  { id: 'printing', label: 'Printing', icon: 'print-outline' },
+const CATEGORY_TABS: {
+  id: CategoryId;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  bg: string;
+}[] = [
+  { id: 'all', label: 'All Categories', icon: 'grid', color: '#4F46E5', bg: '#EEF2FF' },
+  { id: 'mugs', label: 'Mugs', icon: 'cafe', color: '#0284C7', bg: '#E0F2FE' },
+  { id: 'pins', label: 'Pins', icon: 'pricetag', color: '#7C3AED', bg: '#EDE9FE' },
+  { id: 'tshirts', label: 'T-Shirts', icon: 'shirt', color: '#2563EB', bg: '#EFF6FF' },
+  { id: 'stickers', label: 'Stickers', icon: 'layers', color: '#D97706', bg: '#FEF3C7' },
+  { id: 'tote_bags', label: 'Tote Bags', icon: 'bag', color: '#059669', bg: '#ECFDF5' },
+  { id: 'calendars', label: 'Calendars', icon: 'calendar', color: '#DC2626', bg: '#FEF2F2' },
+  { id: 'printing', label: 'Printing', icon: 'print', color: '#9333EA', bg: '#FAF5FF' },
 ];
 
 const CUSTOMIZABLE_CATEGORY_CARDS: CategoryCardItem[] = [
@@ -447,12 +453,16 @@ export default function ServicesScreen() {
                   isSelected && styles.catChipActive,
                   pressed && { opacity: 0.8 },
                 ]}>
-                <Ionicons
-                  name={tab.icon}
-                  size={14}
-                  color={isSelected ? '#FFFFFF' : '#4B5563'}
-                  style={{ marginRight: 6 }}
-                />
+                <View style={[
+                  styles.catChipIconWrap,
+                  { backgroundColor: isSelected ? 'rgba(255,255,255,0.22)' : tab.bg }
+                ]}>
+                  <Ionicons
+                    name={tab.icon}
+                    size={12}
+                    color={isSelected ? '#FFFFFF' : tab.color}
+                  />
+                </View>
                 <Text style={[styles.catChipText, isSelected && styles.catChipTextActive]}>
                   {tab.label}
                 </Text>
@@ -679,6 +689,14 @@ const styles = StyleSheet.create({
   catChipActive: {
     backgroundColor: BrandColors.primary,
     borderColor: BrandColors.primary,
+  },
+  catChipIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
   },
   catChipText: {
     fontSize: 13,
