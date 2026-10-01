@@ -1142,11 +1142,13 @@ export default function Mug3DScreen() {
               <Text style={styles.priceLabel}>Total Price</Text>
               <Text style={styles.priceValue}>{displayTotal}</Text>
             </View>
-            <Pressable
+          <Pressable
               onPress={handleAddToCart}
-              style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.9 }]}>
+              style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
+            >
+              <Ionicons name="bag-add-outline" size={22} color="#fff" />
               <Text style={styles.addBtnText}>Add to Cart</Text>
-              <Ionicons name="cart-outline" size={18} color="#fff" />
+              <Text style={styles.addBtnPrice}>{displayTotal}</Text>
             </Pressable>
           </View>
         </View>
@@ -1493,13 +1495,22 @@ const styles = StyleSheet.create({
   priceLabel: { fontSize: 11, color: '#9CA3AF' },
   priceValue: { fontSize: 22, fontWeight: '800', color: BrandColors.primary, fontFamily: 'Manrope_700Bold' },
   addBtn: {
-    backgroundColor: BrandColors.primary,
-    paddingHorizontal: 22,
-    paddingVertical: 13,
-    borderRadius: 14,
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: BrandColors.primary,
+    paddingVertical: 17,
+    borderRadius: 16,
+    marginTop: 4,
   },
-  addBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', fontFamily: 'Manrope_700Bold' },
+  addBtnPressed: { opacity: 0.88, transform: [{ scale: 0.97 }] },
+  addBtnText: { color: '#fff', fontSize: 16, fontWeight: '800', fontFamily: 'Manrope_700Bold' },
+  addBtnPrice: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: 'Inter_600SemiBold',
+  },
 });

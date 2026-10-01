@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image as ExpoImage } from 'expo-image';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -14,7 +16,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -25,6 +26,7 @@ import {
   type TrackingStep,
 } from '@/constants/orders-data';
 import { BrandColors } from '@/constants/theme';
+import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
 import { ApiOrder, fetchOrderDetails } from '@/utils/api';
 
@@ -118,7 +120,7 @@ function DynamicLineItemRow({ item }: { item: any }) {
     <View style={li.row}>
       <View style={li.imgWrap}>
         {previewUri ? (
-          <ExpoImage source={{ uri: previewUri }} style={li.img} contentFit="cover" />
+          <Image source={{ uri: previewUri }} style={li.img} resizeMode="cover" />
         ) : (
           <View style={li.fallbackImg}>
             <Ionicons name="cube" size={28} color="#9CA3AF" />
@@ -183,9 +185,22 @@ function DynamicLineItemRow({ item }: { item: any }) {
 export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useLanguage();
+  const { user } = useAuth();
 
   const [order, setOrder] = useState<ApiOrder | Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyOrderNumber = async () => {
+    if (!order) return;
+    const orderNum = order.orderNumber || (order as any).order_number || order.id;
+    await Clipboard.setStringAsync(String(orderNum));
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -194,15 +209,22 @@ export default function OrderDetailScreen() {
       if (!id) return;
       setLoading(true);
 
+      const cleanId = String(id).trim().replace(/^#/, '');
+      const lower = cleanId.toLowerCase();
+
       // Check fallback first for immediate responsiveness
-      const fallback = ALL_ORDERS.find((o) => o.id === id || o.orderNumber === id);
+      const fallback = ALL_ORDERS.find((o) =>
+        o.id === cleanId ||
+        o.orderNumber.toLowerCase() === lower ||
+        o.orderNumber.toLowerCase() === `rd-${lower}`
+      );
       if (fallback && isMounted) {
         setOrder(fallback);
       }
 
       // Fetch dynamic order from backend API
       try {
-        const dynamicOrder = await fetchOrderDetails(id);
+        const dynamicOrder = await fetchOrderDetails(cleanId, user?.email);
         if (dynamicOrder && isMounted) {
           setOrder(dynamicOrder);
         }
@@ -218,7 +240,7 @@ export default function OrderDetailScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, user?.email]);
 
   const handleShare = async () => {
     if (!order) return;
@@ -267,11 +289,19 @@ export default function OrderDetailScreen() {
   const placedDate = order.placedOn || (order as any).placed_at || 'Recently';
   const expectedDelivery = (order as any).expectedDelivery || (order as any).expected_delivery || '3–5 business days';
 
-  const lineItems = (order as any).lineItems || (order as any).items || [];
-  const trackingSteps = (order as any).trackingSteps || (order as any).tracking_steps || [];
+  const lineItems: any[] = Array.isArray((order as any).lineItems)
+    ? (order as any).lineItems
+    : Array.isArray((order as any).items)
+    ? (order as any).items
+    : [];
+  const trackingSteps: any[] = Array.isArray((order as any).trackingSteps)
+    ? (order as any).trackingSteps
+    : Array.isArray((order as any).tracking_steps)
+    ? (order as any).tracking_steps
+    : [];
 
-  const subtotalFormatted = (order as any).subtotal_formatted || (typeof order.subtotal === 'number' ? `₱${order.subtotal.toFixed(2)}` : String(order.subtotal));
-  const shippingFormatted = (order as any).shipping_fee_formatted || order.delivery || 'Free';
+  const subtotalFormatted = (order as any).subtotal_formatted || (typeof (order as any).subtotal === 'number' ? `₱${(order as any).subtotal.toFixed(2)}` : String((order as any).subtotal ?? '₱0.00'));
+  const shippingFormatted = (order as any).shipping_fee_formatted || (order as any).delivery || 'Free';
   const totalFormatted = (order as any).total_formatted || (order as any).total_display || (typeof order.total === 'number' ? `₱${order.total.toFixed(2)}` : String(order.total));
   const customizationFeeFormatted = (order as any).customization_total_formatted || ((order as any).customization_total > 0 ? `+₱${Number((order as any).customization_total).toFixed(2)}` : null);
 
@@ -302,17 +332,33 @@ export default function OrderDetailScreen() {
         contentContainerStyle={styles.scroll}>
 
         {/* ── Order number + date ──────────────────────────────── */}
-        <Animated.View entering={FadeInUp.duration(400)} style={styles.heroSection}>
+        <View style={styles.heroSection}>
           <Text style={styles.heroLabel}>{(t.orderNumberPrefix || 'ORDER').toUpperCase()}</Text>
-          <Text style={styles.heroNumber}>#{orderNum}</Text>
+          <Pressable
+            onPress={handleCopyOrderNumber}
+            hitSlop={10}
+            style={({ pressed }) => [styles.copyOrderNumBtn, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={styles.heroNumber}>#{orderNum}</Text>
+            <View style={[styles.copyPill, copied && styles.copyPillSuccess]}>
+              <Ionicons
+                name={copied ? 'checkmark' : 'copy-outline'}
+                size={13}
+                color={copied ? '#059669' : BrandColors.primary}
+              />
+              <Text style={[styles.copyPillText, copied && styles.copyPillTextSuccess]}>
+                {copied ? 'Copied!' : 'Copy'}
+              </Text>
+            </View>
+          </Pressable>
           <View style={styles.heroBadgeRow}>
             <Ionicons name="calendar-outline" size={13} color="#9CA3AF" />
             <Text style={styles.heroDate}>{t.placedOn || 'Placed on'} {placedDate}</Text>
           </View>
-        </Animated.View>
+        </View>
 
         {/* ── Delivery + status card ───────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(80).duration(500)} style={styles.card}>
+        <View style={styles.card}>
           <View style={styles.deliveryRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.deliveryLabel}>{t.estimatedDelivery || 'Estimated Delivery'}</Text>
@@ -328,25 +374,34 @@ export default function OrderDetailScreen() {
 
           {/* Tracking timeline */}
           <Timeline steps={trackingSteps} />
-        </Animated.View>
+        </View>
 
         {/* ── Items in order ───────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(160).duration(500)}>
-          <Text style={styles.sectionTitle}>{t.itemsOrdered || 'Items in Order'} ({lineItems.length})</Text>
+        <View>
+          <Text style={styles.sectionTitle}>
+            {t.itemsOrdered || 'Items in Order'}{lineItems.length > 0 ? ` (${lineItems.length})` : ''}
+          </Text>
 
           <View style={styles.card}>
-            {lineItems.map((item: any, i: number) => (
-              <View key={item.id || i}>
-                <DynamicLineItemRow item={item} />
-                {i < lineItems.length - 1 && <View style={styles.cardDivider} />}
+            {lineItems.length > 0 ? (
+              lineItems.map((item: any, i: number) => (
+                <View key={item.id || i}>
+                  <DynamicLineItemRow item={item} />
+                  {i < lineItems.length - 1 && <View style={styles.cardDivider} />}
+                </View>
+              ))
+            ) : (
+              <View style={styles.noItemsRow}>
+                <Ionicons name="cube-outline" size={28} color="#D1D5DB" />
+                <Text style={styles.noItemsText}>Item details will appear once synced.</Text>
               </View>
-            ))}
+            )}
           </View>
-        </Animated.View>
+        </View>
 
         {/* ── Shipping Address (if dynamic) ────────────────────── */}
         {shippingAddress && (
-          <Animated.View entering={FadeInDown.delay(200).duration(500)}>
+          <View>
             <Text style={styles.sectionTitle}>Delivery Details</Text>
             <View style={styles.card}>
               <View style={styles.addressWrap}>
@@ -363,11 +418,11 @@ export default function OrderDetailScreen() {
                 </View>
               </View>
             </View>
-          </Animated.View>
+          </View>
         )}
 
         {/* ── Price summary ────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(240).duration(500)} style={styles.card}>
+        <View style={styles.card}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>{t.subtotal || 'Subtotal'}</Text>
             <Text style={styles.summaryValue}>{subtotalFormatted}</Text>
@@ -391,10 +446,10 @@ export default function OrderDetailScreen() {
             <Text style={styles.totalLabel}>{t.total || 'Total'}</Text>
             <Text style={styles.totalValue}>{totalFormatted}</Text>
           </View>
-        </Animated.View>
+        </View>
 
         {/* ── Actions ──────────────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.actions}>
+        <View style={styles.actions}>
           {(statusKey === 'in_progress' || statusKey === 'processing') && (
             <Pressable
               onPress={handleTrackOrderAlert}
@@ -419,7 +474,7 @@ export default function OrderDetailScreen() {
             <Ionicons name="chatbubble-outline" size={18} color={BrandColors.primary} />
             <Text style={styles.actionBtnSecondaryText}>{t.qaTalkAgent || 'Chat with AI Support'}</Text>
           </Pressable>
-        </Animated.View>
+        </View>
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -700,7 +755,38 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#111827',
     fontFamily: 'Manrope_700Bold',
+  },
+  copyOrderNumBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     marginBottom: 8,
+    marginTop: 2,
+  },
+  copyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#BFDBFE',
+  },
+  copyPillSuccess: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  copyPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: BrandColors.primary,
+    fontFamily: 'Manrope_700Bold',
+  },
+  copyPillTextSuccess: {
+    color: '#059669',
   },
   heroBadgeRow: {
     flexDirection: 'row',
@@ -904,5 +990,18 @@ const styles = StyleSheet.create({
 
   bottomSpacer: {
     height: 24,
+  },
+
+  noItemsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+  },
+  noItemsText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontFamily: 'Inter_400Regular',
   },
 });

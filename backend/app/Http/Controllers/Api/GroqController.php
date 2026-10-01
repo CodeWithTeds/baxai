@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Order;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -107,11 +108,17 @@ Always respond in the language and style primarily used by the customer. Do not 
 
 ---
 
-# 2. RESPONSE STYLE
+# 2. RESPONSE STYLE & PLAIN TEXT FORMATTING (CRITICAL FOR NON-TECH USERS)
 
-Always be: Friendly, Professional, Concise, Helpful, Clear, Natural.
+Always be: Friendly, Warm, Conversational, Professional, Concise, Helpful, and Clear.
 
-Use the shortest response that completely answers the question. For simple questions give a direct answer. For complicated concerns explain in clear numbered steps.
+CRITICAL FORMATTING RULES:
+- NEVER use markdown syntax: NO double asterisks (**bold**), NO single asterisks (*italic*), NO bullet hyphens (- item or --), NO hashtags (#), and NO raw code blocks.
+- Regular everyday shoppers and non-technical customers read your responses on a mobile phone screen and listen to them spoken aloud via text-to-speech. Asterisks (**), hyphens (-), and symbols look like broken computer code or formatting errors to them and sound robotic when read aloud!
+- Always write in clean, natural, human conversational sentences and short paragraphs.
+- For order tracking updates, explain status and delivery dates naturally like a helpful retail assistant:
+  Example: "Good news! Your order RD-3607 is currently in production and scheduled for fulfillment. Estimated delivery is on October 6, with Cash on Delivery payment. We will send you an update as soon as it ships!"
+- Never use list dashes like "- Status: In progress" or "- Payment: COD". Integrate the details into smooth, natural sentences instead.
 
 ---
 
@@ -121,25 +128,61 @@ NEVER invent or assume product prices, availability, order status, tracking numb
 
 ---
 
-# 4. PRIVACY
-
-Never expose passwords, OTPs, PINs, card numbers, or another customer's information.
+# 4. PRIVACY & SECURITY
+Never expose passwords, OTPs, PINs, card numbers, or another customer's personal data or order history.
 
 ---
 
-# 5. FINAL PRINCIPLE
+# 5. STRICT DOMAIN SCOPE & OFF-TOPIC POLICY (MANDATORY)
+- You are EXCLUSIVELY a customer support assistant for Rens Digital / NUYDA ENTERPRISE (custom printing, mugs, t-shirts, stickers, pins, tote bags, orders, tracking, pricing, and store inquiries).
+- You MUST REFUSE to answer ANY off-topic or unrelated questions, including:
+  - Programming, coding, computer science (e.g. "What is Python?", "Write code in JavaScript", "How to write a function", HTML, CSS, SQL, bug fixing, etc.)
+  - General world knowledge, facts, science, history, politics, gaming, cooking recipes, or celebrity news.
+  - Math homework or general academic tutoring.
+- If the customer asks ANY question not directly related to our printing services, products, orders, or shopping on this app:
+  You MUST DECLINE immediately in 1-2 friendly sentences and guide them back to our store services.
+  Example decline: "I am specialized only in assisting with Rens Digital products, custom printing, and orders! I cannot answer general programming or unrelated topics. How can I help you with our custom merchandise or orders today?"
+- NEVER explain code, write scripts, or answer general tech questions like "what is Python".
 
-Never guess. Never invent system data. Be concise, natural, accurate, and helpful.
+---
+
+# 6. DIRECT ORDER TRACKING BY ORDER ID
+- When a customer provides their specific Order ID or Reference (e.g. RD-3607, #RD-3607, or numeric ID):
+  - Track and provide the order details directly using that Order ID!
+  - DO NOT ask them to log in.
+  - DO NOT ask them for their email address or account.
+  - They have the order number, so give them the tracking progress, estimated delivery, and payment status directly, warmly, and helpfully.
+- If a customer asks "where is my order" but does NOT provide an order ID:
+  - Ask them politely to provide their Order Reference (e.g. RD-3607) so you can track it for them.
+- If a customer asks to browse "all orders" or orders from other people:
+  - Explain that you can only track a specific order reference and ask for their Order ID.
+
+---
+
+# 7. FINAL PRINCIPLE
+Never guess. Never invent system data. Stay strictly on-topic. Be concise, natural, accurate, and helpful.
 PROMPT;
 
         if ($isTagalog) {
             $systemPrompt .= "\n\nNOTE: Customer is speaking Filipino/Tagalog. Respond in Filipino/Tagalog or Taglish.";
         }
 
+        // Authenticated or provided customer email
+        $customerEmail = $request->input('customer_email');
+        if (empty($customerEmail) && $request->user()) {
+            $customerEmail = $request->user()->email;
+        }
+
         // Inject live DB context
         $dbContext = $this->buildDbContext();
         if ($dbContext) {
             $systemPrompt .= "\n\n--- LIVE SYSTEM DATA ---\n{$dbContext}\n--- END SYSTEM DATA ---";
+        }
+
+        // Specifically look up any order reference mentioned in customer messages
+        $matchedOrder = $this->findMentionedOrderContext($request->input('messages', []), $customerEmail);
+        if ($matchedOrder) {
+            $systemPrompt .= "\n\n--- SPECIFIC MATCHED ORDER FROM DATABASE ---\n{$matchedOrder}\n--- END MATCHED ORDER ---";
         }
 
         $messages = array_merge(
@@ -153,7 +196,7 @@ PROMPT;
                 'model'       => 'openai/gpt-oss-20b',
                 'messages'    => $messages,
                 'temperature' => 0.7,
-                'max_tokens'  => 150,
+                'max_tokens'  => 350,
             ]);
 
         if ($response->failed()) {
@@ -167,6 +210,17 @@ PROMPT;
         $reply = preg_replace('/<think>[\s\S]*?<\/think>/u', '', $reply);
         // Fallback: strip any stray opening/closing think tags
         $reply = preg_replace('/<\/?think>/u', '', $reply);
+
+        // Clean markdown symbols for clean non-technical display & natural voice speech
+        // Strip bold/italic asterisks: **text** -> text, *text* -> text
+        $reply = preg_replace('/\*{1,3}([^*]+)\*{1,3}/u', '$1', $reply);
+        // Strip stray markdown headers
+        $reply = preg_replace('/^#+\s*/mu', '', $reply);
+        // Clean markdown list bullets: convert "- Item" into "• Item"
+        $reply = preg_replace('/^\s*[-*]\s+/mu', '• ', $reply);
+        // Remove double hyphens, stray asterisks, or markdown lines
+        $reply = str_replace(['**', '*', '`', '---', '--'], ['', '', '', '', ' - '], $reply);
+        $reply = preg_replace('/[ \t]{2,}/u', ' ', $reply);
         $reply = trim($reply);
 
         // Safety truncation to stay under TTS 1200 TPM limit — be conservative (400 chars ≈ well under 1200 TPM)
@@ -304,31 +358,33 @@ PROMPT;
         $lines = [];
 
         try {
-            $userCount = DB::table('users')->count();
-            $lines[]   = "Total registered customers: {$userCount}";
+            $customerCount = DB::table('customers')->count();
+            $orderCount = Order::count();
+            $lines[] = "Total registered customers: {$customerCount}";
+            $lines[] = "Total active/completed orders in system: {$orderCount}";
 
-            $taskStats = DB::table('tasks')
-                ->selectRaw('status, COUNT(*) as total')
+            $orderStats = Order::selectRaw('status, COUNT(*) as total')
                 ->groupBy('status')
                 ->get();
 
-            if ($taskStats->isNotEmpty()) {
-                $lines[] = "\nOrder summary by status:";
-                foreach ($taskStats as $row) {
+            if ($orderStats->isNotEmpty()) {
+                $lines[] = "\nSystem orders by status:";
+                foreach ($orderStats as $row) {
                     $lines[] = "  - {$row->status}: {$row->total} order(s)";
                 }
             }
 
-            $recent = DB::table('tasks')
-                ->select('id', 'title', 'status', 'created_at')
-                ->orderByDesc('created_at')
-                ->limit(5)
+            // Recent customer orders from real orders table
+            $recentOrders = Order::with('items')
+                ->latest('placed_at')
+                ->limit(10)
                 ->get();
 
-            if ($recent->isNotEmpty()) {
-                $lines[] = "\nMost recent orders:";
-                foreach ($recent as $task) {
-                    $lines[] = "  - Order #{$task->id}: \"{$task->title}\" | Status: {$task->status} | Date: {$task->created_at}";
+            if ($recentOrders->isNotEmpty()) {
+                $lines[] = "\nRecent verified orders in database:";
+                foreach ($recentOrders as $ord) {
+                    $itemsStr = $ord->items->map(fn($it) => "{$it->product_name} (x{$it->quantity})")->implode(', ');
+                    $lines[] = "  - Order #{$ord->order_number}: Customer \"{$ord->customer_name}\" ({$ord->customer_email}) | Items: [{$itemsStr}] | Total: \${$ord->total} | Status: {$ord->status} | Expected Delivery: {$ord->expected_delivery}";
                 }
             }
         } catch (\Throwable $e) {
@@ -336,5 +392,75 @@ PROMPT;
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Scan customer messages for order numbers (e.g. RD-3607, #RD-3607, 3607)
+     * and inject full live tracking and item details into AI context.
+     */
+    private function findMentionedOrderContext(array $messages, ?string $customerEmail = null): ?string
+    {
+        try {
+            $fullText = '';
+            foreach ($messages as $msg) {
+                if (($msg['role'] ?? '') === 'user') {
+                    $fullText .= ' ' . ($msg['content'] ?? '');
+                }
+            }
+
+            if (empty(trim($fullText))) {
+                return null;
+            }
+
+            // Extract candidate numbers / references
+            preg_match_all('/(?:#|rd-|\border\s*#?)\s*([a-z0-9_-]{3,20})/i', $fullText, $matches1);
+            preg_match_all('/\b(rd-\d{3,6}|\d{4,6})\b/i', $fullText, $matches2);
+
+            $candidates = array_unique(array_filter(array_merge($matches1[0] ?? [], $matches1[1] ?? [], $matches2[0] ?? [])));
+
+            foreach ($candidates as $cand) {
+                $raw = trim($cand);
+                $unhashed = ltrim($raw, '#');
+                $digits = preg_replace('/\D/', '', $unhashed);
+
+                $order = Order::with(['items', 'customer'])
+                    ->where(function ($query) use ($raw, $unhashed, $digits) {
+                        if (is_numeric($raw)) {
+                            $query->orWhere('id', (int) $raw);
+                        }
+
+                        $query->orWhereRaw('LOWER(order_number) = ?', [strtolower($raw)])
+                              ->orWhereRaw('LOWER(order_number) = ?', [strtolower($unhashed)])
+                              ->orWhereRaw('REPLACE(LOWER(order_number), "-", "") = ?', [strtolower($unhashed)]);
+
+                        if (!empty($digits) && strlen($digits) >= 3) {
+                            $query->orWhereRaw('LOWER(order_number) = ?', [strtolower('RD-' . $digits)])
+                                  ->orWhere('order_number', 'like', '%-' . $digits);
+                        }
+                    })
+                    ->first();
+
+                if ($order) {
+                    $itemsDetail = $order->items->map(function ($it) {
+                        return "{$it->product_name} (Qty: {$it->quantity})";
+                    })->implode(', ');
+
+                    return implode("\n", [
+                        "ORDER TRACKING DETAILS FOR #{$order->order_number}:",
+                        "Order Reference: #{$order->order_number} (Internal ID: {$order->id})",
+                        "Current Status: {$order->status} (in production and scheduled for fulfillment)",
+                        "Placed Date: " . ($order->placed_at ? $order->placed_at->format('M d, Y') : 'Recently'),
+                        "Estimated Delivery: {$order->expected_delivery}",
+                        "Total Amount: ₱{$order->total} (Payment: {$order->payment_method}, {$order->payment_status})",
+                        "Items in Order: {$itemsDetail}",
+                        "MANDATORY INSTRUCTION: The customer provided this exact Order ID. Give them the order tracking update directly and immediately! DO NOT ask them to log in. DO NOT ask for their email address. Explain these details in warm, friendly, natural sentences without markdown asterisks (**) or bullet dashes (-).",
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('findMentionedOrderContext failed', ['error' => $e->getMessage()]);
+        }
+
+        return null;
     }
 }

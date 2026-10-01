@@ -1,9 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Animated,
   Modal,
   Platform,
   Pressable,
@@ -19,15 +23,54 @@ import { useAuth } from '@/contexts/auth-context';
 import { CartItem, useCart } from '@/contexts/cart-context';
 import { createOrder } from '@/utils/api';
 
+// ─── Full-screen loading overlay ─────────────────────────────────────────────
+
+function LoadingOverlay({ visible, label }: { visible: boolean; label?: string }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: visible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View style={[styles.loadingOverlay, { opacity }]}>
+      <View style={styles.loadingBox}>
+        <ActivityIndicator size="large" color={BrandColors.primary} />
+        {label ? <Text style={styles.loadingLabel}>{label}</Text> : null}
+      </View>
+    </Animated.View>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
 export default function CartScreen() {
   const { items, itemCount, subtotal, updateQuantity, removeItem, clearCart } = useCart();
   const { user } = useAuth();
   const [orderSuccessModal, setOrderSuccessModal] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState('');
+  const [copiedRef, setCopiedRef] = useState(false);
+
+  const handleCopyReference = async () => {
+    if (!placedOrderId) return;
+    await Clipboard.setStringAsync(placedOrderId);
+    try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+    setCopiedRef(true);
+    setTimeout(() => setCopiedRef(false), 2000);
+  };
 
   const handleClearCart = () => {
-    Alert.alert('Clear Cart', 'Are you sure you want to remove all items from your cart?', [
+    Alert.alert('Clear Cart', 'Remove all items?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Clear All', style: 'destructive', onPress: clearCart },
     ]);
@@ -35,6 +78,7 @@ export default function CartScreen() {
 
   const handleCheckout = async () => {
     if (items.length === 0 || isSubmitting) return;
+    setLoadingLabel('Placing your order…');
     setIsSubmitting(true);
 
     try {
@@ -72,6 +116,7 @@ export default function CartScreen() {
       setOrderSuccessModal(true);
     } finally {
       setIsSubmitting(false);
+      setLoadingLabel('');
     }
   };
 
@@ -81,25 +126,20 @@ export default function CartScreen() {
     router.replace('/(tabs)/orders');
   };
 
-  // Calculate total customization addon fees across cart
   const totalCustomizationFees = items.reduce(
     (sum, it) => sum + (it.addonPrice || 0) * (it.quantity || 1),
     0
   );
-
   const baseItemsSubtotal = subtotal - totalCustomizationFees;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      {/* ── Top Header Navigation ──────────────────────────────── */}
+      {/* ── Top Header ─────────────────────────────────────────── */}
       <View style={styles.header}>
         <Pressable
           onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace('/(tabs)');
-            }
+            if (router.canGoBack()) router.back();
+            else router.replace('/(tabs)');
           }}
           style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.7 }]}
           hitSlop={8}
@@ -119,7 +159,6 @@ export default function CartScreen() {
             onPress={handleClearCart}
             style={({ pressed }) => [styles.headerBtn, styles.clearBtn, pressed && { opacity: 0.7 }]}
             hitSlop={8}
-            accessibilityLabel="Clear all items in cart"
           >
             <Ionicons name="trash-outline" size={18} color="#DC2626" />
           </Pressable>
@@ -128,7 +167,7 @@ export default function CartScreen() {
         )}
       </View>
 
-      {/* ── Main Content ────────────────────────────────────────── */}
+      {/* ── Main Content ──────────────────────────────────────── */}
       {items.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconCircle}>
@@ -136,14 +175,14 @@ export default function CartScreen() {
           </View>
           <Text style={styles.emptyTitle}>Your cart is empty</Text>
           <Text style={styles.emptySubtitle}>
-            Customize dynamic products with 3D interactive preview and add them here to review!
+            Customize products with 3D preview and add them here.
           </Text>
           <Pressable
             onPress={() => router.replace('/(tabs)/services')}
             style={({ pressed }) => [styles.browseBtn, pressed && { opacity: 0.85 }]}
           >
             <Ionicons name="sparkles" size={18} color="#FFFFFF" />
-            <Text style={styles.browseBtnText}>Browse Customizable Products</Text>
+            <Text style={styles.browseBtnText}>Browse Products</Text>
           </Pressable>
         </View>
       ) : (
@@ -152,20 +191,7 @@ export default function CartScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Pre-Cart Verification Status Banner ───────────── */}
-          <View style={styles.verificationBanner}>
-            <View style={styles.bannerHeaderRow}>
-              <View style={styles.bannerCheckIcon}>
-                <Ionicons name="checkmark-circle" size={18} color="#059669" />
-              </View>
-              <Text style={styles.bannerTitle}>Pre-Cart Verification Active</Text>
-            </View>
-            <Text style={styles.bannerBody}>
-              All items are dynamically validated with live inventory, variant specifications, and custom artwork ready for production.
-            </Text>
-          </View>
-
-          {/* ── Cart Items List ──────────────────────────────── */}
+          {/* ── Cart Items ─────────────────────────────────────── */}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Customized Products ({items.length})</Text>
           </View>
@@ -180,7 +206,7 @@ export default function CartScreen() {
             />
           ))}
 
-          {/* ── Free Packaging / Proof Inspection Info ──────── */}
+          {/* ── Quality Guarantee ──────────────────────────────── */}
           <View style={styles.perkCard}>
             <View style={styles.perkIconWrap}>
               <Ionicons name="shield-checkmark" size={20} color={BrandColors.primary} />
@@ -188,17 +214,17 @@ export default function CartScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.perkTitle}>Quality Guaranteed</Text>
               <Text style={styles.perkDesc}>
-                Includes free professional design inspection, color matching proof, and protective custom packaging.
+                Free design inspection, color proof, and protective custom packaging included.
               </Text>
             </View>
           </View>
 
-          {/* ── Order Summary Card ───────────────────────────── */}
+          {/* ── Order Summary ──────────────────────────────────── */}
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>Order Summary</Text>
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Base Products Subtotal</Text>
+              <Text style={styles.summaryLabel}>Products Subtotal</Text>
               <Text style={styles.summaryValue}>₱{baseItemsSubtotal.toFixed(2)}</Text>
             </View>
 
@@ -232,12 +258,18 @@ export default function CartScreen() {
             </View>
           </View>
 
-          {/* ── Actions ─────────────────────────────────────── */}
+          {/* ── Actions ────────────────────────────────────────── */}
           <Pressable
             onPress={handleCheckout}
-            style={({ pressed }) => [styles.checkoutBtn, pressed && { opacity: 0.88 }]}
+            disabled={isSubmitting}
+            style={({ pressed }) => [
+              styles.checkoutBtn,
+              (pressed || isSubmitting) && { opacity: 0.88 },
+            ]}
           >
-            <Text style={styles.checkoutBtnText}>Proceed to Checkout • ₱{subtotal.toFixed(2)}</Text>
+            <Text style={styles.checkoutBtnText}>
+              Place Order • ₱{subtotal.toFixed(2)}
+            </Text>
             <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
           </Pressable>
 
@@ -251,45 +283,77 @@ export default function CartScreen() {
         </ScrollView>
       )}
 
-      {/* ── Order Placed Success Modal ───────────────────────── */}
-      <Modal visible={orderSuccessModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.successModalCard}>
-            <View style={styles.successIconCircle}>
-              <Ionicons name="checkmark-done" size={44} color="#FFFFFF" />
-            </View>
-            <Text style={styles.successModalTitle}>Order Placed! 🎉</Text>
-            <Text style={styles.successModalSubtitle}>
-              Your customized order has been received and queued for production.
-            </Text>
+      {/* ── Loading Overlay ────────────────────────────────────── */}
+      <LoadingOverlay visible={isSubmitting} label={loadingLabel} />
 
-            <View style={styles.successOrderBox}>
-              <View style={styles.orderBoxRow}>
-                <Text style={styles.orderBoxLabel}>Order Reference:</Text>
-                <Text style={styles.orderBoxValue}>{placedOrderId}</Text>
-              </View>
-              <View style={styles.orderBoxRow}>
-                <Text style={styles.orderBoxLabel}>Total Amount:</Text>
-                <Text style={[styles.orderBoxValue, { color: BrandColors.primary, fontWeight: '800' }]}>
-                  ₱{subtotal.toFixed(2)}
-                </Text>
-              </View>
-              <View style={styles.orderBoxRow}>
-                <Text style={styles.orderBoxLabel}>Total Items:</Text>
-                <Text style={styles.orderBoxValue}>{itemCount} items</Text>
-              </View>
-            </View>
+      {/* ── Order Success Modal — Apple-style sheet ────────────── */}
+      <Modal visible={orderSuccessModal} transparent animationType="slide">
+        <Pressable style={styles.sheetBackdrop} onPress={handleFinishOrder} />
+        <View style={styles.sheetCard}>
+          {/* pill handle */}
+          <View style={styles.sheetHandle} />
 
-            <Pressable onPress={handleFinishOrder} style={styles.viewOrdersBtn}>
-              <Text style={styles.viewOrdersBtnText}>View My Orders</Text>
-              <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+          <Text style={styles.sheetEmoji}>🎉</Text>
+          <Text style={styles.sheetTitle}>Order Placed</Text>
+          <Text style={styles.sheetSubtitle}>
+            Your order is queued for production and will be ready in 1–3 business days.
+          </Text>
+
+          <View style={styles.sheetInfoBox}>
+            <Pressable
+              onPress={handleCopyReference}
+              hitSlop={8}
+              style={({ pressed }) => [styles.sheetInfoRow, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.sheetInfoLabel}>Reference</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.sheetInfoValue}>{placedOrderId}</Text>
+                <Ionicons
+                  name={copiedRef ? 'checkmark-circle' : 'copy-outline'}
+                  size={14}
+                  color={copiedRef ? '#059669' : BrandColors.primary}
+                />
+                {copiedRef && (
+                  <Text style={{ fontSize: 11, color: '#059669', fontWeight: '700', fontFamily: 'Manrope_700Bold' }}>
+                    Copied!
+                  </Text>
+                )}
+              </View>
             </Pressable>
+            <View style={styles.sheetInfoDivider} />
+            <View style={styles.sheetInfoRow}>
+              <Text style={styles.sheetInfoLabel}>Total</Text>
+              <Text style={[styles.sheetInfoValue, { color: BrandColors.primary }]}>
+                ₱{subtotal.toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.sheetInfoDivider} />
+            <View style={styles.sheetInfoRow}>
+              <Text style={styles.sheetInfoLabel}>Items</Text>
+              <Text style={styles.sheetInfoValue}>{itemCount}</Text>
+            </View>
           </View>
+
+          <Pressable
+            onPress={handleFinishOrder}
+            style={({ pressed }) => [styles.sheetBtn, pressed && { opacity: 0.88 }]}
+          >
+            <Text style={styles.sheetBtnText}>View My Orders</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => { setOrderSuccessModal(false); clearCart(); }}
+            style={({ pressed }) => [styles.sheetSecondaryBtn, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={styles.sheetSecondaryBtnText}>Done</Text>
+          </Pressable>
         </View>
       </Modal>
     </SafeAreaView>
   );
 }
+
+// ─── Cart Item Card ───────────────────────────────────────────────────────────
 
 function CartItemCard({
   item,
@@ -309,7 +373,7 @@ function CartItemCard({
 
   return (
     <View style={styles.itemCard}>
-      {/* ── Top Header of Card ───────────────────────────────── */}
+      {/* ── Card Header ─────────────────────────────────────── */}
       <View style={styles.itemCardHeader}>
         <View style={styles.imgWrap}>
           {previewUri ? (
@@ -323,9 +387,7 @@ function CartItemCard({
 
         <View style={styles.itemInfoWrap}>
           <View style={styles.nameRow}>
-            <Text style={styles.itemName} numberOfLines={2}>
-              {item.name}
-            </Text>
+            <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
             <Pressable onPress={onRemove} hitSlop={8} style={styles.removeBtn}>
               <Ionicons name="close" size={18} color="#9CA3AF" />
             </Pressable>
@@ -336,7 +398,6 @@ function CartItemCard({
             <Text style={styles.categoryBadge}>{item.category || 'Custom Product'}</Text>
           </View>
 
-          {/* Live Inventory Status */}
           <View style={styles.stockRow}>
             {isOutOfStock ? (
               <View style={[styles.stockBadge, styles.stockBadgeOut]}>
@@ -350,77 +411,58 @@ function CartItemCard({
               </View>
             ) : (
               <View style={[styles.stockBadge, styles.stockBadgeIn]}>
-                <Ionicons name="checkmark-circle" size={12} color="#059669" />
-                <Text style={styles.stockTextIn}>In Stock ({item.stockQuantity} available)</Text>
+                <View style={styles.stockDot} />
+                <Text style={styles.stockTextIn}>In Stock</Text>
               </View>
             )}
           </View>
         </View>
       </View>
 
-      {/* ── Customization Specifications Breakdown ─────────── */}
+      {/* ── Customization Specs ──────────────────────────────── */}
       <View style={styles.customizationSection}>
-        <Text style={styles.customizationHeading}>Customization Specs:</Text>
+        <Text style={styles.customizationHeading}>Customization</Text>
         <View style={styles.chipsWrap}>
           {item.selectedColor && (
             <View style={styles.chip}>
               <View style={[styles.colorDot, { backgroundColor: item.selectedColor }]} />
-              <Text style={styles.chipLabel}>Color: {item.selectedColorName || item.selectedColor}</Text>
+              <Text style={styles.chipLabel}>{item.selectedColorName || item.selectedColor}</Text>
             </View>
           )}
-
           {item.selectedSize && (
             <View style={styles.chip}>
-              <Ionicons name="resize-outline" size={11} color="#4B5563" />
-              <Text style={styles.chipLabel}>Style/Size: {item.selectedSize}</Text>
+              <Text style={styles.chipLabel}>{item.selectedSize}</Text>
             </View>
           )}
-
           {item.customization.placement && (
             <View style={styles.chip}>
-              <Ionicons name="navigate-outline" size={11} color="#4B5563" />
-              <Text style={styles.chipLabel}>Placement: {item.customization.placement}</Text>
+              <Text style={styles.chipLabel}>{item.customization.placement}</Text>
             </View>
           )}
-
           {item.customization.text ? (
             <View style={[styles.chip, styles.chipTextCustom]}>
-              <Ionicons name="text" size={11} color={BrandColors.primary} />
               <Text style={[styles.chipLabel, { color: BrandColors.primary }]} numberOfLines={1}>
-                {`"${item.customization.text}"`}
+                "{item.customization.text}"
               </Text>
               {item.customization.fontFamily && (
                 <Text style={styles.fontSubtext}>({item.customization.fontFamily})</Text>
               )}
             </View>
           ) : null}
-
           {item.customization.imageUri ? (
             <View style={[styles.chip, styles.chipArtwork]}>
-              <Ionicons name="image-outline" size={11} color="#7C3AED" />
-              <Text style={[styles.chipLabel, { color: '#7C3AED' }]}>Custom Artwork Attached</Text>
-            </View>
-          ) : null}
-
-          {item.customization.flipH ? (
-            <View style={styles.chip}>
-              <Text style={styles.chipLabel}>Flip X</Text>
-            </View>
-          ) : null}
-
-          {item.customization.flipV ? (
-            <View style={styles.chip}>
-              <Text style={styles.chipLabel}>Flip Y</Text>
+              <Text style={[styles.chipLabel, { color: '#7C3AED' }]}>Custom Artwork</Text>
             </View>
           ) : null}
         </View>
       </View>
 
-      {/* ── Price Breakdown & Quantity Controls ────────────── */}
+      {/* ── Price & Qty Controls ─────────────────────────────── */}
       <View style={styles.cardFooterRow}>
         <View style={styles.priceBreakdownWrap}>
           <Text style={styles.unitPriceText}>
-            ₱{item.unitPrice.toFixed(2)} <Text style={styles.eachText}>/ unit</Text>
+            ₱{item.unitPrice.toFixed(2)}{' '}
+            <Text style={styles.eachText}>/ unit</Text>
           </Text>
           {item.addonPrice > 0 && (
             <Text style={styles.addonBreakdownText}>
@@ -441,9 +483,7 @@ function CartItemCard({
               color={item.quantity === 1 ? '#DC2626' : '#111827'}
             />
           </Pressable>
-
           <Text style={styles.quantityNumber}>{item.quantity}</Text>
-
           <Pressable
             onPress={onIncrement}
             disabled={isMaxStockReached}
@@ -459,7 +499,7 @@ function CartItemCard({
         </View>
 
         <View style={styles.lineTotalWrap}>
-          <Text style={styles.lineTotalLabel}>Item Total</Text>
+          <Text style={styles.lineTotalLabel}>Total</Text>
           <Text style={styles.lineTotalValue}>₱{item.totalPrice.toFixed(2)}</Text>
         </View>
       </View>
@@ -467,11 +507,15 @@ function CartItemCard({
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -479,7 +523,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E5E7EB',
   },
   headerBtn: {
@@ -490,133 +534,103 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerBtnPlaceholder: {
-    width: 38,
-    height: 38,
-  },
-  clearBtn: {
-    backgroundColor: '#FEE2E2',
-  },
-  headerTitleWrap: {
-    alignItems: 'center',
-  },
+  headerBtnPlaceholder: { width: 38, height: 38 },
+  clearBtn: { backgroundColor: '#FEE2E2' },
+  headerTitleWrap: { alignItems: 'center' },
   headerTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#111827',
+    fontFamily: 'Manrope_700Bold',
   },
   headerSubtitle: {
     fontSize: 12,
     color: '#6B7280',
-    fontWeight: '500',
+    fontFamily: 'Inter_400Regular',
   },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  verificationBanner: {
-    backgroundColor: '#ECFDF5',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    marginBottom: 16,
-  },
-  bannerHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  bannerCheckIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#D1FAE5',
+
+  // Loading overlay
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 999,
   },
-  bannerTitle: {
+  loadingBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    gap: 14,
+    minWidth: 140,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
+      android: { elevation: 10 },
+    }),
+  },
+  loadingLabel: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#065F46',
+    color: '#374151',
+    fontFamily: 'Inter_500Medium',
+    textAlign: 'center',
   },
-  bannerBody: {
-    fontSize: 12,
-    color: '#047857',
-    lineHeight: 17,
-    paddingLeft: 32,
-  },
-  sectionHeaderRow: {
-    marginBottom: 10,
-  },
+
+  // Scroll
+  scrollContainer: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 40 },
+
+  // Section header
+  sectionHeaderRow: { marginBottom: 10 },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '800',
     color: '#111827',
+    fontFamily: 'Manrope_700Bold',
   },
+
+  // Item card
   itemCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
     ...Platform.select({
-      web: { boxShadow: '0 2px 8px rgba(0,0,0,0.04)' } as any,
-      default: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6 },
+      android: { elevation: 2 },
     }),
   },
-  itemCardHeader: {
-    flexDirection: 'row',
-    gap: 12,
-  },
+  itemCardHeader: { flexDirection: 'row', gap: 12 },
   imgWrap: {
     width: 72,
     height: 72,
     borderRadius: 12,
     backgroundColor: '#F3F4F6',
     overflow: 'hidden',
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
   },
-  itemImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imgFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemInfoWrap: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
+  itemImage: { width: '100%', height: '100%' },
+  imgFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  itemInfoWrap: { flex: 1 },
+  nameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   itemName: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#111827',
     lineHeight: 18,
     flex: 1,
     marginRight: 6,
+    fontFamily: 'Manrope_700Bold',
   },
-  removeBtn: {
-    padding: 2,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
+  removeBtn: { padding: 2 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   skuText: {
     fontSize: 11,
     color: '#6B7280',
@@ -630,10 +644,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 4,
+    fontFamily: 'Inter_600SemiBold',
   },
-  stockRow: {
-    marginTop: 6,
-  },
+  stockRow: { marginTop: 6 },
   stockBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -643,49 +656,31 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
   },
-  stockBadgeIn: {
-    backgroundColor: '#ECFDF5',
-  },
-  stockBadgeLow: {
-    backgroundColor: '#FEF3C7',
-  },
-  stockBadgeOut: {
-    backgroundColor: '#FEE2E2',
-  },
-  stockTextIn: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  stockTextLow: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#D97706',
-  },
-  stockTextOut: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#DC2626',
-  },
+  stockBadgeIn: { backgroundColor: '#ECFDF5' },
+  stockBadgeLow: { backgroundColor: '#FEF3C7' },
+  stockBadgeOut: { backgroundColor: '#FEE2E2' },
+  stockDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#059669' },
+  stockTextIn: { fontSize: 10, fontWeight: '700', color: '#059669', fontFamily: 'Inter_600SemiBold' },
+  stockTextLow: { fontSize: 10, fontWeight: '700', color: '#D97706', fontFamily: 'Inter_600SemiBold' },
+  stockTextOut: { fontSize: 10, fontWeight: '700', color: '#DC2626', fontFamily: 'Inter_600SemiBold' },
+
+  // Customization chips
   customizationSection: {
     marginTop: 10,
     paddingTop: 10,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#F3F4F6',
   },
   customizationHeading: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#6B7280',
+    color: '#9CA3AF',
     marginBottom: 6,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.6,
+    fontFamily: 'Inter_600SemiBold',
   },
-  chipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -694,61 +689,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
   },
-  chipTextCustom: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
-  },
-  chipArtwork: {
-    backgroundColor: '#F5F3FF',
-    borderColor: '#DDD6FE',
-  },
-  colorDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.15)',
-  },
-  chipLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  fontSubtext: {
-    fontSize: 10,
-    color: '#6B7280',
-  },
+  chipTextCustom: { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' },
+  chipArtwork: { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' },
+  colorDot: { width: 9, height: 9, borderRadius: 4.5, borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)' },
+  chipLabel: { fontSize: 11, fontWeight: '600', color: '#374151', fontFamily: 'Inter_600SemiBold' },
+  fontSubtext: { fontSize: 10, color: '#6B7280', fontFamily: 'Inter_400Regular' },
+
+  // Footer row
   cardFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 12,
     paddingTop: 10,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#F3F4F6',
   },
-  priceBreakdownWrap: {
-    flex: 1,
-  },
-  unitPriceText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  eachText: {
-    fontSize: 10,
-    fontWeight: '400',
-    color: '#6B7280',
-  },
-  addonBreakdownText: {
-    fontSize: 10,
-    color: '#059669',
-    fontWeight: '600',
-    marginTop: 1,
-  },
+  priceBreakdownWrap: { flex: 1 },
+  unitPriceText: { fontSize: 13, fontWeight: '800', color: '#111827', fontFamily: 'Manrope_700Bold' },
+  eachText: { fontSize: 10, fontWeight: '400', color: '#6B7280' },
+  addonBreakdownText: { fontSize: 10, color: '#059669', fontWeight: '600', marginTop: 1 },
   stepperWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -757,7 +720,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 4,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
   },
   stepperBtn: {
@@ -767,7 +730,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
   },
   quantityNumber: {
@@ -776,20 +739,13 @@ const styles = StyleSheet.create({
     color: '#111827',
     minWidth: 20,
     textAlign: 'center',
+    fontFamily: 'Manrope_700Bold',
   },
-  lineTotalWrap: {
-    alignItems: 'flex-end',
-    marginLeft: 10,
-  },
-  lineTotalLabel: {
-    fontSize: 10,
-    color: '#6B7280',
-  },
-  lineTotalValue: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: BrandColors.primary,
-  },
+  lineTotalWrap: { alignItems: 'flex-end', marginLeft: 10 },
+  lineTotalLabel: { fontSize: 10, color: '#6B7280', fontFamily: 'Inter_400Regular' },
+  lineTotalValue: { fontSize: 15, fontWeight: '900', color: BrandColors.primary, fontFamily: 'Manrope_700Bold' },
+
+  // Perk card
   perkCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -798,7 +754,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     marginVertical: 10,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#BFDBFE',
   },
   perkIconWrap: {
@@ -809,88 +765,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  perkTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E40AF',
-  },
-  perkDesc: {
-    fontSize: 11,
-    color: '#1E3A8A',
-    lineHeight: 16,
-    marginTop: 2,
-  },
+  perkTitle: { fontSize: 13, fontWeight: '700', color: '#1E40AF', fontFamily: 'Manrope_700Bold' },
+  perkDesc: { fontSize: 11, color: '#1E3A8A', lineHeight: 16, marginTop: 2, fontFamily: 'Inter_400Regular' },
+
+  // Summary card
   summaryCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     marginTop: 8,
     marginBottom: 16,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
   },
-  summaryTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: 13,
-    color: '#4B5563',
-  },
-  summaryValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  summaryGreen: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  addonTag: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  addonTagText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 10,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  totalSubtext: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: 1,
-  },
-  totalValue: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: BrandColors.primary,
-  },
+  summaryTitle: { fontSize: 15, fontWeight: '800', color: '#111827', marginBottom: 12, fontFamily: 'Manrope_700Bold' },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  summaryLabel: { fontSize: 13, color: '#4B5563', fontFamily: 'Inter_400Regular' },
+  summaryValue: { fontSize: 13, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold' },
+  summaryGreen: { fontSize: 12, fontWeight: '700', color: '#059669', fontFamily: 'Inter_600SemiBold' },
+  addonTag: { backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
+  addonTagText: { fontSize: 9, fontWeight: '700', color: '#059669', fontFamily: 'Inter_600SemiBold' },
+  summaryDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB', marginVertical: 10 },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalLabel: { fontSize: 16, fontWeight: '800', color: '#111827', fontFamily: 'Manrope_700Bold' },
+  totalSubtext: { fontSize: 10, color: '#6B7280', marginTop: 1, fontFamily: 'Inter_400Regular' },
+  totalValue: { fontSize: 20, fontWeight: '900', color: BrandColors.primary, fontFamily: 'Manrope_700Bold' },
+
+  // Checkout button
   checkoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -905,6 +806,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+    fontFamily: 'Manrope_700Bold',
   },
   continueBtn: {
     flexDirection: 'row',
@@ -913,17 +815,10 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 12,
   },
-  continueBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#374151',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
+  continueBtnText: { fontSize: 13, fontWeight: '600', color: '#374151', fontFamily: 'Inter_600SemiBold' },
+
+  // Empty state
+  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emptyIconCircle: {
     width: 96,
     height: 96,
@@ -933,18 +828,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 18,
   },
-  emptyTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 6,
-  },
+  emptyTitle: { fontSize: 19, fontWeight: '800', color: '#111827', marginBottom: 6, fontFamily: 'Manrope_700Bold' },
   emptySubtitle: {
     fontSize: 13,
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 19,
     marginBottom: 24,
+    fontFamily: 'Inter_400Regular',
   },
   browseBtn: {
     flexDirection: 'row',
@@ -955,84 +846,86 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
   },
-  browseBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  modalOverlay: {
+  browseBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', fontFamily: 'Manrope_700Bold' },
+
+  // Apple-style bottom sheet success modal
+  sheetBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  successModalCard: {
-    width: '100%',
-    maxWidth: 360,
+  sheetCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingBottom: 36,
+    paddingTop: 12,
     alignItems: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 30, shadowOffset: { width: 0, height: -4 } },
+      android: { elevation: 20 },
+    }),
   },
-  successIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#059669',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#D1D5DB',
+    marginBottom: 24,
   },
-  successModalTitle: {
-    fontSize: 20,
-    fontWeight: '900',
+  sheetEmoji: {
+    fontSize: 52,
+    marginBottom: 12,
+  },
+  sheetTitle: {
+    fontSize: 24,
+    fontWeight: '800',
     color: '#111827',
+    fontFamily: 'Manrope_700Bold',
     marginBottom: 6,
-  },
-  successModalSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 16,
   },
-  successOrderBox: {
+  sheetSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  sheetInfoBox: {
     width: '100%',
     backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 20,
-    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    marginBottom: 24,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
   },
-  orderBoxRow: {
+  sheetInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  orderBoxLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  orderBoxValue: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  viewOrdersBtn: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#111827',
-    width: '100%',
     paddingVertical: 14,
-    borderRadius: 12,
   },
-  viewOrdersBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+  sheetInfoDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB' },
+  sheetInfoLabel: { fontSize: 14, color: '#6B7280', fontFamily: 'Inter_400Regular' },
+  sheetInfoValue: { fontSize: 14, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold' },
+  sheetBtn: {
+    width: '100%',
+    backgroundColor: '#111827',
+    paddingVertical: 15,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginBottom: 10,
   },
+  sheetBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', fontFamily: 'Manrope_700Bold' },
+  sheetSecondaryBtn: {
+    width: '100%',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  sheetSecondaryBtnText: { fontSize: 15, fontWeight: '600', color: '#6B7280', fontFamily: 'Inter_600SemiBold' },
 });

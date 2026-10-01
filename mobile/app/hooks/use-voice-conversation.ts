@@ -26,11 +26,62 @@ export type VoiceState =
   | 'speaking'     // TTS playing back
   | 'error';       // something failed
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://10.149.41.1:8080/api/v1'; // fallback for dev — override via .env EXPO_PUBLIC_API_URL
+// Ensure the base URL always ends with /api/v1
+function buildApiBase(): string {
+  const raw = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/+$/, '');
+  if (!raw) return 'http://192.168.1.13:8084/api/v1';
+  if (raw.endsWith('/api/v1')) return raw;
+  return `${raw}/api/v1`;
+}
+const API = buildApiBase();
+
+// ─── Local fallback replies (when backend is unreachable) ────────────────────
+
+function localFallbackReply(text: string): string | null {
+  const clean = text.trim();
+  const lower = clean.toLowerCase();
+
+  // Strict domain scope & off-topic refusal for local fallback
+  if (
+    /\b(python|javascript|coding|c\+\+|java|php|html|css|sql|programming|developer|script|algorithm)\b/i.test(lower) ||
+    /\b(poem|poetry|joke|weather|politics|president|who is|crypto|bitcoin|stock market)\b/i.test(lower)
+  ) {
+    return "I am specialized only in assisting with Rens Digital products, custom printing, and orders! I cannot answer general programming or unrelated topics. Let me know if you need help with your orders or merchandise!";
+  }
+
+  // Direct order reference e.g. RD-1234, #RD-1234, #1234
+  if (/(?:#|rd-|order\s*\d)/i.test(clean) || (/^[a-z0-9_-]{4,15}$/i.test(clean) && /\d/.test(clean))) {
+    const orderRef = clean.replace(/^#/, '');
+    return `To check order ${orderRef}, please check the Orders tab where all your personal verified orders and live tracking milestones are listed securely! 📦`;
+  }
+
+  if (/track|order|status|where.*order|my order/.test(lower)) {
+    return "To track your order, type or paste your Order Reference (such as RD-1234) right here into the chat, or head to the Orders tab to view live delivery timelines! 📦";
+  }
+  if (/price|cost|how much|magkano/.test(lower)) {
+    return "Prices vary by product and customization. Browse the Services tab to see all available products with their starting prices. 🏷️";
+  }
+  if (/hello|hi|kumusta|magandang/.test(lower)) {
+    return "Hi there! 👋 I'm Owla, your NUYDA ENTERPRISE assistant. I can help you with orders, pricing, and product info. How can I help?";
+  }
+  if (/cancel|undo|bawi/.test(lower)) {
+    return "To cancel an order, please contact us directly through the AI Hub chat or visit our store. We process orders quickly so reach out as soon as possible! ⏰";
+  }
+  if (/pay|bayad|cash|gcash|online/.test(lower)) {
+    return "We currently accept Cash on Delivery for all orders. Online payment options are coming soon! 💳";
+  }
+  if (/product|customize|custom|personalize/.test(lower)) {
+    return "You can customize mugs, t-shirts, stickers, pins, tote bags, and more! Head to the Services tab to explore our full catalogue and launch the 3D preview. 🎨";
+  }
+  return null;
+}
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useVoiceConversation() {
+export function useVoiceConversation(userEmail?: string | null) {
+  const userEmailRef = useRef(userEmail);
+  userEmailRef.current = userEmail;
+
   const [messages, setMessages] = useState<ConvoMessage[]>([
     {
       id: '0',
@@ -150,22 +201,37 @@ export function useVoiceConversation() {
       // ── 2. LLM ─────────────────────────────────────────────────────────────
       setVoiceState('thinking');
 
-      const chatRes  = await fetch(`${API}/groq/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: historyRef.current,
-          language: detectedLang,
-        }),
-      });
-      const chatJson = await chatRes.json();
+      let reply: string;
+      let replyLang: string = detectedLang;
 
-      if (!chatRes.ok || chatJson.status !== 'success') {
-        throw new Error(chatJson.message ?? 'Chat failed');
+      try {
+        const chatRes  = await fetch(`${API}/groq/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: historyRef.current,
+            language: detectedLang,
+            customer_email: userEmailRef.current || undefined,
+          }),
+        });
+        const chatJson = await chatRes.json();
+
+        if (!chatRes.ok || chatJson.status !== 'success') {
+          throw new Error(chatJson.message ?? 'Chat failed');
+        }
+
+        reply     = chatJson.data.reply;
+        replyLang = chatJson.data.language ?? detectedLang;
+      } catch (chatErr: any) {
+        // Try local keyword fallback before giving up
+        const localReply = localFallbackReply(transcribedText);
+        if (localReply) {
+          addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: localReply });
+          setVoiceState('idle');
+          return;
+        }
+        throw chatErr;
       }
-
-      const reply: string    = chatJson.data.reply;
-      const replyLang: string = chatJson.data.language ?? detectedLang;
 
       addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: reply });
 
@@ -250,22 +316,36 @@ export function useVoiceConversation() {
     try {
       setVoiceState('thinking');
 
-      const chatRes  = await fetch(`${API}/groq/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: historyRef.current,
-          language: 'en',
-        }),
-      });
-      const chatJson = await chatRes.json();
+      let reply: string;
+      let replyLang: string = 'en';
 
-      if (!chatRes.ok || chatJson.status !== 'success') {
-        throw new Error(chatJson.message ?? 'Chat failed');
+      try {
+        const chatRes  = await fetch(`${API}/groq/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: historyRef.current,
+            language: 'en',
+            customer_email: userEmailRef.current || undefined,
+          }),
+        });
+        const chatJson = await chatRes.json();
+
+        if (!chatRes.ok || chatJson.status !== 'success') {
+          throw new Error(chatJson.message ?? 'Chat failed');
+        }
+
+        reply     = chatJson.data.reply;
+        replyLang = chatJson.data.language ?? 'en';
+      } catch (chatErr: any) {
+        const localReply = localFallbackReply(text);
+        if (localReply) {
+          addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: localReply });
+          setVoiceState('idle');
+          return;
+        }
+        throw chatErr;
       }
-
-      const reply: string     = chatJson.data.reply;
-      const replyLang: string = chatJson.data.language ?? 'en';
 
       addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: reply });
 
@@ -347,6 +427,22 @@ export function useVoiceConversation() {
     // Ignore taps during transcribing / thinking
   }, [voiceState, startRecording, stopAndProcess]);
 
+  // ── Clear conversation ──────────────────────────────────────────────────────
+
+  const clearConversation = useCallback(() => {
+    try { Speech.stop(); } catch {}
+    historyRef.current = [];
+    setError(null);
+    setVoiceState('idle');
+    setMessages([
+      {
+        id: Date.now().toString(),
+        role: 'assistant',
+        text: "Hi! I'm Owla, your NUYDA ENTERPRISE assistant. Tap me or type below — what can I help you with today?",
+      },
+    ]);
+  }, []);
+
   // Stop speech when unmounting
   useEffect(() => {
     return () => { try { Speech.stop(); } catch {} };
@@ -359,6 +455,7 @@ export function useVoiceConversation() {
     permissionGranted,
     toggle,
     sendText,
+    clearConversation,
   };
 }
 

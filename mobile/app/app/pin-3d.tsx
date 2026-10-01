@@ -178,18 +178,14 @@ export default function Pin3DScreen() {
           </View>
         </View>
 
-        <View style={styles.actions}>
-          <View style={styles.priceBlock}>
-            <Text style={styles.priceLabel}>Price</Text>
-            <Text style={styles.price}>{price}</Text>
-          </View>
-          <Pressable
-            onPress={handleAddToCart}
-            style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }]}>
-            <Text style={styles.primaryText}>Add to Cart</Text>
-            <Ionicons name="cart-outline" size={18} color="#fff" />
-          </Pressable>
-        </View>
+        <Pressable
+          onPress={handleAddToCart}
+          style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
+        >
+          <Ionicons name="bag-add-outline" size={22} color="#fff" />
+          <Text style={styles.primaryText}>Add to Cart</Text>
+          <Text style={styles.primaryPrice}>{price}</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -342,6 +338,23 @@ const styles = StyleSheet.create({
   priceBlock: { flex: 1 },
   priceLabel: { fontSize: 11, color: '#9CA3AF', fontFamily: 'Inter_400Regular' },
   price: { fontSize: 20, fontWeight: '800', color: BrandColors.primary, fontFamily: 'Manrope_700Bold' },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: BrandColors.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14 },
-  primaryText: { color: '#fff', fontWeight: '700', fontSize: 14, fontFamily: 'Manrope_700Bold' },
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: BrandColors.primary,
+    paddingVertical: 17,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  primaryBtnPressed: { opacity: 0.88, transform: [{ scale: 0.97 }] },
+  primaryText: { color: '#fff', fontWeight: '800', fontSize: 16, fontFamily: 'Manrope_700Bold' },
+  primaryPrice: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: 'Inter_600SemiBold',
+  },
 });

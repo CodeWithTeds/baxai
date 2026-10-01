@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { Image as ExpoImage } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
   RefreshControl,
@@ -13,7 +16,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import ScreenHeader from '@/components/screen-header';
 import {
@@ -26,103 +28,133 @@ import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
 import { ApiOrder, fetchOrders } from '@/utils/api';
 
+// ─── Status pill colors ───────────────────────────────────────────────────────
+
+const STATUS_PILL: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+  in_progress: { bg: '#EFF6FF', text: '#1D4ED8', dot: '#3B82F6', label: 'In Progress' },
+  processing:  { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B', label: 'Processing'  },
+  delivered:   { bg: '#ECFDF5', text: '#065F46', dot: '#10B981', label: 'Delivered'   },
+  cancelled:   { bg: '#FEF2F2', text: '#991B1B', dot: '#EF4444', label: 'Cancelled'   },
+};
+
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
 function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
   const { t } = useLanguage();
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 380,
+        delay: index * 70,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 380,
+        delay: index * 70,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   const statusKey = (item.status || 'in_progress') as OrderStatus;
-  const cfg = STATUS_CONFIG[statusKey] || STATUS_CONFIG.in_progress;
+  const pill = STATUS_PILL[statusKey] || STATUS_PILL.in_progress;
 
-  const getStatusLabel = () => {
-    switch (statusKey) {
-      case 'in_progress':
-        return t.statusInProgress || 'In Progress';
-      case 'processing':
-        return t.statusProcessing || 'Processing';
-      case 'delivered':
-        return t.statusCompleted || 'Delivered';
-      case 'cancelled':
-        return t.statusCancelled || 'Cancelled';
-      default:
-        return cfg.label;
-    }
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyOrderNum = async () => {
+    const numToCopy = item.orderNumber || (item as any).order_number || String(item.id);
+    await Clipboard.setStringAsync(String(numToCopy));
+    try {
+      await Haptics.selectionAsync();
+    } catch {}
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const handlePress = () => {
-    router.push(`/order/${item.id}` as any);
-  };
+  const handlePress = () => router.push(`/order/${item.id}` as any);
 
-  const orderNum = item.orderNumber || (item as any).order_number || String(item.id);
-  const placedDate = item.placedOn || (item as any).placed_at || 'Recently';
-  const totalDisplay = (item as any).total_formatted || (item as any).total_display || (typeof item.total === 'number' ? `₱${item.total.toFixed(2)}` : String(item.total));
+  const orderNum   = item.orderNumber || (item as any).order_number || String(item.id);
+  const placedDate = item.placedOn    || (item as any).placed_at    || 'Recently';
+  const totalDisplay =
+    (item as any).total_formatted ||
+    (item as any).total_display ||
+    (typeof item.total === 'number' ? `₱${item.total.toFixed(2)}` : String(item.total ?? '—'));
 
-  // Determine line items & total item count
-  const lineItems = (item as any).lineItems || (item as any).items || [];
-  const totalItemQty = lineItems.length > 0
-    ? lineItems.reduce((sum: number, li: any) => sum + (li.quantity || li.qty || 1), 0)
+  const lineItems    = Array.isArray((item as any).lineItems) ? (item as any).lineItems
+                     : Array.isArray((item as any).items)     ? (item as any).items : [];
+  const previewImage = (item as any).image || lineItems[0]?.banner_image || lineItems[0]?.customization?.imageUri;
+  const productName  = (item as any).productName || lineItems[0]?.product_name || lineItems[0]?.name || 'Custom Product';
+  const totalQty     = lineItems.length > 0
+    ? lineItems.reduce((s: number, li: any) => s + (li.quantity || li.qty || 1), 0)
     : 1;
 
-  // Resolve preview image (custom design or banner image or fallback)
-  const previewImage = (item as any).image || (lineItems[0]?.banner_image) || (lineItems[0]?.customization?.imageUri);
-
   return (
-    <Animated.View entering={FadeInDown.delay(index * 60).duration(400)}>
+    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
       <Pressable
         onPress={handlePress}
-        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
-
-        {/* ── Card header ─────────────────────────────── */}
-        <View style={styles.cardHeader}>
+        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      >
+        {/* ── Top strip: order# + status ──────────────────── */}
+        <View style={styles.cardTop}>
           <View>
-            <Text style={styles.orderNumber}>#{orderNum}</Text>
-            <Text style={styles.orderDate}>{t.placedOn} {placedDate}</Text>
+            <Pressable
+              onPress={handleCopyOrderNum}
+              hitSlop={8}
+              style={({ pressed }) => [styles.orderNumCopyRow, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.orderNumber}>#{orderNum}</Text>
+              <Ionicons
+                name={copied ? 'checkmark-circle' : 'copy-outline'}
+                size={13}
+                color={copied ? '#059669' : '#9CA3AF'}
+                style={{ marginLeft: 5 }}
+              />
+              {copied && <Text style={styles.orderCopiedText}>Copied!</Text>}
+            </Pressable>
+            <Text style={styles.orderDate}>{t.placedOn}  {placedDate}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
-            <Ionicons name={cfg.icon} size={13} color={cfg.color} style={{ marginRight: 4 }} />
-            <Text style={[styles.statusText, { color: cfg.color }]}>{getStatusLabel()}</Text>
+          <View style={[styles.pill, { backgroundColor: pill.bg }]}>
+            <View style={[styles.pillDot, { backgroundColor: pill.dot }]} />
+            <Text style={[styles.pillText, { color: pill.text }]}>{pill.label}</Text>
           </View>
         </View>
 
-        {/* ── Divider ─────────────────────────────────── */}
-        <View style={styles.divider} />
-
-        {/* ── Product row ─────────────────────────────── */}
+        {/* ── Product row ──────────────────────────────────── */}
         <View style={styles.productRow}>
           <View style={styles.imgWrap}>
             {previewImage ? (
-              <ExpoImage
-                source={{ uri: previewImage }}
-                style={styles.productImg}
-                contentFit="cover"
-              />
+              <ExpoImage source={{ uri: previewImage }} style={styles.productImg} contentFit="cover" />
             ) : (
               <View style={styles.imgFallback}>
-                <Ionicons name="cube" size={28} color="#9CA3AF" />
+                <Text style={{ fontSize: 28 }}>📦</Text>
               </View>
             )}
           </View>
+
           <View style={styles.productInfo}>
-            <Text style={styles.productName} numberOfLines={2}>
-              {item.productName || lineItems[0]?.product_name || 'Custom Product'}
+            <Text style={styles.productName} numberOfLines={2}>{productName}</Text>
+            <Text style={styles.productSub}>
+              {lineItems.length > 1 ? `${lineItems.length} items` : `Qty: ${totalQty}`}
             </Text>
-            <View style={styles.productMeta}>
-              <View style={styles.qtyBadge}>
-                <Text style={styles.qtyText}>
-                  {t.qtyPrefix || 'Qty'}: {totalItemQty}
-                </Text>
-              </View>
-              <Text style={styles.totalText}>{totalDisplay}</Text>
-            </View>
+            <Text style={styles.totalText}>{totalDisplay}</Text>
           </View>
+
+          <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
         </View>
 
-        {/* ── Footer actions ──────────────────────────── */}
+        {/* ── Footer CTA row ──────────────────────────────── */}
         <View style={styles.cardFooter}>
           <Pressable
             onPress={handlePress}
             hitSlop={8}
-            style={({ pressed }) => [styles.footerBtn, pressed && styles.footerBtnPressed]}>
-            <Ionicons name="document-text-outline" size={15} color={BrandColors.primary} />
+            style={({ pressed }) => [styles.footerBtn, pressed && { opacity: 0.7 }]}
+          >
+            <Ionicons name="document-text-outline" size={14} color={BrandColors.primary} />
             <Text style={styles.footerBtnText}>{t.viewDetails}</Text>
           </Pressable>
 
@@ -130,12 +162,9 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
             <Pressable
               hitSlop={8}
               onPress={handlePress}
-              style={({ pressed }) => [
-                styles.footerBtn,
-                styles.footerBtnSecondary,
-                pressed && styles.footerBtnPressed,
-              ]}>
-              <Ionicons name="location-outline" size={15} color="#6B7280" />
+              style={({ pressed }) => [styles.footerBtn, styles.footerBtnGray, pressed && { opacity: 0.7 }]}
+            >
+              <Ionicons name="location-outline" size={14} color="#6B7280" />
               <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>{t.trackOrder}</Text>
             </Pressable>
           )}
@@ -143,14 +172,11 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
           {statusKey === 'delivered' && (
             <Pressable
               hitSlop={8}
-              onPress={handlePress}
-              style={({ pressed }) => [
-                styles.footerBtn,
-                styles.footerBtnSecondary,
-                pressed && styles.footerBtnPressed,
-              ]}>
-              <Ionicons name="repeat-outline" size={15} color="#6B7280" />
-              <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>{t.trackOrder}</Text>
+              onPress={() => router.push('/(tabs)/services')}
+              style={({ pressed }) => [styles.footerBtn, styles.footerBtnGray, pressed && { opacity: 0.7 }]}
+            >
+              <Ionicons name="repeat-outline" size={14} color="#6B7280" />
+              <Text style={[styles.footerBtnText, { color: '#6B7280' }]}>Reorder</Text>
             </Pressable>
           )}
         </View>
@@ -164,37 +190,39 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
 function TabToggle({
   active,
   activeCount,
+  pastCount,
   onChange,
 }: {
   active: 'active' | 'past';
   activeCount: number;
+  pastCount: number;
   onChange: (v: 'active' | 'past') => void;
 }) {
   const { t } = useLanguage();
   return (
     <View style={styles.toggleWrap}>
-      <Pressable
-        onPress={() => onChange('active')}
-        style={[styles.toggleTab, active === 'active' && styles.toggleTabActive]}>
-        <Text style={[styles.toggleText, active === 'active' && styles.toggleTextActive]}>
-          {t.activeOrders}
-        </Text>
-        {activeCount > 0 && (
-          <View style={[styles.toggleCount, active === 'active' && styles.toggleCountActive]}>
-            <Text style={[styles.toggleCountText, active === 'active' && styles.toggleCountTextActive]}>
-              {activeCount}
+      {(['active', 'past'] as const).map((tab) => {
+        const isActive = active === tab;
+        const count    = tab === 'active' ? activeCount : pastCount;
+        return (
+          <Pressable
+            key={tab}
+            onPress={() => onChange(tab)}
+            style={[styles.toggleTab, isActive && styles.toggleTabActive]}
+          >
+            <Text style={[styles.toggleText, isActive && styles.toggleTextActive]}>
+              {tab === 'active' ? t.activeOrders : t.pastOrders}
             </Text>
-          </View>
-        )}
-      </Pressable>
-
-      <Pressable
-        onPress={() => onChange('past')}
-        style={[styles.toggleTab, active === 'past' && styles.toggleTabActive]}>
-        <Text style={[styles.toggleText, active === 'past' && styles.toggleTextActive]}>
-          {t.pastOrders}
-        </Text>
-      </Pressable>
+            {count > 0 && (
+              <View style={[styles.toggleBadge, isActive && styles.toggleBadgeActive]}>
+                <Text style={[styles.toggleBadgeText, isActive && styles.toggleBadgeTextActive]}>
+                  {count}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -202,22 +230,21 @@ function TabToggle({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function OrdersScreen() {
-  const [tab, setTab] = useState<'active' | 'past'>('active');
-  const [orders, setOrders] = useState<ApiOrder[]>([]);
+  const [tab, setTab]         = useState<'active' | 'past'>('active');
+  const [orders, setOrders]   = useState<ApiOrder[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const { user } = useAuth();
+  const { user }  = useAuth();
+  const { t }     = useLanguage();
   const userEmail = user?.email;
 
   const loadOrders = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
-
     try {
       const data = await fetchOrders(userEmail);
-      if (Array.isArray(data) && data.length > 0) {
-        setOrders(data);
-      }
+      if (Array.isArray(data) && data.length > 0) setOrders(data);
     } catch (err) {
       console.warn('[OrdersScreen] Error fetching orders:', err);
     } finally {
@@ -226,80 +253,90 @@ export default function OrdersScreen() {
     }
   }, [userEmail]);
 
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+  useEffect(() => { loadOrders(); }, [loadOrders]);
 
-  const onRefresh = () => {
-    loadOrders(true);
-  };
+  const activeOrders = orders.filter(o => o.status === 'in_progress' || o.status === 'processing');
+  const pastOrders   = orders.filter(o => o.status === 'delivered'   || o.status === 'cancelled');
+  const displayed    = tab === 'active' ? activeOrders : pastOrders;
 
-  const activeOrders = orders.filter(
-    (o) => o.status === 'in_progress' || o.status === 'processing'
-  );
-  const pastOrders = orders.filter(
-    (o) => o.status === 'delivered' || o.status === 'cancelled'
-  );
-
-  const displayedOrders = tab === 'active' ? activeOrders : pastOrders;
+  const filteredOrders = displayed.filter((o) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const orderNum = (o.orderNumber || (o as any).order_number || String(o.id)).toLowerCase();
+    const prodName = (o.productName || (o as any).product_name || (o as any).name || '').toLowerCase();
+    return orderNum.includes(q) || prodName.includes(q);
+  });
 
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
-      {/* ── Header + Search ──────────────────────────────────── */}
       <ScreenHeader
         title={t.ordersTitle || 'My Orders'}
-        hideSearch
+        searchPlaceholder="Search order # or product..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
       />
 
-      {/* ── Tab toggle ───────────────────────────────────────── */}
+      {/* ── Tab toggle ─────────────────────────────────── */}
       <View style={styles.toggleContainer}>
         <TabToggle
           active={tab}
           activeCount={activeOrders.length}
+          pastCount={pastOrders.length}
           onChange={setTab}
         />
       </View>
 
-      {/* ── Orders list ──────────────────────────────────────── */}
+      {/* ── List ──────────────────────────────────────── */}
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BrandColors.primary]} />
-        }>
-
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadOrders(true)} tintColor={BrandColors.primary} colors={[BrandColors.primary]} />
+        }
+      >
         {loading && !refreshing ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color={BrandColors.primary} />
-            <Text style={styles.loadingText}>Loading dynamic orders…</Text>
+            <Text style={styles.loadingText}>Loading orders…</Text>
           </View>
-        ) : displayedOrders.length === 0 ? (
-          <Animated.View entering={FadeInDown.duration(400)} style={styles.emptyWrap}>
-            <View style={styles.emptyIconWrap}>
-              <Ionicons name="receipt-outline" size={48} color="#D1D5DB" />
-            </View>
+        ) : filteredOrders.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyEmoji}>{searchQuery ? '🔍' : tab === 'active' ? '🛍️' : '📦'}</Text>
             <Text style={styles.emptyTitle}>
-              {tab === 'active' ? 'No active orders' : 'No past orders'}
+              {searchQuery ? 'No matching orders' : tab === 'active' ? 'No active orders' : 'No past orders'}
             </Text>
             <Text style={styles.emptySubtitle}>
-              {tab === 'active'
-                ? 'Orders you place will dynamically update here with live tracking.'
-                : 'Your completed or delivered orders will be archived here.'}
+              {searchQuery
+                ? `No orders matching "${searchQuery}". Check the order number or clear your search.`
+                : tab === 'active'
+                ? 'Your active orders will appear here with live status updates.'
+                : 'Completed and cancelled orders are archived here.'}
             </Text>
-            <Pressable
-              onPress={() => router.push('/(tabs)/services')}
-              style={styles.exploreBtn}>
-              <Text style={styles.exploreBtnText}>Browse Customizable Products</Text>
-            </Pressable>
-          </Animated.View>
+            {searchQuery ? (
+              <Pressable
+                onPress={() => setSearchQuery('')}
+                style={({ pressed }) => [styles.exploreBtn, pressed && { opacity: 0.85 }]}
+              >
+                <Ionicons name="close" size={16} color="#fff" />
+                <Text style={styles.exploreBtnText}>Clear Search</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => router.push('/(tabs)/services')}
+                style={({ pressed }) => [styles.exploreBtn, pressed && { opacity: 0.85 }]}
+              >
+                <Ionicons name="sparkles" size={16} color="#fff" />
+                <Text style={styles.exploreBtnText}>Browse Products</Text>
+              </Pressable>
+            )}
+          </View>
         ) : (
-          displayedOrders.map((order, i) => (
-            <OrderCard key={order.id || order.orderNumber || i} item={order} index={i} />
+          filteredOrders.map((order, i) => (
+            <OrderCard key={String(order.id || order.orderNumber || i)} item={order} index={i} />
           ))
         )}
-
         <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>
@@ -308,43 +345,29 @@ export default function OrdersScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CARD_SHADOW = Platform.select({
-  ios: {
-    shadowColor: '#000',
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-  },
+const SHADOW = Platform.select({
+  ios:     { shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
   android: { elevation: 3 },
 });
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-  },
+  root: { flex: 1, backgroundColor: '#F3F4F6' },
 
+  // Tab toggle
   toggleContainer: {
     backgroundColor: '#FFFFFF',
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    paddingTop: 4,
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 3 },
-      },
+      ios: { shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 3 } },
       android: { elevation: 3 },
     }),
   },
-
   toggleWrap: {
     flexDirection: 'row',
-    marginHorizontal: 20,
-    marginTop: 4,
-    marginBottom: 0,
     backgroundColor: '#F3F4F6',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 4,
   },
   toggleTab: {
@@ -352,104 +375,75 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 9,
-    borderRadius: 10,
+    paddingVertical: 10,
+    borderRadius: 11,
     gap: 6,
   },
   toggleTabActive: {
     backgroundColor: '#FFFFFF',
     ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 2 },
-      },
+      ios: { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
       android: { elevation: 2 },
     }),
   },
-  toggleText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#9CA3AF',
-    fontFamily: 'Inter_600SemiBold',
-  },
-  toggleTextActive: {
-    color: '#111827',
-  },
-  toggleCount: {
+  toggleText: { fontSize: 13, fontWeight: '600', color: '#9CA3AF', fontFamily: 'Inter_600SemiBold' },
+  toggleTextActive: { color: '#111827' },
+  toggleBadge: {
     backgroundColor: '#E5E7EB',
     borderRadius: 10,
     paddingHorizontal: 7,
     paddingVertical: 1,
   },
-  toggleCountActive: {
-    backgroundColor: BrandColors.primary,
-  },
-  toggleCountText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6B7280',
-    fontFamily: 'Manrope_700Bold',
-  },
-  toggleCountTextActive: {
-    color: '#FFFFFF',
-  },
+  toggleBadgeActive: { backgroundColor: BrandColors.primary },
+  toggleBadgeText: { fontSize: 11, fontWeight: '700', color: '#6B7280', fontFamily: 'Manrope_700Bold' },
+  toggleBadgeTextActive: { color: '#FFFFFF' },
 
-  scroll: {
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-  },
+  scroll: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 24 },
 
+  // Card
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 20,
     marginBottom: 14,
     overflow: 'hidden',
-    ...CARD_SHADOW,
+    ...SHADOW,
   },
-  cardPressed: {
-    opacity: 0.92,
-  },
-  cardHeader: {
+  cardPressed: { opacity: 0.94, transform: [{ scale: 0.985 }] },
+
+  cardTop: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F3F4F6',
   },
-  orderNumber: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#111827',
-    fontFamily: 'Manrope_700Bold',
-    marginBottom: 3,
-  },
-  orderDate: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    fontFamily: 'Inter_400Regular',
-  },
-  statusBadge: {
+  orderNumber: { fontSize: 17, fontWeight: '800', color: '#111827', fontFamily: 'Manrope_700Bold' },
+  orderNumCopyRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  orderCopiedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+    marginLeft: 4,
+    fontFamily: 'Manrope_700Bold',
+  },
+  orderDate:   { fontSize: 12, color: '#9CA3AF', fontFamily: 'Inter_400Regular', marginTop: 2 },
+
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
   },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    fontFamily: 'Manrope_700Bold',
-  },
-
-  divider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginHorizontal: 16,
-  },
+  pillDot: { width: 6, height: 6, borderRadius: 3 },
+  pillText: { fontSize: 12, fontWeight: '700', fontFamily: 'Manrope_700Bold' },
 
   productRow: {
     flexDirection: 'row',
@@ -459,64 +453,30 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   imgWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
+    width: 76,
+    height: 76,
+    borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#F9FAFB',
     flexShrink: 0,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
   },
-  productImg: {
-    width: '100%',
-    height: '100%',
-  },
-  imgFallback: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  productInfo: {
-    flex: 1,
-    gap: 8,
-  },
-  productName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
-    fontFamily: 'Manrope_700Bold',
-    lineHeight: 20,
-  },
-  productMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  qtyBadge: {
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  qtyText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontFamily: 'Inter_500Medium',
-  },
-  totalText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: BrandColors.primary,
-    fontFamily: 'Manrope_700Bold',
-  },
+  productImg:    { width: '100%', height: '100%' },
+  imgFallback:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  productInfo:   { flex: 1, gap: 4 },
+  productName:   { fontSize: 14, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold', lineHeight: 20 },
+  productSub:    { fontSize: 12, color: '#9CA3AF', fontFamily: 'Inter_400Regular' },
+  totalText:     { fontSize: 19, fontWeight: '900', color: BrandColors.primary, fontFamily: 'Manrope_700Bold' },
 
   cardFooter: {
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 16,
     paddingBottom: 14,
-    paddingTop: 4,
+    paddingTop: 2,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#F3F4F6',
   },
   footerBtn: {
     flexDirection: 'row',
@@ -527,73 +487,33 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
   },
-  footerBtnSecondary: {
-    backgroundColor: '#F3F4F6',
-  },
-  footerBtnPressed: {
-    opacity: 0.7,
-  },
-  footerBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: BrandColors.primary,
-    fontFamily: 'Inter_600SemiBold',
-  },
+  footerBtnGray: { backgroundColor: '#F3F4F6' },
+  footerBtnText: { fontSize: 12, fontWeight: '600', color: BrandColors.primary, fontFamily: 'Inter_600SemiBold' },
 
-  loadingWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
+  // Loading / empty
+  loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 80, gap: 14 },
+  loadingText: { fontSize: 13, color: '#6B7280', fontFamily: 'Inter_400Regular' },
 
   emptyWrap: {
     alignItems: 'center',
     marginTop: 60,
-    gap: 12,
-  },
-  emptyIconWrap: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#374151',
-    fontFamily: 'Manrope_700Bold',
-  },
-  emptySubtitle: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    fontFamily: 'Inter_400Regular',
-    textAlign: 'center',
     paddingHorizontal: 32,
-    lineHeight: 18,
+    gap: 10,
   },
+  emptyEmoji:    { fontSize: 52, marginBottom: 4 },
+  emptyTitle:    { fontSize: 19, fontWeight: '800', color: '#374151', fontFamily: 'Manrope_700Bold', textAlign: 'center' },
+  emptySubtitle: { fontSize: 13, color: '#9CA3AF', fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 19 },
   exploreBtn: {
-    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
     backgroundColor: '#111827',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+    borderRadius: 14,
   },
-  exploreBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  exploreBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', fontFamily: 'Manrope_700Bold' },
 
-  bottomSpacer: {
-    height: 16,
-  },
+  bottomSpacer: { height: 20 },
 });

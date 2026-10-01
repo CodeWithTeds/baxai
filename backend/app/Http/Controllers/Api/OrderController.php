@@ -21,10 +21,17 @@ class OrderController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Order::with('items')->latest('placed_at');
+        $query = Order::with(['items', 'customer'])->latest('placed_at');
 
-        if ($request->filled('customer_email')) {
-            $query->where('customer_email', strtolower(trim($request->customer_email)));
+        $email = $request->input('customer_email') ?: $request->input('email');
+        if (!empty($email)) {
+            $cleanEmail = strtolower(trim($email));
+            $query->where(function ($q) use ($cleanEmail) {
+                $q->whereRaw('LOWER(customer_email) = ?', [$cleanEmail])
+                  ->orWhereHas('customer', function ($cq) use ($cleanEmail) {
+                      $cq->whereRaw('LOWER(email) = ?', [$cleanEmail]);
+                  });
+            });
         }
 
         if ($request->filled('customer_id')) {
@@ -43,14 +50,25 @@ class OrderController extends Controller
         }
 
         if ($request->filled('search')) {
-            $search = '%' . trim($request->search) . '%';
-            $query->where(function ($q) use ($search) {
-                $q->where('order_number', 'like', $search)
-                  ->orWhere('customer_name', 'like', $search)
-                  ->orWhereHas('items', function ($iq) use ($search) {
-                      $iq->where('product_name', 'like', $search)
-                         ->orWhere('sku', 'like', $search);
-                  });
+            $rawSearch = trim($request->search);
+            $cleanSearch = ltrim($rawSearch, '#');
+            $digits = preg_replace('/\D/', '', $cleanSearch);
+
+            $query->where(function ($q) use ($rawSearch, $cleanSearch, $digits) {
+                $q->where('order_number', 'like', "%{$rawSearch}%")
+                  ->orWhere('order_number', 'like', "%{$cleanSearch}%")
+                  ->orWhere('customer_name', 'like', "%{$rawSearch}%")
+                  ->orWhere('customer_email', 'like', "%{$rawSearch}%");
+
+                if (!empty($digits) && strlen($digits) >= 3) {
+                    $q->orWhere('order_number', 'like', "%{$digits}%")
+                      ->orWhere('order_number', 'like', "RD-{$digits}%");
+                }
+
+                $q->orWhereHas('items', function ($iq) use ($rawSearch) {
+                    $iq->where('product_name', 'like', "%{$rawSearch}%")
+                       ->orWhere('sku', 'like', "%{$rawSearch}%");
+                });
             });
         }
 
@@ -191,17 +209,58 @@ class OrderController extends Controller
     }
 
     /**
+     * Helper to find an order by ID or order_number flexibly.
+     */
+    protected function findOrderByIdentifier(string $id): ?Order
+    {
+        $raw = urldecode(trim($id));
+        $clean = trim($raw);
+        $unhashed = ltrim($clean, '#');
+        $digits = preg_replace('/\D/', '', $unhashed);
+
+        return Order::with(['items', 'customer'])
+            ->where(function ($query) use ($clean, $unhashed, $digits) {
+                if (is_numeric($clean)) {
+                    $query->orWhere('id', (int) $clean);
+                }
+
+                $query->orWhereRaw('LOWER(order_number) = ?', [strtolower($clean)])
+                      ->orWhereRaw('LOWER(order_number) = ?', [strtolower($unhashed)])
+                      ->orWhereRaw('REPLACE(LOWER(order_number), "-", "") = ?', [strtolower($unhashed)]);
+
+                if (!empty($digits) && strlen($digits) >= 3) {
+                    $query->orWhereRaw('LOWER(order_number) = ?', [strtolower('RD-' . $digits)])
+                          ->orWhere('order_number', 'like', '%-' . $digits);
+                }
+            })
+            ->first();
+    }
+
+    /**
      * Display the specified order.
      */
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $order = Order::with('items')
-            ->where('id', $id)
-            ->orWhere('order_number', $id)
-            ->first();
+        $order = $this->findOrderByIdentifier($id);
 
         if (!$order) {
             return response()->json(['message' => 'Order not found'], 404);
+        }
+
+        // If client passed email verification, verify ownership
+        $email = $request->input('customer_email') ?: $request->input('email');
+        if (!empty($email)) {
+            $cleanEmail = strtolower(trim($email));
+            $orderEmail = strtolower(trim($order->customer_email ?? ''));
+            $custEmail = strtolower(trim($order->customer->email ?? ''));
+
+            if ($orderEmail !== $cleanEmail && $custEmail !== $cleanEmail) {
+                // If it doesn't match, verify if user is admin or allow direct reference match
+                // We allow direct order_number match if the client knows the exact reference
+                if (strtolower($order->order_number) !== strtolower(ltrim(trim($id), '#'))) {
+                    return response()->json(['message' => 'Order not found for this customer'], 404);
+                }
+            }
         }
 
         return (new OrderResource($order))->response();
@@ -212,9 +271,11 @@ class OrderController extends Controller
      */
     public function updateStatus(Request $request, string $id): JsonResponse
     {
-        $order = Order::where('id', $id)
-            ->orWhere('order_number', $id)
-            ->firstOrFail();
+        $order = $this->findOrderByIdentifier($id);
+
+        if (!$order) {
+            return response()->json(['message' => 'Order not found'], 404);
+        }
 
         $validated = $request->validate([
             'status' => 'required|in:in_progress,processing,delivered,cancelled',
