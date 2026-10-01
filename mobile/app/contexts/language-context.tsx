@@ -96,6 +96,7 @@ type Translations = {
   aiAssistant: string;
   aiAssistantDesc: string;
   quickActions: string;
+  qaHelpMeChoose: string;
   qaTrackOrder: string;
   qaCheckPricing: string;
   qaTalkAgent: string;
@@ -215,6 +216,7 @@ const TRANSLATIONS: Record<Language, Translations> = {
     aiAssistant: 'Owl AI Assistant',
     aiAssistantDesc: 'Ask anything about products, order tracking, or custom designs.',
     quickActions: 'Quick Actions',
+    qaHelpMeChoose: 'Help me choose',
     qaTrackOrder: 'Track Order',
     qaCheckPricing: 'Check Pricing',
     qaTalkAgent: 'Talk to Agent',
@@ -341,6 +343,7 @@ const TRANSLATIONS: Record<Language, Translations> = {
     aiAssistant: 'Owl AI Assistant',
     aiAssistantDesc: 'Magtanong tungkol sa mga produkto, pag-track ng order, o mga kustom na disenyo.',
     quickActions: 'Mga Mabilis na Aksyon',
+    qaHelpMeChoose: 'Tulungan akong pumili',
     qaTrackOrder: 'Sundan ang Order',
     qaCheckPricing: 'Suriin ang Presyo',
     qaTalkAgent: 'Makausap ang Agent',

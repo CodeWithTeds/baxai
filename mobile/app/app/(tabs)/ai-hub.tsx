@@ -632,7 +632,7 @@ export default function AiHubScreen() {
     sendText,
     clearConversation,
   } = useVoiceConversation(user?.email);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const owlRef = useRef<OwlMascotHandle>(null);
   const flatListRef = useRef<FlatList>(null);
@@ -728,6 +728,14 @@ export default function AiHubScreen() {
       setInputText('Track order #');
       return;
     }
+    if (action.id === 'quiz') {
+      sendText(
+        language === 'tl'
+          ? 'Maaari mo ba akong tulungang pumili ng tamang produkto? Tanungin mo ako ng mabilis na tanong para marekomenda ang pinakamagandang item!'
+          : 'Can you help me choose the right product? Ask me a few quick questions to recommend the best item!'
+      );
+      return;
+    }
     sendText(action.label);
   };
 
@@ -741,6 +749,7 @@ export default function AiHubScreen() {
   };
 
   const quickActions = [
+    { id: 'quiz',    label: t.qaHelpMeChoose, icon: 'sparkles' as const,             color: IconColors.ai,       bg: IconColors.aiBg },
     { id: 'track',   label: t.qaTrackOrder,   icon: 'bus-outline' as const,          color: IconColors.tracking, bg: IconColors.trackingBg },
     { id: 'pricing', label: t.qaCheckPricing, icon: 'pricetag-outline' as const,     color: IconColors.pricing,  bg: IconColors.pricingBg },
     { id: 'talk',    label: t.qaTalkAgent,    icon: 'headset-outline' as const,      color: IconColors.support,  bg: IconColors.supportBg },

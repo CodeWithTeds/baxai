@@ -403,6 +403,7 @@ const stepperStyles = StyleSheet.create({
 export default function Mug3DScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
+    id?: string;
     name?: string;
     price?: string;
     sku?: string;
@@ -410,6 +411,10 @@ export default function Mug3DScreen() {
     viewer_type?: string;
     category?: string;
     description?: string;
+    customization_addon_price?: string;
+    max_text_length?: string;
+    thumbnail?: string;
+    fallback_image?: string;
   }>();
 
   const name        = params.name        || 'Coffee Mugs';

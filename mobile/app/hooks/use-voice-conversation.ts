@@ -94,6 +94,9 @@ function localFallbackReply(text: string): string | null {
   if (/track|order|status|where.*order|my order/.test(lower)) {
     return "To track your order, type or paste your Order Reference (such as RD-1234) right here into the chat, or head to the Orders tab to view live delivery timelines! 📦";
   }
+  if (/choose|recommend|suggest|pili|quiz|help me pick/i.test(lower)) {
+    return "I would love to help you find the perfect product! 🎉 Could you share:\n1. What is the occasion or purpose? (Gift, event, personal use, or giveaway?)\n2. How many pieces do you need?\n3. What is your target budget?\n\nTell me your preferences and I will recommend the best match for you!";
+  }
   if (/price|cost|how much|magkano/.test(lower)) {
     return "Prices vary by product and customization. Browse the Services tab to see all available products with their starting prices. 🏷️";
   }

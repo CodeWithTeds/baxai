@@ -14,6 +14,7 @@ export default function Pin3DScreen() {
   const router = useRouter();
   const { addItem } = useCart();
   const params = useLocalSearchParams<{
+    id?: string;
     name?: string;
     price?: string;
     sku?: string;
@@ -22,6 +23,7 @@ export default function Pin3DScreen() {
     category?: string;
     description?: string;
     customization_addon_price?: string;
+    max_text_length?: string;
     thumbnail?: string;
     fallback_image?: string;
   }>();
