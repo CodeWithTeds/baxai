@@ -8,6 +8,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { BrandColors } from '@/constants/theme';
 import { useLanguage } from '@/contexts/language-context';
 import ProfileModal from '@/components/profile-modal';
+import NavigationDrawer from '@/components/navigation-drawer';
 import { CartHeaderButton } from '@/components/cart-header-button';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -51,8 +52,17 @@ export default function ScreenHeader({
 }: ScreenHeaderProps) {
   const { t } = useLanguage();
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showDrawer, setShowDrawer] = useState(false);
   const effectivePlaceholder = searchPlaceholder ?? t.searchPlaceholder;
   const isLogo = showLogo ?? (!title || title === 'NUYDA ENTERPRISE' || title === t.brandName);
+
+  const handleMenuPress = () => {
+    if (onMenuPress) {
+      onMenuPress();
+    } else {
+      setShowDrawer(true);
+    }
+  };
 
   const handleAvatarPress = () => {
     if (onAvatarPress) {
@@ -67,7 +77,7 @@ export default function ScreenHeader({
       {/* ── Top bar ──────────────────────────────────────────── */}
       <SafeAreaView edges={['top']} style={styles.topSafe}>
         <View style={styles.topBar}>
-          <Pressable hitSlop={8} style={styles.iconBtn} onPress={onMenuPress}>
+          <Pressable hitSlop={8} style={styles.iconBtn} onPress={handleMenuPress}>
             <Ionicons name="menu" size={26} color={BrandColors.primary} />
           </Pressable>
 
@@ -110,6 +120,12 @@ export default function ScreenHeader({
           </Pressable>
         </Animated.View>
       )}
+
+      {/* Slide-out Navigation Drawer */}
+      <NavigationDrawer
+        visible={showDrawer}
+        onClose={() => setShowDrawer(false)}
+      />
 
       {/* Profile & Logout Modal */}
       <ProfileModal
