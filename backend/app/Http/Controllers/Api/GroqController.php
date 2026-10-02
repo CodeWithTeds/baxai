@@ -137,8 +137,9 @@ CRITICAL FORMATTING RULES:
 - NEVER use markdown syntax: NO double asterisks (**bold**), NO single asterisks (*italic*), NO bullet hyphens (- item or --), NO hashtags (#), and NO raw code blocks.
 - Regular everyday shoppers and non-technical customers read your responses on a mobile phone screen and listen to them spoken aloud via text-to-speech. Asterisks (**), hyphens (-), and symbols look like broken computer code or formatting errors to them and sound robotic when read aloud!
 - Always write in clean, natural, human conversational sentences and short paragraphs.
-- For order tracking updates, explain status and delivery dates naturally like a helpful retail assistant:
-  Example: "Good news! Your order RD-3607 is currently in production and scheduled for fulfillment. Estimated delivery is on October 6, with Cash on Delivery payment. We will send you an update as soon as it ships!"
+- For order tracking updates, explain status and delivery dates naturally like a helpful retail assistant. Always reflect the REAL status from the system data — do NOT use a fixed phrase for all orders:
+  Example (active order): "Good news! Your order RD-3607 is currently in production and scheduled for fulfillment. Estimated delivery is on October 6, with Cash on Delivery payment. We will send you an update as soon as it ships!"
+  Example (cancelled order): "I am really sorry to let you know that your order RD-3607 has been cancelled. [Include the cancellation reason if provided.] We apologize for the inconvenience — please do not hesitate to reach out if you have any questions or if we can help you place a new order!"
 - Never use list dashes like "- Status: In progress" or "- Payment: COD". Integrate the details into smooth, natural sentences instead.
 
 ---
@@ -714,16 +715,44 @@ PROMPT;
                         return "{$it->product_name} (Qty: {$it->quantity})";
                     })->implode(', ');
 
-                    return implode("\n", [
+                    // Build a human-readable, accurate status description based on actual status
+                    $statusDescription = match ($order->status) {
+                        'cancelled'   => 'CANCELLED — this order has been cancelled and will NOT be fulfilled',
+                        'delivered'   => 'DELIVERED — the order has been successfully delivered to the customer',
+                        'shipped'     => 'SHIPPED — the order is on its way and currently in transit',
+                        'in_progress' => 'IN PROGRESS — order is being finished and packaged',
+                        'processing'  => 'PROCESSING — order is in active production and printing queue',
+                        default       => "{$order->status} — status as recorded in the system",
+                    };
+
+                    // Include cancellation reason if available
+                    $cancellationLine = '';
+                    if ($order->status === 'cancelled' && ! empty($order->cancellation_reason)) {
+                        $cancellationLine = "Cancellation Reason: {$order->cancellation_reason}";
+                    }
+
+                    // Choose the appropriate mandatory instruction based on status
+                    $mandatoryInstruction = $order->status === 'cancelled'
+                        ? 'MANDATORY INSTRUCTION: This order is CANCELLED. Do NOT say it is in production or scheduled for fulfillment — that is completely wrong. Acknowledge the cancellation clearly but warmly. If a cancellation reason is provided, share it with the customer in a sympathetic way. Apologize for any inconvenience, comfort the customer, and offer to help them place a new order or assist with anything else they need. Use warm, natural sentences without markdown asterisks (**) or bullet dashes (-).'
+                        : 'MANDATORY INSTRUCTION: The customer provided this exact Order ID. Give them the order tracking update directly and immediately! DO NOT ask them to log in. DO NOT ask for their email address. Explain these details in warm, friendly, natural sentences without markdown asterisks (**) or bullet dashes (-).';
+
+                    $lines = [
                         "ORDER TRACKING DETAILS FOR #{$order->order_number}:",
                         "Order Reference: #{$order->order_number} (Internal ID: {$order->id})",
-                        "Current Status: {$order->status} (in production and scheduled for fulfillment)",
+                        "Current Status: {$statusDescription}",
                         'Placed Date: '.($order->placed_at ? $order->placed_at->format('M d, Y') : 'Recently'),
                         "Estimated Delivery: {$order->expected_delivery}",
                         "Total Amount: ₱{$order->total} (Payment: {$order->payment_method}, {$order->payment_status})",
                         "Items in Order: {$itemsDetail}",
-                        'MANDATORY INSTRUCTION: The customer provided this exact Order ID. Give them the order tracking update directly and immediately! DO NOT ask them to log in. DO NOT ask for their email address. Explain these details in warm, friendly, natural sentences without markdown asterisks (**) or bullet dashes (-).',
-                    ]);
+                    ];
+
+                    if ($cancellationLine) {
+                        $lines[] = $cancellationLine;
+                    }
+
+                    $lines[] = $mandatoryInstruction;
+
+                    return implode("\n", $lines);
                 }
             }
         } catch (\Throwable $e) {
