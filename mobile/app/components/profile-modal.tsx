@@ -16,9 +16,10 @@ interface Props {
   email?: string;
   name?: string;
   avatar?: string;
+  onReplayTutorial?: () => void;
 }
 
-export default function ProfileModal({ visible, onClose, email: propEmail, name: propName, avatar }: Props) {
+export default function ProfileModal({ visible, onClose, email: propEmail, name: propName, avatar, onReplayTutorial }: Props) {
   const { user, logout } = useAuth();
   
   const displayEmail = propEmail || user?.email || 'Not Logged In';
@@ -173,6 +174,20 @@ export default function ProfileModal({ visible, onClose, email: propEmail, name:
                 Synced to <Text style={{ fontWeight: '700' }}>{`${getApiBaseUrls()[0] ?? ''}/customers`}</Text>
               </Text>
             </View>
+
+            {/* Mascot Tour / Tutorial Button */}
+            {onReplayTutorial && (
+              <Pressable
+                onPress={() => {
+                  triggerHaptic();
+                  onReplayTutorial();
+                }}
+                style={({ pressed }) => [styles.tutorialBtn, pressed && styles.tutorialBtnPressed]}
+              >
+                <Ionicons name="sparkles" size={17} color="#2563EB" />
+                <Text style={styles.tutorialBtnText}>App Guide & Mascot Tour</Text>
+              </Pressable>
+            )}
 
             {/* Logout Button */}
             <Pressable
@@ -399,6 +414,26 @@ const styles = StyleSheet.create({
     color: '#1E40AF',
     fontFamily: 'Inter_400Regular',
     flex: 1,
+  },
+  tutorialBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  tutorialBtnPressed: {
+    backgroundColor: '#DBEAFE',
+  },
+  tutorialBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2563EB',
+    fontFamily: 'Manrope_700Bold',
   },
   logoutBtn: {
     flexDirection: 'row',

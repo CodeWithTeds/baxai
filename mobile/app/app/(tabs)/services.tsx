@@ -21,6 +21,7 @@ import { BrandColors } from '@/constants/theme';
 import { useLanguage } from '@/contexts/language-context';
 import { fetchPrintItems, fetchProducts, getApiBaseUrls, type ApiPrintItem, type ApiProduct } from '@/utils/api';
 import { getCategoryForItem, type CategoryId } from '@/utils/category';
+import { matchProductSearch } from '@/utils/price-search';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -445,10 +446,7 @@ export default function ServicesScreen() {
   const filteredServices = services.filter((s) => {
     const itemCategory = getCategoryForItem({ name: s.name, category: s.category });
     const categoryMatch = selectedCategory === 'all' || itemCategory === selectedCategory;
-    const searchMatch =
-      query.length === 0 ||
-      s.name.toLowerCase().includes(query.toLowerCase()) ||
-      (s.description && s.description.toLowerCase().includes(query.toLowerCase()));
+    const searchMatch = matchProductSearch(s, query);
     return categoryMatch && searchMatch;
   });
 

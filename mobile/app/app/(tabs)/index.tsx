@@ -16,15 +16,18 @@ import {
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ProfileModal from '@/components/profile-modal';
 import ScreenHeader from '@/components/screen-header';
 import { BrandColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import HomeTutorialSpotlight, { HOME_TUTORIAL_KEY } from '@/components/home-tutorial-spotlight';
 import { fetchPrintItems, fetchProducts, getApiBaseUrls, type ApiPrintItem, type ApiProduct } from '@/utils/api';
 import { getCategoryForItem } from '@/utils/category';
 import { syncCustomerToBackend } from '@/utils/customer-sync';
+import { matchProductSearch } from '@/utils/price-search';
 
 export interface FeaturedItem {
   id: string;
@@ -83,10 +86,27 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [featured, setFeatured] = useState<FeaturedItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const { t } = useLanguage();
+
+  const searchBarRef = useRef<View>(null);
+  const categoriesRef = useRef<View>(null);
+  const featuredRef = useRef<View>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const handleTutorialScroll = (stepIndex: number) => {
+    if (stepIndex === 0) {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    } else if (stepIndex === 1) {
+      scrollViewRef.current?.scrollTo({ y: 135, animated: true });
+    } else if (stepIndex === 2) {
+      scrollViewRef.current?.scrollTo({ y: 315, animated: true });
+    }
+  };
 
   const activeEmail = params.email || user?.email;
 
@@ -98,6 +118,26 @@ export default function HomeScreen() {
       }
     }
   }, [params.authSuccess, activeEmail]);
+
+  useEffect(() => {
+    let timer: any;
+    async function checkTutorial() {
+      if (params.authSuccess !== '1') {
+        try {
+          const seen = await AsyncStorage.getItem(HOME_TUTORIAL_KEY);
+          if (seen !== 'true') {
+            timer = setTimeout(() => {
+              setShowTutorial(true);
+            }, 700);
+          }
+        } catch {}
+      }
+    }
+    checkTutorial();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [user, params.authSuccess]);
 
   const loadData = async () => {
     try {
@@ -291,14 +331,37 @@ export default function HomeScreen() {
     }
   };
 
+  const trimmedSearch = searchQuery.trim();
+  const displayedFeatured = trimmedSearch
+    ? featured.filter((item) => matchProductSearch(item, trimmedSearch))
+    : featured;
+
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
 
       {/* ── Header + Search ──────────────────────────────────── */}
-      <ScreenHeader showLogo onAvatarPress={() => setShowProfileModal(true)} />
+      <ScreenHeader
+        searchBarRef={searchBarRef}
+        showLogo
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSubmitSearch={() => {
+          if (searchQuery.trim()) {
+            router.push({
+              pathname: '/(tabs)/services',
+              params: { query: searchQuery.trim() },
+            } as any);
+          }
+        }}
+        onClearSearch={() => setSearchQuery('')}
+        onFilterPress={() => router.push('/(tabs)/services' as any)}
+        onLogoPress={() => setShowTutorial(true)}
+        onAvatarPress={() => setShowProfileModal(true)}
+      />
 
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -341,7 +404,11 @@ export default function HomeScreen() {
         </Animated.View>
 
         {/* ── Explore Categories ───────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(160).duration(500)} style={styles.section}>
+        <View ref={categoriesRef} collapsable={false}>
+          <Animated.View
+            entering={FadeInDown.delay(160).duration(500)}
+            style={styles.section}
+          >
           <Text style={styles.sectionTitle}>{t.categories}</Text>
 
           {/* Unified Category Icons Row */}
@@ -367,12 +434,27 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
         </Animated.View>
+        </View>
 
         {/* ── Featured Services ─────────────────────────────────── */}
-        <Animated.View entering={FadeInDown.delay(240).duration(500)} style={styles.section}>
+        <View ref={featuredRef} collapsable={false}>
+          <Animated.View
+            entering={FadeInDown.delay(240).duration(500)}
+            style={styles.section}
+          >
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t.featuredProducts}</Text>
-            <Pressable hitSlop={8} style={styles.seeAllBtn} onPress={() => router.push('/(tabs)/services' as any)}>
+            <Text style={styles.sectionTitle}>
+              {searchQuery.trim() ? `Search Results (${displayedFeatured.length})` : t.featuredProducts}
+            </Text>
+            <Pressable
+              hitSlop={8}
+              style={styles.seeAllBtn}
+              onPress={() =>
+                router.push({
+                  pathname: '/(tabs)/services',
+                  params: searchQuery.trim() ? { query: searchQuery.trim() } : undefined,
+                } as any)
+              }>
               <Text style={styles.seeAllText}>{t.viewAll}</Text>
               <Ionicons name="arrow-forward" size={14} color={BrandColors.primary} />
             </Pressable>
@@ -380,9 +462,28 @@ export default function HomeScreen() {
 
           {loading ? (
             <ActivityIndicator size="small" color={BrandColors.primary} style={{ marginVertical: 20 }} />
+          ) : displayedFeatured.length === 0 ? (
+            <View style={styles.searchEmptyBox}>
+              <Ionicons name="search-outline" size={36} color="#9CA3AF" />
+              <Text style={styles.searchEmptyTitle}>No items matching "{searchQuery}"</Text>
+              <Text style={styles.searchEmptySub}>
+                Try searching with another keyword or explore our complete catalog.
+              </Text>
+              <Pressable
+                style={styles.searchCatalogBtn}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(tabs)/services',
+                    params: { query: searchQuery.trim() },
+                  } as any)
+                }>
+                <Text style={styles.searchCatalogBtnText}>Search All Services</Text>
+                <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+              </Pressable>
+            </View>
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredScroll}>
-              {featured.map((item) => (
+              {displayedFeatured.map((item) => (
                 <Pressable
                   key={item.id}
                   onPress={() => handleFeaturedPress(item)}
@@ -433,13 +534,21 @@ export default function HomeScreen() {
             </ScrollView>
           )}
         </Animated.View>
+        </View>
 
         {/* Bottom spacing */}
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
       {/* Profile Modal */}
-      <ProfileModal visible={showProfileModal} onClose={() => setShowProfileModal(false)} />
+      <ProfileModal
+        visible={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onReplayTutorial={() => {
+          setShowProfileModal(false);
+          setTimeout(() => setShowTutorial(true), 250);
+        }}
+      />
 
       {/* Success Modal */}
       <Modal visible={showSuccessModal} transparent animationType="fade">
@@ -452,12 +561,27 @@ export default function HomeScreen() {
             </Text>
             <Pressable
               style={styles.modalBtn}
-              onPress={() => setShowSuccessModal(false)}>
+              onPress={() => {
+                setShowSuccessModal(false);
+                setTimeout(() => setShowTutorial(true), 350);
+              }}>
               <Text style={styles.modalBtnText}>Continue</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
+
+      {/* ── Spotlight Coachmark Tutorial with Mascot & Bounding Boxes ── */}
+      <HomeTutorialSpotlight
+        visible={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        targets={{
+          search: searchBarRef,
+          categories: categoriesRef,
+          featured: featuredRef,
+        }}
+        onScrollToStep={handleTutorialScroll}
+      />
     </View>
   );
 }
@@ -830,6 +954,49 @@ const styles = StyleSheet.create({
   modalBtnText: {
     color: '#FFFFFF',
     fontSize: 14,
+    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
+  },
+
+  // Search Empty State
+  searchEmptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginVertical: 4,
+    gap: 8,
+  },
+  searchEmptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1F2937',
+    fontFamily: 'Manrope_700Bold',
+    textAlign: 'center',
+  },
+  searchEmptySub: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  searchCatalogBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: BrandColors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  searchCatalogBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '700',
     fontFamily: 'Manrope_700Bold',
   },

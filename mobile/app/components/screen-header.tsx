@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,7 +9,6 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { BrandColors } from '@/constants/theme';
 import { useLanguage } from '@/contexts/language-context';
 import ProfileModal from '@/components/profile-modal';
-import NavigationDrawer from '@/components/navigation-drawer';
 import { CartHeaderButton } from '@/components/cart-header-button';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -28,12 +28,18 @@ interface ScreenHeaderProps {
   searchValue?: string;
   /** Called when the search text changes */
   onSearchChange?: (text: string) => void;
+  /** Called when the user submits search (e.g. presses return key or search icon) */
+  onSubmitSearch?: () => void;
+  /** Called when the search text is cleared */
+  onClearSearch?: () => void;
   /** Called when the filter/options button is pressed */
   onFilterPress?: () => void;
-  /** Called when the left menu button is pressed */
-  onMenuPress?: () => void;
   /** Called when the right avatar button is pressed */
   onAvatarPress?: () => void;
+  /** Ref to search bar container for spotlight tutorial measurement */
+  searchBarRef?: React.Ref<View>;
+  /** Optional callback when logo or brand is pressed */
+  onLogoPress?: () => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -46,21 +52,52 @@ export default function ScreenHeader({
   searchPlaceholder,
   searchValue,
   onSearchChange,
+  onSubmitSearch,
+  onClearSearch,
   onFilterPress,
-  onMenuPress,
   onAvatarPress,
+  searchBarRef,
+  onLogoPress,
 }: ScreenHeaderProps) {
   const { t } = useLanguage();
   const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showDrawer, setShowDrawer] = useState(false);
+  const [internalText, setInternalText] = useState('');
+
+  const currentSearchText = searchValue !== undefined ? searchValue : internalText;
   const effectivePlaceholder = searchPlaceholder ?? t.searchPlaceholder;
   const isLogo = showLogo ?? (!title || title === 'NUYDA ENTERPRISE' || title === t.brandName);
 
-  const handleMenuPress = () => {
-    if (onMenuPress) {
-      onMenuPress();
+  const handleTextChange = (text: string) => {
+    if (searchValue === undefined) {
+      setInternalText(text);
+    }
+    onSearchChange?.(text);
+  };
+
+  const handleClear = () => {
+    if (searchValue === undefined) {
+      setInternalText('');
+    }
+    onSearchChange?.('');
+    onClearSearch?.();
+  };
+
+  const handleSubmit = () => {
+    if (onSubmitSearch) {
+      onSubmitSearch();
+    } else if (currentSearchText.trim()) {
+      router.push({
+        pathname: '/(tabs)/services',
+        params: { query: currentSearchText.trim() },
+      } as any);
+    }
+  };
+
+  const handleFilter = () => {
+    if (onFilterPress) {
+      onFilterPress();
     } else {
-      setShowDrawer(true);
+      router.push('/(tabs)/services' as any);
     }
   };
 
@@ -77,21 +114,24 @@ export default function ScreenHeader({
       {/* ── Top bar ──────────────────────────────────────────── */}
       <SafeAreaView edges={['top']} style={styles.topSafe}>
         <View style={styles.topBar}>
-          <Pressable hitSlop={8} style={styles.iconBtn} onPress={handleMenuPress}>
-            <Ionicons name="menu" size={26} color={BrandColors.primary} />
-          </Pressable>
-
           {isLogo ? (
-            <View style={styles.logoWrap} pointerEvents="none">
+            <Pressable
+              style={styles.logoWrap}
+              onPress={onLogoPress}
+              disabled={!onLogoPress}
+              pointerEvents={onLogoPress ? 'auto' : 'none'}
+            >
               <Image
                 source={require('@/assets/images/logo.png')}
                 style={styles.brandLogo}
                 contentFit="contain"
                 priority="high"
               />
-            </View>
+            </Pressable>
           ) : (
-            <Text style={styles.brandName} numberOfLines={1}>{title}</Text>
+            <Pressable onPress={onLogoPress} disabled={!onLogoPress}>
+              <Text style={styles.brandName} numberOfLines={1}>{title}</Text>
+            </Pressable>
           )}
 
           <View style={styles.rightActions}>
@@ -105,27 +145,34 @@ export default function ScreenHeader({
 
       {/* ── Search bar (optional) ────────────────────────────── */}
       {!hideSearch && (
-        <Animated.View entering={FadeIn.duration(400)} style={styles.searchWrap}>
-          <Ionicons name="search" size={18} color="#9CA3AF" style={styles.searchIcon} />
-          <TextInput
-            placeholder={effectivePlaceholder}
-            placeholderTextColor="#9CA3AF"
-            style={styles.searchInput}
-            returnKeyType="search"
-            value={searchValue}
-            onChangeText={onSearchChange}
-          />
-          <Pressable hitSlop={8} style={styles.filterBtn} onPress={onFilterPress}>
-            <Ionicons name="options-outline" size={20} color="#4B5563" />
-          </Pressable>
-        </Animated.View>
+        <View ref={searchBarRef} collapsable={false}>
+          <Animated.View
+            entering={FadeIn.duration(400)}
+            style={styles.searchWrap}
+          >
+            <Pressable hitSlop={6} onPress={handleSubmit} style={styles.searchIconBtn}>
+              <Ionicons name="search" size={18} color="#9CA3AF" />
+            </Pressable>
+            <TextInput
+              placeholder={effectivePlaceholder}
+              placeholderTextColor="#9CA3AF"
+              style={styles.searchInput}
+              returnKeyType="search"
+              value={currentSearchText}
+              onChangeText={handleTextChange}
+              onSubmitEditing={handleSubmit}
+            />
+            {currentSearchText.length > 0 && (
+              <Pressable hitSlop={8} style={styles.clearBtn} onPress={handleClear}>
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              </Pressable>
+            )}
+            <Pressable hitSlop={8} style={styles.filterBtn} onPress={handleFilter}>
+              <Ionicons name="options-outline" size={20} color="#4B5563" />
+            </Pressable>
+          </Animated.View>
+        </View>
       )}
-
-      {/* Slide-out Navigation Drawer */}
-      <NavigationDrawer
-        visible={showDrawer}
-        onClose={() => setShowDrawer(false)}
-      />
 
       {/* Profile & Logout Modal */}
       <ProfileModal
@@ -181,6 +228,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginLeft: 'auto',
   },
   searchWrap: {
     flexDirection: 'row',
@@ -202,8 +250,9 @@ const styles = StyleSheet.create({
       android: { elevation: 2 },
     }),
   },
-  searchIcon: {
-    marginRight: 8,
+  searchIconBtn: {
+    padding: 2,
+    marginRight: 6,
   },
   searchInput: {
     flex: 1,
@@ -212,8 +261,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     padding: 0,
   },
+  clearBtn: {
+    padding: 4,
+    marginRight: 2,
+  },
   filterBtn: {
-    marginLeft: 8,
+    marginLeft: 6,
     padding: 2,
   },
 });

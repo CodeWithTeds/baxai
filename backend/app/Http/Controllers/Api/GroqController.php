@@ -181,7 +181,7 @@ Never expose passwords, OTPs, PINs, card numbers, or another customer's personal
 
 ---
 
-# 7. INTERACTIVE PRODUCT RECOMMENDATION QUIZ ("HELP ME CHOOSE")
+# 7. INTERACTIVE PRODUCT RECOMMENDATION QUIZ ("HELP ME CHOOSE") & BUDGET FILTERING
 - When a customer taps "Help me choose", asks for recommendations, or isn't sure what product to buy:
   - Respond with warm, helpful enthusiasm!
   - Ask them 3 short, friendly questions to help match the ideal product:
@@ -190,12 +190,25 @@ Never expose passwords, OTPs, PINs, card numbers, or another customer's personal
     3. What is your target budget? (Under ₱200, ₱200 to ₱500, or flexible?)
   - When the customer provides their answers or describes what they want:
     - Match 1 to 3 specific products directly from our live store products in database.
-    - Mention each recommended product by its name (such as "Custom Ceramic Mug", "Button Pin", "Custom Cotton T-Shirt", "Tote Bag", "Custom Sticker", "Wall Calendar") so our mobile app automatically displays interactive product cards with photos, prices, and Customize buttons!
+    - Mention each recommended product by its exact name (such as "t-shirt-reg", "esresso cup", "shoulder bag", "square", "tumbler-l") so our mobile app automatically displays interactive product cards with photos, prices, and Customize buttons!
     - Explain why each product fits their occasion and budget in clean conversational sentences.
 
 ---
 
-# 8. FINAL PRINCIPLE
+# 8. STRICT PRICE & BUDGET FILTERING RULES (CRITICAL)
+- Whenever a customer mentions a price threshold, budget, or price filter (e.g. "500 up", "500+", "500 pataas", "500 and above", "above 500", "over 500", "under 200", "below 500", "less than 500", "between 100 and 500"):
+  - You MUST check the exact Price of each product from the LIVE SYSTEM DATA table below.
+  - STRICTLY ONLY recommend products whose base price complies with the customer's price filter!
+  - If the customer asks for "500 up", "500 and above", or "above 500":
+    - NEVER recommend or mention any product priced below ₱500 (such as ₱99 pins, ₱99 tumblers, ₱100 espresso cups, or ₱100 shoulder bags)!
+    - ONLY recommend products with a price of ₱500 or higher (such as "t-shirt-reg" at ₱1000.00).
+  - If NO products in the store meet the customer's requested price range:
+    - Clearly and politely explain that we do not have items in that specific price range right now.
+    - Honestly state our current store price range (₱99.00 to ₱1000.00) without pretending a cheaper or more expensive product fits their price criteria.
+
+---
+
+# 9. FINAL PRINCIPLE
 Never guess. Never invent system data. Stay strictly on-topic. Be concise, natural, accurate, and helpful.
 PROMPT;
 
@@ -597,6 +610,36 @@ PROMPT;
     }
 
     /**
+     * Extract price constraints (min_price, max_price) from user message text.
+     * Supports: "500 up", "500+", "500 pataas", "500 and above", "above 500", "over 500", "below 500", "under 500", "between 100 and 500", etc.
+     */
+    private function extractPriceConstraints(string $text): array
+    {
+        $min = null;
+        $max = null;
+
+        // Range: e.g. "between 100 and 500", "from 100 to 500", "100 - 500", "100 to 500", "100 hanggang 500"
+        if (preg_match('/(?:between|from)\s*(?:₱|php|p)?\s*(\d+(?:\.\d+)?)\s*(?:to|-|and|hanggang)\s*(?:₱|php|p)?\s*(\d+(?:\.\d+)?)/i', $text, $rm)) {
+            $min = (float) $rm[1];
+            $max = (float) $rm[2];
+        } elseif (preg_match('/\b(?:₱|php|p)?\s*(\d+(?:\.\d+)?)\s*(?:to|-|hanggang)\s*(?:₱|php|p)?\s*(\d+(?:\.\d+)?)\b/i', $text, $rm)) {
+            $min = (float) $rm[1];
+            $max = (float) $rm[2];
+        } else {
+            // Min price: e.g. "500 up", "500+", "500 pataas", "500 and above", "above 500", "over 500", "> 500", ">= 500", "at least 500", "min 500"
+            if (preg_match('/(?:(?:₱|php|p)?\s*(\d+(?:\.\d+)?)\s*(?:up|\+|pataas|and\s*above|or\s*above|above|over|higher\s*than|greater\s*than|minimum|min))|(?:(?:above|over|exceeding|more\s*than|at\s*least|min(?:imum)?|pataas\s*sa|>|>=)\s*(?:₱|php|p)?\s*(\d+(?:\.\d+)?))/i', $text, $m)) {
+                $min = (float) (! empty($m[1]) ? $m[1] : $m[2]);
+            }
+            // Max price: e.g. "under 500", "below 500", "less than 500", "500 pababa", "up to 500", "< 500", "<= 500", "max 500"
+            if (preg_match('/(?:(?:under|below|less\s*than|cheaper\s*than|up\s*to|max(?:imum)?|pababa|hanggang|<|<=)\s*(?:₱|php|p)?\s*(\d+(?:\.\d+)?))|(?:(?:₱|php|p)?\s*(\d+(?:\.\d+)?)\s*(?:down|pababa|and\s*below|or\s*below|below|under|max))/i', $text, $m)) {
+                $max = (float) (! empty($m[1]) ? $m[1] : $m[2]);
+            }
+        }
+
+        return ['min' => $min, 'max' => $max];
+    }
+
+    /**
      * Scan customer messages and assistant reply for products mentioned or recommended
      * and return structured product metadata for rich product card display in mobile UI.
      */
@@ -609,12 +652,33 @@ PROMPT;
                     $userText .= ' '.($msg['content'] ?? '');
                 }
             }
-            $combined = strtolower($userText.' '.$reply);
+            $userTextLower = strtolower($userText);
+            $replyLower = strtolower($reply);
+            $combined = $userTextLower.' '.$replyLower;
+
+            $priceConstraint = $this->extractPriceConstraints($userText);
+            $minPrice = $priceConstraint['min'];
+            $maxPrice = $priceConstraint['max'];
+            $hasPriceFilter = ($minPrice !== null || $maxPrice !== null);
 
             $allProducts = Product::whereNull('deleted_at')->get();
             $matched = [];
 
+            // If the user asked generally for "products" with a price filter (e.g. "500 up on product", "products under 200")
+            // without specifying a specific item, allow matching all products that satisfy the price constraint.
+            $isGeneralProductQuery = preg_match('/\b(product|products|item|items|merch|merchandise|merchandises|benta|paninda)\b/i', $userTextLower);
+
             foreach ($allProducts as $p) {
+                $basePrice = (float) $p->base_price;
+
+                // STRICT PRICE FILTER: If a price filter is present, candidate MUST satisfy price criteria
+                if ($minPrice !== null && $basePrice < $minPrice) {
+                    continue; // Exclude products cheaper than minimum requested
+                }
+                if ($maxPrice !== null && $basePrice > $maxPrice) {
+                    continue; // Exclude products more expensive than maximum requested
+                }
+
                 $nameLower = strtolower($p->name);
                 $catLower = strtolower($p->category ?? '');
                 $skuLower = strtolower($p->sku ?? '');
@@ -635,6 +699,9 @@ PROMPT;
                 } elseif ((str_contains($nameLower, 'sticker') || str_contains($catLower, 'sticker')) && str_contains($combined, 'sticker')) {
                     $isMatch = true;
                 } elseif ((str_contains($nameLower, 'calendar') || str_contains($catLower, 'calendar')) && (str_contains($combined, 'calendar') || str_contains($combined, 'kalendaryo'))) {
+                    $isMatch = true;
+                } elseif ($hasPriceFilter && $isGeneralProductQuery) {
+                    // Match general products satisfying the requested price filter
                     $isMatch = true;
                 }
 

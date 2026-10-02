@@ -10,6 +10,7 @@ import { FileSystemUploadType } from 'expo-file-system/legacy';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Speech from 'expo-speech';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { extractPriceConstraintFromText } from '@/utils/price-search';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -420,7 +421,21 @@ export function useVoiceConversation(userEmail?: string | null) {
 
       reply     = chatJson.data.reply;
       replyLang = chatJson.data.language ?? lang;
-      const returnedProducts: ConvoProduct[] = chatJson.data.products || [];
+      let returnedProducts: ConvoProduct[] = chatJson.data.products || [];
+
+      // Client-side safety safeguard: Ensure no products violating user budget are rendered
+      const constraint = extractPriceConstraintFromText(promptText);
+      if (constraint.min !== undefined || constraint.max !== undefined) {
+        returnedProducts = returnedProducts.filter((p) => {
+          const numPrice = typeof p.price === 'number'
+            ? p.price
+            : parseFloat(String(p.price || 0).replace(/[^\d.]/g, ''));
+          if (constraint.min !== undefined && numPrice < constraint.min) return false;
+          if (constraint.max !== undefined && numPrice > constraint.max) return false;
+          return true;
+        });
+      }
+
       addMessage({ id: (Date.now() + 1).toString(), role: 'assistant', text: reply, products: returnedProducts });
     } catch (chatErr: any) {
       const localReply = localFallbackReply(promptText);
