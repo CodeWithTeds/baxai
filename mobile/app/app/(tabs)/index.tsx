@@ -238,26 +238,14 @@ export default function HomeScreen() {
   ];
 
   const handleCategoryPress = (id: string) => {
-    if (id === 'mugs') {
-      router.push('/mug-3d' as any);
-    } else if (id === 'pins') {
-      router.push('/pin-3d' as any);
-    } else if (id === 'apparel') {
-      router.push({
-        pathname: '/(tabs)/services',
-        params: { category: 'tshirts' },
-      } as any);
-    } else if (id === 'totes') {
-      router.push({
-        pathname: '/(tabs)/services',
-        params: { category: 'tote_bags' },
-      } as any);
-    } else {
-      router.push({
-        pathname: '/(tabs)/services',
-        params: { category: id },
-      } as any);
-    }
+    let targetCat: string = id;
+    if (id === 'apparel') targetCat = 'tshirts';
+    else if (id === 'totes') targetCat = 'tote_bags';
+
+    router.push({
+      pathname: '/(tabs)/services',
+      params: { category: targetCat },
+    } as any);
   };
 
   const handleFeaturedPress = (item: FeaturedItem) => {

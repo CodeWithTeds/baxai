@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image, type ImageSource } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useGlobalSearchParams, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Modal,
@@ -262,7 +262,8 @@ function GridServiceCard({ item, onPress }: { item: ServiceItem; onPress?: () =>
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ServicesScreen() {
-  const params = useLocalSearchParams<{ category?: string; query?: string }>();
+  const localParams = useLocalSearchParams<{ category?: string; query?: string }>();
+  const globalParams = useGlobalSearchParams<{ category?: string; query?: string }>();
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('all');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -273,17 +274,28 @@ export default function ServicesScreen() {
   const router = useRouter();
   const { t } = useLanguage();
 
+  const activeCategoryParam = localParams.category || globalParams.category;
+  const activeQueryParam = localParams.query || globalParams.query;
+
   useEffect(() => {
-    if (params.category) {
-      const catParam = params.category.toLowerCase() as CategoryId;
-      if (CATEGORY_TABS.some((t) => t.id === catParam)) {
-        setSelectedCategory(catParam);
-      }
+    if (activeCategoryParam) {
+      const rawCat = activeCategoryParam.toLowerCase().trim();
+      let mappedCat: CategoryId = 'all';
+      if (rawCat === 'mugs' || rawCat === 'mug') mappedCat = 'mugs';
+      else if (rawCat === 'pins' || rawCat === 'pin') mappedCat = 'pins';
+      else if (rawCat === 'tshirts' || rawCat === 't-shirt' || rawCat === 'apparel' || rawCat === 'shirt') mappedCat = 'tshirts';
+      else if (rawCat === 'stickers' || rawCat === 'sticker') mappedCat = 'stickers';
+      else if (rawCat === 'tote_bags' || rawCat === 'totes' || rawCat === 'tote' || rawCat === 'bags' || rawCat === 'bag') mappedCat = 'tote_bags';
+      else if (rawCat === 'calendars' || rawCat === 'calendar') mappedCat = 'calendars';
+      else if (rawCat === 'printing' || rawCat === 'prints') mappedCat = 'printing';
+      else if (CATEGORY_TABS.some((t) => t.id === rawCat as CategoryId)) mappedCat = rawCat as CategoryId;
+
+      setSelectedCategory(mappedCat);
     }
-    if (params.query) {
-      setQuery(params.query);
+    if (activeQueryParam !== undefined) {
+      setQuery(activeQueryParam);
     }
-  }, [params.category, params.query]);
+  }, [activeCategoryParam, activeQueryParam]);
 
   const loadData = async () => {
     try {
