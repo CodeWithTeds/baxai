@@ -46,7 +46,7 @@ class OrderSeeder extends Seeder
                 ['label' => 'Order Placed', 'subtitle' => now()->subHours(8)->format('M d, h:i A'), 'state' => 'done'],
                 ['label' => 'Finishing & Packaging', 'subtitle' => 'Custom text decal in production', 'state' => 'active'],
                 ['label' => 'Shipped', 'subtitle' => 'Pending courier handover', 'state' => 'pending'],
-                ['label' => 'Delivered', 'subtitle' => 'Expected ' . now()->addDays(3)->format('M d'), 'state' => 'pending'],
+                ['label' => 'Delivered', 'subtitle' => 'Expected '.now()->addDays(3)->format('M d'), 'state' => 'pending'],
             ],
             'shipping_address' => [
                 'recipient' => $customerName,
@@ -101,7 +101,7 @@ class OrderSeeder extends Seeder
                 ['label' => 'Order Placed', 'subtitle' => now()->subDay()->format('M d, h:i A'), 'state' => 'done'],
                 ['label' => 'Printing & Curing', 'subtitle' => 'Direct-to-garment press in progress', 'state' => 'active'],
                 ['label' => 'Shipped', 'subtitle' => 'Pending pickup', 'state' => 'pending'],
-                ['label' => 'Delivered', 'subtitle' => 'Estimated ' . now()->addDays(4)->format('M d'), 'state' => 'pending'],
+                ['label' => 'Delivered', 'subtitle' => 'Estimated '.now()->addDays(4)->format('M d'), 'state' => 'pending'],
             ],
             'shipping_address' => [
                 'recipient' => $customerName,
@@ -155,7 +155,7 @@ class OrderSeeder extends Seeder
                 ['label' => 'Order Placed', 'subtitle' => now()->subDays(6)->format('M d, h:i A'), 'state' => 'done'],
                 ['label' => 'Production & Enameling', 'subtitle' => 'Completed', 'state' => 'done'],
                 ['label' => 'Shipped', 'subtitle' => now()->subDays(3)->format('M d, h:i A'), 'state' => 'done'],
-                ['label' => 'Delivered', 'subtitle' => now()->subDays(2)->format('M d, h:i A') . ' • Signed', 'state' => 'done'],
+                ['label' => 'Delivered', 'subtitle' => now()->subDays(2)->format('M d, h:i A').' • Signed', 'state' => 'done'],
             ],
             'shipping_address' => [
                 'recipient' => $customerName,

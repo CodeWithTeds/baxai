@@ -30,6 +30,8 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call([
+            PSGCSeeder::class,
+            PsgcEnhancementSeeder::class,
             CustomerSeeder::class,
             PrintCategorySeeder::class,
             PrintItemSeeder::class,

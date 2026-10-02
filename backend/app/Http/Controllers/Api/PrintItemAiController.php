@@ -15,6 +15,7 @@ class PrintItemAiController extends Controller
     use ApiResponse;
 
     private string $apiKey;
+
     private string $baseUrl = 'https://api.groq.com/openai/v1';
 
     public function __construct()
@@ -36,7 +37,7 @@ class PrintItemAiController extends Controller
             mkdir($tmpDir, 0755, true);
         }
 
-        $tmpPath = $tmpDir . '/scan_' . uniqid() . '.jpg';
+        $tmpPath = $tmpDir.'/scan_'.uniqid().'.jpg';
 
         try {
             if ($request->hasFile('image')) {
@@ -58,14 +59,14 @@ class PrintItemAiController extends Controller
 
             // Multi-pass Tesseract OCR to capture all text blocks and sparse label codes
             $tesseractBin = file_exists('/opt/homebrew/bin/tesseract') ? '/opt/homebrew/bin/tesseract' : 'tesseract';
-            
-            $cmd1 = escapeshellcmd($tesseractBin) . ' ' . escapeshellarg($tmpPath) . ' stdout --psm 3 2>&1';
+
+            $cmd1 = escapeshellcmd($tesseractBin).' '.escapeshellarg($tmpPath).' stdout --psm 3 2>&1';
             $ocrText1 = shell_exec($cmd1) ?? '';
-            
-            $cmd2 = escapeshellcmd($tesseractBin) . ' ' . escapeshellarg($tmpPath) . ' stdout --psm 11 2>&1';
+
+            $cmd2 = escapeshellcmd($tesseractBin).' '.escapeshellarg($tmpPath).' stdout --psm 11 2>&1';
             $ocrText2 = shell_exec($cmd2) ?? '';
 
-            $ocrText = trim($ocrText1 . "\n" . $ocrText2);
+            $ocrText = trim($ocrText1."\n".$ocrText2);
 
             if (file_exists($tmpPath)) {
                 @unlink($tmpPath);
@@ -96,7 +97,7 @@ Return ONLY a JSON object (no markdown, no ```json code wrapper) containing thes
 - notes: Full technical specifications including page yield, gsm weight, handling/cutting instructions, storage conditions, and warranty/finish details.
 PROMPT;
 
-            $userContent = "Scanned Label OCR Text:\n" . $ocrText;
+            $userContent = "Scanned Label OCR Text:\n".$ocrText;
 
             $modelsToTry = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'qwen/qwen3.8-27b'];
             $data = null;
@@ -117,6 +118,7 @@ PROMPT;
 
                     if ($response->failed()) {
                         Log::error('Groq OCR structurization failed', ['model' => $groqModel, 'status' => $response->status()]);
+
                         continue;
                     }
 
@@ -150,8 +152,8 @@ PROMPT;
                     'compatibility' => 'Compatible with standard printers',
                     'available_quantity' => 100,
                     'unit' => 'reams',
-                    'description' => 'Scanned product resource: ' . mb_substr(implode(' ', $lines), 0, 200),
-                    'notes' => 'Extracted label OCR text: ' . mb_substr($ocrText, 0, 300),
+                    'description' => 'Scanned product resource: '.mb_substr(implode(' ', $lines), 0, 200),
+                    'notes' => 'Extracted label OCR text: '.mb_substr($ocrText, 0, 300),
                 ];
             }
 
@@ -170,7 +172,8 @@ PROMPT;
                 @unlink($tmpPath);
             }
             Log::error('AI recognition exception', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            return $this->errorResponse('Image processing failed: ' . $e->getMessage(), 500);
+
+            return $this->errorResponse('Image processing failed: '.$e->getMessage(), 500);
         }
     }
 }

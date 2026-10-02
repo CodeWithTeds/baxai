@@ -20,13 +20,32 @@ class PrintItemController extends Controller
         protected PrintItemService $service,
     ) {}
 
-    public function index(Request $request): AnonymousResourceCollection { return PrintItemResource::collection($this->items->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 15))); }
+    public function index(Request $request): AnonymousResourceCollection
+    {
+        return PrintItemResource::collection($this->items->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 15)));
+    }
 
-    public function store(StorePrintItemRequest $request): JsonResponse { return (new PrintItemResource($this->service->create($request->validated())->load('category')))->response()->setStatusCode(201); }
+    public function store(StorePrintItemRequest $request): JsonResponse
+    {
+        return (new PrintItemResource($this->service->create($request->validated())->load('category')))->response()->setStatusCode(201);
+    }
 
-    public function show(PrintItem $printItem): PrintItemResource { return new PrintItemResource($printItem->load('category')); }
+    public function show(PrintItem $printItem): PrintItemResource
+    {
+        return new PrintItemResource($printItem->load('category'));
+    }
 
-    public function update(UpdatePrintItemRequest $request, PrintItem $printItem): PrintItemResource { $this->items->update($printItem, $request->validated()); return new PrintItemResource($printItem->fresh()->load('category')); }
+    public function update(UpdatePrintItemRequest $request, PrintItem $printItem): PrintItemResource
+    {
+        $this->items->update($printItem, $request->validated());
 
-    public function destroy(PrintItem $printItem): JsonResponse { $this->items->delete($printItem); return response()->json(['message' => 'Print item deleted successfully.']); }
+        return new PrintItemResource($printItem->fresh()->load('category'));
+    }
+
+    public function destroy(PrintItem $printItem): JsonResponse
+    {
+        $this->items->delete($printItem);
+
+        return response()->json(['message' => 'Print item deleted successfully.']);
+    }
 }

@@ -22,23 +22,65 @@ class PrintItemController extends Controller
         protected PrintItemService $service,
     ) {}
 
-    public function index(Request $request): Response { return Inertia::render('printing/items/index', ['items' => $this->items->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 10)), 'categories' => $this->categories->all(), 'filters' => $request->only('filter', 'sort', 'per_page'), 'stats' => $this->items->getStats()]); }
+    public function index(Request $request): Response
+    {
+        return Inertia::render('printing/items/index', ['items' => $this->items->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 10)), 'categories' => $this->categories->all(), 'filters' => $request->only('filter', 'sort', 'per_page'), 'stats' => $this->items->getStats()]);
+    }
 
-    public function create(): Response { return Inertia::render('printing/items/create', ['categories' => $this->categories->all()]); }
+    public function create(): Response
+    {
+        return Inertia::render('printing/items/create', ['categories' => $this->categories->all()]);
+    }
 
-    public function store(StorePrintItemRequest $request): RedirectResponse { $this->service->create($request->validated()); return redirect()->route('print-items.index'); }
+    public function store(StorePrintItemRequest $request): RedirectResponse
+    {
+        $this->service->create($request->validated());
 
-    public function show(PrintItem $printItem): Response { return Inertia::render('printing/items/show', ['item' => $printItem->load('category')]); }
+        return redirect()->route('print-items.index');
+    }
 
-    public function edit(PrintItem $printItem): Response { return Inertia::render('printing/items/edit', ['item' => $printItem->load('category'), 'categories' => $this->categories->all()]); }
+    public function show(PrintItem $printItem): Response
+    {
+        return Inertia::render('printing/items/show', ['item' => $printItem->load('category')]);
+    }
 
-    public function update(UpdatePrintItemRequest $request, PrintItem $printItem): RedirectResponse { $this->items->update($printItem, $request->validated()); return redirect()->route('print-items.index'); }
+    public function edit(PrintItem $printItem): Response
+    {
+        return Inertia::render('printing/items/edit', ['item' => $printItem->load('category'), 'categories' => $this->categories->all()]);
+    }
 
-    public function destroy(PrintItem $printItem): RedirectResponse { $this->items->delete($printItem); return redirect()->route('print-items.index'); }
+    public function update(UpdatePrintItemRequest $request, PrintItem $printItem): RedirectResponse
+    {
+        $this->items->update($printItem, $request->validated());
 
-    public function bulkActivate(BulkPrintItemRequest $request): RedirectResponse { $this->items->bulkUpdateStatus($request->validated()['ids'], 'active'); return redirect()->route('print-items.index'); }
+        return redirect()->route('print-items.index');
+    }
 
-    public function bulkArchive(BulkPrintItemRequest $request): RedirectResponse { $this->items->bulkUpdateStatus($request->validated()['ids'], 'archived'); return redirect()->route('print-items.index'); }
+    public function destroy(PrintItem $printItem): RedirectResponse
+    {
+        $this->items->delete($printItem);
 
-    public function bulkDestroy(BulkPrintItemRequest $request): RedirectResponse { $this->items->bulkDelete($request->validated()['ids']); return redirect()->route('print-items.index'); }
+        return redirect()->route('print-items.index');
+    }
+
+    public function bulkActivate(BulkPrintItemRequest $request): RedirectResponse
+    {
+        $this->items->bulkUpdateStatus($request->validated()['ids'], 'active');
+
+        return redirect()->route('print-items.index');
+    }
+
+    public function bulkArchive(BulkPrintItemRequest $request): RedirectResponse
+    {
+        $this->items->bulkUpdateStatus($request->validated()['ids'], 'archived');
+
+        return redirect()->route('print-items.index');
+    }
+
+    public function bulkDestroy(BulkPrintItemRequest $request): RedirectResponse
+    {
+        $this->items->bulkDelete($request->validated()['ids']);
+
+        return redirect()->route('print-items.index');
+    }
 }

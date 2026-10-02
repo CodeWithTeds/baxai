@@ -212,10 +212,15 @@ class PromotionsSeeder extends Seeder
         foreach ($customers as $index => $customer) {
             $spent = (float) $customer->total_spent;
             $tier = 'Bronze';
-            if ($spent >= 100000) $tier = 'VIP Diamond';
-            elseif ($spent >= 50000) $tier = 'Platinum';
-            elseif ($spent >= 15000) $tier = 'Gold';
-            elseif ($spent >= 5000) $tier = 'Silver';
+            if ($spent >= 100000) {
+                $tier = 'VIP Diamond';
+            } elseif ($spent >= 50000) {
+                $tier = 'Platinum';
+            } elseif ($spent >= 15000) {
+                $tier = 'Gold';
+            } elseif ($spent >= 5000) {
+                $tier = 'Silver';
+            }
 
             $points = (int) ($spent / 10) + ($index * 120);
 
@@ -231,7 +236,7 @@ class PromotionsSeeder extends Seeder
                     CustomerReward::create([
                         'customer_id' => $customer->id,
                         'reward_id' => $reward->id,
-                        'reward_code' => 'CLAIM-' . strtoupper(substr(md5(uniqid()), 0, 8)),
+                        'reward_code' => 'CLAIM-'.strtoupper(substr(md5(uniqid()), 0, 8)),
                         'points_spent' => $reward->points_required,
                         'status' => 'issued',
                         'issued_at' => Carbon::now()->subDays($index * 2),

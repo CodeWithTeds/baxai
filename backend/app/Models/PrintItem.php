@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Enums\PrintColorMode;
 use App\Enums\PrintItemStatus;
 use App\Enums\PrintSides;
-
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

@@ -25,10 +25,10 @@ class PrintItemService
     protected function generateItemCode(array $data): string
     {
         $prefix = 'PRT';
-        if (!empty($data['category_id'])) {
+        if (! empty($data['category_id'])) {
             $category = $this->categoryRepository->findById((int) $data['category_id']);
-            if ($category && !empty($category->code)) {
-                $prefix = 'PRT-' . strtoupper(substr($category->code, 0, 4));
+            if ($category && ! empty($category->code)) {
+                $prefix = 'PRT-'.strtoupper(substr($category->code, 0, 4));
             }
         }
 

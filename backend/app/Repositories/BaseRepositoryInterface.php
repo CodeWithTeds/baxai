@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 
 interface BaseRepositoryInterface
 {
-
     public function all(): array|Collection;
 
     public function paginate(int $perPage = 15): LengthAwarePaginator;

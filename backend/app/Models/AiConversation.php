@@ -25,11 +25,11 @@ class AiConversation extends Model
     ];
 
     protected $casts = [
-        'is_verified'             => 'boolean',
-        'stage_user_verified'     => 'boolean',
-        'stage_data_verified'     => 'boolean',
+        'is_verified' => 'boolean',
+        'stage_user_verified' => 'boolean',
+        'stage_data_verified' => 'boolean',
         'stage_security_verified' => 'boolean',
-        'verified_at'             => 'datetime',
-        'metadata'                => 'array',
+        'verified_at' => 'datetime',
+        'metadata' => 'array',
     ];
 }

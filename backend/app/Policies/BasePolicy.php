@@ -7,7 +7,7 @@ use Illuminate\Auth\Access\HandlesAuthorization;
 
 abstract class BasePolicy
 {
-    use  HandlesAuthorization;
+    use HandlesAuthorization;
 
     // ?bool for now ->
     public function before(User $user, string $ability): ?bool
@@ -28,7 +28,7 @@ abstract class BasePolicy
         return isset($model->{$foreignKey}) && $model->{$foreignKey} === $user->id;
     }
 
-    public function authorieOwnerShip(User $user, mixed $model, string $foreignKey = 'user_id', string $message = null)
+    public function authorieOwnerShip(User $user, mixed $model, string $foreignKey = 'user_id', ?string $message = null)
     {
         return $this->isOwner(User::find($user->id), $model, $foreignKey)
             ? $this->allow()

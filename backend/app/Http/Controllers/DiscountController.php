@@ -25,8 +25,8 @@ class DiscountController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('code', 'like', "%{$search}%")
-                  ->orWhere('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
@@ -41,8 +41,8 @@ class DiscountController extends Controller
         if ($category && $category !== 'all') {
             $query->where(function ($q) use ($category) {
                 $q->where('applicable_category', $category)
-                  ->orWhere('applicable_category', 'All Services')
-                  ->orWhereNull('applicable_category');
+                    ->orWhere('applicable_category', 'All Services')
+                    ->orWhereNull('applicable_category');
             });
         }
 
@@ -98,7 +98,7 @@ class DiscountController extends Controller
     public function update(Request $request, Discount $discount)
     {
         $validated = $request->validate([
-            'code' => 'required|string|max:50|unique:discounts,code,' . $discount->id,
+            'code' => 'required|string|max:50|unique:discounts,code,'.$discount->id,
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'type' => 'required|string|in:percentage,fixed_amount,free_shipping,bulk_print',
@@ -133,28 +133,31 @@ class DiscountController extends Controller
     public function bulkActivate(Request $request)
     {
         $ids = $request->input('ids', []);
-        if (!empty($ids)) {
+        if (! empty($ids)) {
             Discount::whereIn('id', $ids)->update(['status' => 'active']);
         }
-        return redirect()->back()->with('flash', ['success' => count($ids) . ' coupon(s) activated.']);
+
+        return redirect()->back()->with('flash', ['success' => count($ids).' coupon(s) activated.']);
     }
 
     public function bulkArchive(Request $request)
     {
         $ids = $request->input('ids', []);
-        if (!empty($ids)) {
+        if (! empty($ids)) {
             Discount::whereIn('id', $ids)->update(['status' => 'disabled']);
         }
-        return redirect()->back()->with('flash', ['success' => count($ids) . ' coupon(s) disabled.']);
+
+        return redirect()->back()->with('flash', ['success' => count($ids).' coupon(s) disabled.']);
     }
 
     public function bulkDestroy(Request $request)
     {
         $ids = $request->input('ids', []);
-        if (!empty($ids)) {
+        if (! empty($ids)) {
             Discount::whereIn('id', $ids)->delete();
         }
-        return redirect()->back()->with('flash', ['success' => count($ids) . ' coupon(s) deleted.']);
+
+        return redirect()->back()->with('flash', ['success' => count($ids).' coupon(s) deleted.']);
     }
 
     public function calculate(Request $request)
@@ -165,7 +168,7 @@ class DiscountController extends Controller
 
         $discount = Discount::where('code', $code)->first();
 
-        if (!$discount) {
+        if (! $discount) {
             return response()->json([
                 'valid' => false,
                 'message' => 'Coupon code not found.',
@@ -195,7 +198,7 @@ class DiscountController extends Controller
         if ($discount->min_order_amount > 0 && $orderAmount < $discount->min_order_amount) {
             return response()->json([
                 'valid' => false,
-                'message' => "Minimum order amount of ₱" . number_format($discount->min_order_amount, 2) . " required.",
+                'message' => 'Minimum order amount of ₱'.number_format($discount->min_order_amount, 2).' required.',
                 'discount_amount' => 0,
                 'final_total' => $orderAmount,
             ]);
@@ -222,7 +225,7 @@ class DiscountController extends Controller
 
         return response()->json([
             'valid' => true,
-            'message' => "Coupon applied! Saved ₱" . number_format($discountAmount, 2),
+            'message' => 'Coupon applied! Saved ₱'.number_format($discountAmount, 2),
             'code' => $discount->code,
             'name' => $discount->name,
             'type' => $discount->type,

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AiConversation;
 use App\Models\Order;
+use App\Models\Product;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class GroqController extends Controller
     use ApiResponse;
 
     private string $apiKey;
+
     private string $baseUrl = 'https://api.groq.com/openai/v1';
 
     public function __construct()
@@ -39,20 +41,21 @@ class GroqController extends Controller
             ->timeout(60)
             ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
             ->post("{$this->baseUrl}/audio/transcriptions", [
-                'model'           => 'whisper-large-v3-turbo',
+                'model' => 'whisper-large-v3-turbo',
                 'response_format' => 'verbose_json',
-                'temperature'     => 0,
+                'temperature' => 0,
             ]);
 
         if ($response->failed()) {
             Log::error('Groq STT error', ['status' => $response->status(), 'body' => $response->body()]);
+
             return $this->errorResponse('Transcription failed', 502);
         }
 
         $body = $response->json();
 
         return $this->successResponse([
-            'text'     => $body['text'] ?? '',
+            'text' => $body['text'] ?? '',
             'language' => $body['language'] ?? 'en',
         ], 'Transcription successful');
     }
@@ -62,30 +65,30 @@ class GroqController extends Controller
     public function chat(Request $request): JsonResponse
     {
         $request->validate([
-            'messages'           => ['required', 'array', 'min:1'],
-            'messages.*.role'    => ['required', 'in:user,assistant,system'],
+            'messages' => ['required', 'array', 'min:1'],
+            'messages.*.role' => ['required', 'in:user,assistant,system'],
             'messages.*.content' => ['required', 'string'],
-            'language'           => ['sometimes', 'string'],
-            'customer_email'     => ['sometimes', 'nullable', 'string'],
-            'conversation_id'    => ['sometimes', 'nullable', 'string'],
+            'language' => ['sometimes', 'string'],
+            'customer_email' => ['sometimes', 'nullable', 'string'],
+            'conversation_id' => ['sometimes', 'nullable', 'string'],
         ]);
 
         $conversationId = $request->input('conversation_id');
         if ($conversationId) {
             $conversation = AiConversation::where('conversation_id', $conversationId)->first();
             if ($conversation) {
-                if (!$conversation->is_verified) {
+                if (! $conversation->is_verified) {
                     return $this->errorResponse('Security verification required before first response in conversation.', 403);
                 }
                 $meta = $conversation->metadata ?? [];
                 $meta['messages_count'] = ($meta['messages_count'] ?? 0) + 1;
-                $meta['last_activity']  = now()->toIso8601String();
+                $meta['last_activity'] = now()->toIso8601String();
                 $conversation->metadata = $meta;
                 $conversation->save();
             }
         }
 
-        $lang      = $request->input('language', 'en');
+        $lang = $request->input('language', 'en');
         $isTagalog = in_array($lang, ['tl', 'fil', 'tgl'], true);
 
         $systemPrompt = <<<'PROMPT'
@@ -225,14 +228,15 @@ PROMPT;
         $response = Http::withToken($this->apiKey)
             ->timeout(60)
             ->post("{$this->baseUrl}/chat/completions", [
-                'model'       => 'openai/gpt-oss-20b',
-                'messages'    => $messages,
+                'model' => 'openai/gpt-oss-20b',
+                'messages' => $messages,
                 'temperature' => 0.7,
-                'max_tokens'  => 350,
+                'max_tokens' => 350,
             ]);
 
         if ($response->failed()) {
             Log::error('Groq chat error', ['status' => $response->status(), 'body' => $response->body()]);
+
             return $this->errorResponse('Chat failed', 502);
         }
 
@@ -271,10 +275,10 @@ PROMPT;
         $products = $this->findMentionedProducts($request->input('messages', []), $reply);
 
         return $this->successResponse([
-            'reply'           => $reply,
-            'language'        => $lang,
+            'reply' => $reply,
+            'language' => $lang,
             'conversation_id' => $conversationId,
-            'products'        => $products,
+            'products' => $products,
         ], 'Chat successful');
     }
 
@@ -283,32 +287,32 @@ PROMPT;
     {
         $request->validate([
             'conversation_id' => ['required', 'string', 'min:5', 'max:100'],
-            'stage'           => ['required', 'in:user,data,security'],
-            'user_email'      => ['nullable', 'string', 'max:255'],
-            'messages'        => ['nullable', 'array'],
+            'stage' => ['required', 'in:user,data,security'],
+            'user_email' => ['nullable', 'string', 'max:255'],
+            'messages' => ['nullable', 'array'],
         ]);
 
         $conversationId = trim($request->input('conversation_id'));
-        $stage          = $request->input('stage');
-        $userEmail      = trim($request->input('user_email') ?? '');
+        $stage = $request->input('stage');
+        $userEmail = trim($request->input('user_email') ?? '');
 
         $conversation = AiConversation::firstOrCreate(
             ['conversation_id' => $conversationId],
             [
                 'user_email' => $userEmail ?: null,
                 'ip_address' => $request->ip(),
-                'user_agent' => substr((string)$request->userAgent(), 0, 500),
+                'user_agent' => substr((string) $request->userAgent(), 0, 500),
             ]
         );
 
-        if ($userEmail && !$conversation->user_email) {
+        if ($userEmail && ! $conversation->user_email) {
             $conversation->user_email = $userEmail;
         }
 
         // STAGE 1: Checking User — Validate authenticated user/session & confirm current user context is valid
         if ($stage === 'user') {
-            if (!empty($userEmail)) {
-                if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
+            if (! empty($userEmail)) {
+                if (! filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
                     return $this->errorResponse('Invalid user email format provided for session verification.', 422);
                 }
             }
@@ -327,33 +331,33 @@ PROMPT;
             $conversation->save();
 
             return $this->successResponse([
-                'stage'       => 'user',
-                'completed'   => true,
+                'stage' => 'user',
+                'completed' => true,
                 'is_verified' => $conversation->is_verified,
             ], 'User session and context validated successfully.');
         }
 
         // STAGE 2: Checking Data — Validate user/conversation/request data & confirm request has expected info
         if ($stage === 'data') {
-            if (!$conversation->stage_user_verified) {
+            if (! $conversation->stage_user_verified) {
                 return $this->errorResponse('Sequential requirement: Stage 1 (Checking User) must complete before Checking Data.', 400);
             }
 
             $messages = $request->input('messages');
-            if (empty($messages) || !is_array($messages)) {
+            if (empty($messages) || ! is_array($messages)) {
                 return $this->errorResponse('Invalid conversation data. Expected message payload array.', 422);
             }
 
             foreach ($messages as $idx => $msg) {
-                if (!isset($msg['role']) || !in_array($msg['role'], ['user', 'assistant', 'system'])) {
+                if (! isset($msg['role']) || ! in_array($msg['role'], ['user', 'assistant', 'system'])) {
                     return $this->errorResponse("Invalid message role in conversation data at index {$idx}.", 422);
                 }
                 $content = $msg['content'] ?? $msg['text'] ?? '';
-                if (!is_string($content) || strlen($content) === 0) {
+                if (! is_string($content) || strlen($content) === 0) {
                     return $this->errorResponse("Empty or invalid message content at index {$idx}.", 422);
                 }
                 if (strlen($content) > 10000) {
-                    return $this->errorResponse("Message content exceeds maximum allowed character length.", 422);
+                    return $this->errorResponse('Message content exceeds maximum allowed character length.', 422);
                 }
             }
 
@@ -361,36 +365,36 @@ PROMPT;
             $conversation->save();
 
             return $this->successResponse([
-                'stage'       => 'data',
-                'completed'   => true,
+                'stage' => 'data',
+                'completed' => true,
                 'is_verified' => $conversation->is_verified,
             ], 'Conversation and request data verified successfully.');
         }
 
         // STAGE 3: Securing Request — Perform required request/session security validation
         if ($stage === 'security') {
-            if (!$conversation->stage_user_verified) {
+            if (! $conversation->stage_user_verified) {
                 return $this->errorResponse('Sequential requirement: Stage 1 (Checking User) must complete first.', 400);
             }
-            if (!$conversation->stage_data_verified) {
+            if (! $conversation->stage_data_verified) {
                 return $this->errorResponse('Sequential requirement: Stage 2 (Checking Data) must complete first.', 400);
             }
 
             // Anti-abuse & security sanitization audit
             $meta = $conversation->metadata ?? [];
             $meta['security_check_passed'] = true;
-            $meta['verified_at']           = now()->toIso8601String();
-            $meta['ip']                    = $request->ip();
+            $meta['verified_at'] = now()->toIso8601String();
+            $meta['ip'] = $request->ip();
 
-            $conversation->metadata                = $meta;
+            $conversation->metadata = $meta;
             $conversation->stage_security_verified = true;
-            $conversation->is_verified             = true;
-            $conversation->verified_at             = now();
+            $conversation->is_verified = true;
+            $conversation->verified_at = now();
             $conversation->save();
 
             return $this->successResponse([
-                'stage'       => 'security',
-                'completed'   => true,
+                'stage' => 'security',
+                'completed' => true,
                 'is_verified' => true,
                 'verified_at' => $conversation->verified_at->toIso8601String(),
             ], 'Security validation passed. Request secured for AI processing.');
@@ -404,24 +408,24 @@ PROMPT;
     {
         $conversation = AiConversation::where('conversation_id', $conversation_id)->first();
 
-        if (!$conversation) {
+        if (! $conversation) {
             return $this->successResponse([
-                'exists'      => false,
+                'exists' => false,
                 'is_verified' => false,
-                'stages'      => [
-                    'user'     => false,
-                    'data'     => false,
+                'stages' => [
+                    'user' => false,
+                    'data' => false,
                     'security' => false,
                 ],
             ], 'Conversation not initialized yet.');
         }
 
         return $this->successResponse([
-            'exists'      => true,
+            'exists' => true,
             'is_verified' => $conversation->is_verified,
-            'stages'      => [
-                'user'     => $conversation->stage_user_verified,
-                'data'     => $conversation->stage_data_verified,
+            'stages' => [
+                'user' => $conversation->stage_user_verified,
+                'data' => $conversation->stage_data_verified,
                 'security' => $conversation->stage_security_verified,
             ],
             'verified_at' => $conversation->verified_at?->toIso8601String(),
@@ -433,12 +437,12 @@ PROMPT;
     public function tts(Request $request): Response|JsonResponse
     {
         $request->validate([
-            'text'     => ['required', 'string', 'max:4096'],
+            'text' => ['required', 'string', 'max:4096'],
             'language' => ['sometimes', 'string'],
         ]);
 
-        $text     = trim($request->input('text', ''));
-        $lang     = $request->input('language', 'en');
+        $text = trim($request->input('text', ''));
+        $lang = $request->input('language', 'en');
         $isArabic = in_array($lang, ['ar'], true);
 
         // Groq Orpheus valid voices per docs/error: [autumn diana hannah austin daniel troy]
@@ -460,7 +464,7 @@ PROMPT;
             $cut = max(array_map(fn ($v) => $v ?: 0, $cutPoints));
             $text = $cut > 150 ? mb_substr($truncated, 0, $cut + 1) : $truncated;
             Log::warning('Groq TTS text truncated for TPM', [
-                'original_len'  => mb_strlen($request->input('text', '')),
+                'original_len' => mb_strlen($request->input('text', '')),
                 'truncated_len' => mb_strlen($text),
             ]);
         }
@@ -468,16 +472,16 @@ PROMPT;
         $response = Http::withToken($this->apiKey)
             ->timeout(60)
             ->post("{$this->baseUrl}/audio/speech", [
-                'model'           => $model,
-                'input'           => $text,
-                'voice'           => $voice,
+                'model' => $model,
+                'input' => $text,
+                'voice' => $voice,
                 'response_format' => 'wav',
             ]);
 
         if ($response->failed()) {
             $status = $response->status();
-            $body   = $response->body();
-            $json   = $response->json();
+            $body = $response->body();
+            $json = $response->json();
             $groqMsg = $json['error']['message'] ?? $json['message'] ?? $body ?? 'TTS failed';
 
             // Map to user-friendly message while preserving Groq detail in logs/data
@@ -497,11 +501,11 @@ PROMPT;
             }
 
             Log::error('Groq TTS error', [
-                'status'    => $status,
-                'body'      => $body,
-                'text_len'  => mb_strlen($text),
-                'model'     => $model,
-                'voice'     => $voice,
+                'status' => $status,
+                'body' => $body,
+                'text_len' => mb_strlen($text),
+                'model' => $model,
+                'voice' => $voice,
             ]);
 
             // Propagate 400/413/429 instead of masking as 502 so client can degrade gracefully
@@ -519,7 +523,7 @@ PROMPT;
 
             $data = [
                 'groq_status' => $status,
-                'groq_error'  => $groqMsg,
+                'groq_error' => $groqMsg,
                 'retry_after' => $retryAfter,
             ];
 
@@ -532,7 +536,7 @@ PROMPT;
         }
 
         return response($response->body(), 200, [
-            'Content-Type'  => 'audio/wav',
+            'Content-Type' => 'audio/wav',
             'Cache-Control' => 'no-store',
         ]);
     }
@@ -561,7 +565,7 @@ PROMPT;
             }
 
             // Live store products from database
-            $products = \App\Models\Product::whereNull('deleted_at')->get();
+            $products = Product::whereNull('deleted_at')->get();
             if ($products->isNotEmpty()) {
                 $lines[] = "\nLive Available Store Products in Database:";
                 foreach ($products as $p) {
@@ -580,7 +584,7 @@ PROMPT;
             if ($recentOrders->isNotEmpty()) {
                 $lines[] = "\nRecent verified orders in database:";
                 foreach ($recentOrders as $ord) {
-                    $itemsStr = $ord->items->map(fn($it) => "{$it->product_name} (x{$it->quantity})")->implode(', ');
+                    $itemsStr = $ord->items->map(fn ($it) => "{$it->product_name} (x{$it->quantity})")->implode(', ');
                     $lines[] = "  - Order #{$ord->order_number}: Customer \"{$ord->customer_name}\" ({$ord->customer_email}) | Items: [{$itemsStr}] | Total: \${$ord->total} | Status: {$ord->status} | Expected Delivery: {$ord->expected_delivery}";
                 }
             }
@@ -601,21 +605,21 @@ PROMPT;
             $userText = '';
             foreach ($messages as $msg) {
                 if (($msg['role'] ?? '') === 'user') {
-                    $userText .= ' ' . ($msg['content'] ?? '');
+                    $userText .= ' '.($msg['content'] ?? '');
                 }
             }
-            $combined = strtolower($userText . ' ' . $reply);
+            $combined = strtolower($userText.' '.$reply);
 
-            $allProducts = \App\Models\Product::whereNull('deleted_at')->get();
+            $allProducts = Product::whereNull('deleted_at')->get();
             $matched = [];
 
             foreach ($allProducts as $p) {
                 $nameLower = strtolower($p->name);
-                $catLower  = strtolower($p->category ?? '');
-                $skuLower  = strtolower($p->sku ?? '');
+                $catLower = strtolower($p->category ?? '');
+                $skuLower = strtolower($p->sku ?? '');
 
                 $isMatch = false;
-                if (!empty($p->sku) && str_contains($combined, $skuLower)) {
+                if (! empty($p->sku) && str_contains($combined, $skuLower)) {
                     $isMatch = true;
                 } elseif (str_contains($combined, $nameLower)) {
                     $isMatch = true;
@@ -635,25 +639,26 @@ PROMPT;
 
                 if ($isMatch) {
                     $matched[] = [
-                        'id'                        => $p->id,
-                        'name'                      => $p->name,
-                        'category'                  => $p->category,
-                        'price'                     => (string) $p->base_price,
-                        'sku'                       => $p->sku,
-                        'thumbnail'                 => $p->thumbnail,
-                        'fallback_image'            => $p->fallback_image,
-                        'has_3d_preview'            => (bool) $p->has_3d_preview,
-                        'viewer_type'               => $p->viewer_type,
-                        'stock'                     => $p->stock_quantity,
+                        'id' => $p->id,
+                        'name' => $p->name,
+                        'category' => $p->category,
+                        'price' => (string) $p->base_price,
+                        'sku' => $p->sku,
+                        'thumbnail' => $p->thumbnail,
+                        'fallback_image' => $p->fallback_image,
+                        'has_3d_preview' => (bool) $p->has_3d_preview,
+                        'viewer_type' => $p->viewer_type,
+                        'stock' => $p->stock_quantity,
                         'customization_addon_price' => $p->customization_addon_price,
-                        'max_text_length'           => $p->max_text_length,
+                        'max_text_length' => $p->max_text_length,
                     ];
                 }
             }
 
             return array_slice($matched, 0, 5);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('findMentionedProducts failed', ['error' => $e->getMessage()]);
+            Log::warning('findMentionedProducts failed', ['error' => $e->getMessage()]);
+
             return [];
         }
     }
@@ -668,7 +673,7 @@ PROMPT;
             $fullText = '';
             foreach ($messages as $msg) {
                 if (($msg['role'] ?? '') === 'user') {
-                    $fullText .= ' ' . ($msg['content'] ?? '');
+                    $fullText .= ' '.($msg['content'] ?? '');
                 }
             }
 
@@ -694,12 +699,12 @@ PROMPT;
                         }
 
                         $query->orWhereRaw('LOWER(order_number) = ?', [strtolower($raw)])
-                              ->orWhereRaw('LOWER(order_number) = ?', [strtolower($unhashed)])
-                              ->orWhereRaw('REPLACE(LOWER(order_number), "-", "") = ?', [strtolower($unhashed)]);
+                            ->orWhereRaw('LOWER(order_number) = ?', [strtolower($unhashed)])
+                            ->orWhereRaw('REPLACE(LOWER(order_number), "-", "") = ?', [strtolower($unhashed)]);
 
-                        if (!empty($digits) && strlen($digits) >= 3) {
-                            $query->orWhereRaw('LOWER(order_number) = ?', [strtolower('RD-' . $digits)])
-                                  ->orWhere('order_number', 'like', '%-' . $digits);
+                        if (! empty($digits) && strlen($digits) >= 3) {
+                            $query->orWhereRaw('LOWER(order_number) = ?', [strtolower('RD-'.$digits)])
+                                ->orWhere('order_number', 'like', '%-'.$digits);
                         }
                     })
                     ->first();
@@ -713,11 +718,11 @@ PROMPT;
                         "ORDER TRACKING DETAILS FOR #{$order->order_number}:",
                         "Order Reference: #{$order->order_number} (Internal ID: {$order->id})",
                         "Current Status: {$order->status} (in production and scheduled for fulfillment)",
-                        "Placed Date: " . ($order->placed_at ? $order->placed_at->format('M d, Y') : 'Recently'),
+                        'Placed Date: '.($order->placed_at ? $order->placed_at->format('M d, Y') : 'Recently'),
                         "Estimated Delivery: {$order->expected_delivery}",
                         "Total Amount: ₱{$order->total} (Payment: {$order->payment_method}, {$order->payment_status})",
                         "Items in Order: {$itemsDetail}",
-                        "MANDATORY INSTRUCTION: The customer provided this exact Order ID. Give them the order tracking update directly and immediately! DO NOT ask them to log in. DO NOT ask for their email address. Explain these details in warm, friendly, natural sentences without markdown asterisks (**) or bullet dashes (-).",
+                        'MANDATORY INSTRUCTION: The customer provided this exact Order ID. Give them the order tracking update directly and immediately! DO NOT ask them to log in. DO NOT ask for their email address. Explain these details in warm, friendly, natural sentences without markdown asterisks (**) or bullet dashes (-).',
                     ]);
                 }
             }

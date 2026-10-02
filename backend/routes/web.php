@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\PrintItemAiController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DiscountController;
 use App\Http\Controllers\PrintCategoryController;
@@ -7,9 +8,7 @@ use App\Http\Controllers\PrintItemController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RewardController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\PrintItemAiController;
 use Inertia\Inertia;
-
 use Laravel\Fortify\Features;
 
 Route::inertia('/', 'welcome', [
@@ -17,10 +16,11 @@ Route::inertia('/', 'welcome', [
 ])->name('home');
 
 Route::get('models/{file}', function ($file) {
-    $path = public_path('models/' . $file);
-    if (!file_exists($path)) {
+    $path = public_path('models/'.$file);
+    if (! file_exists($path)) {
         abort(404);
     }
+
     return response()->file($path, [
         'Access-Control-Allow-Origin' => '*',
         'Access-Control-Allow-Methods' => 'GET, OPTIONS',

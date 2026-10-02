@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,6 +19,7 @@ class OrderResource extends JsonResource
             'order_number' => $this->order_number,
             'orderNumber' => $this->order_number,
             'customer_id' => $this->customer_id,
+            'customer_address_id' => $this->customer_address_id,
             'customer_name' => $this->customer_name,
             'customer_email' => $this->customer_email,
             'customer_phone' => $this->customer_phone,
@@ -29,21 +31,21 @@ class OrderResource extends JsonResource
             'productName' => $primaryProductName,
             'image' => $primaryImage,
             'subtotal' => (float) $this->subtotal,
-            'subtotal_formatted' => '₱' . number_format((float) $this->subtotal, 2),
+            'subtotal_formatted' => '₱'.number_format((float) $this->subtotal, 2),
             'customization_total' => (float) $this->customization_total,
-            'customization_total_formatted' => '₱' . number_format((float) $this->customization_total, 2),
+            'customization_total_formatted' => '₱'.number_format((float) $this->customization_total, 2),
             'shipping_fee' => (float) $this->shipping_fee,
-            'shipping_fee_formatted' => $this->shipping_fee > 0 ? '₱' . number_format((float) $this->shipping_fee, 2) : 'Free',
-            'delivery' => $this->shipping_fee > 0 ? '₱' . number_format((float) $this->shipping_fee, 2) : 'Free',
+            'shipping_fee_formatted' => $this->shipping_fee > 0 ? '₱'.number_format((float) $this->shipping_fee, 2) : 'Free',
+            'delivery' => $this->shipping_fee > 0 ? '₱'.number_format((float) $this->shipping_fee, 2) : 'Free',
             'discount_total' => (float) $this->discount_total,
-            'discount_total_formatted' => '₱' . number_format((float) $this->discount_total, 2),
+            'discount_total_formatted' => '₱'.number_format((float) $this->discount_total, 2),
             'total' => (float) $this->total,
-            'total_formatted' => '₱' . number_format((float) $this->total, 2),
-            'total_display' => '₱' . number_format((float) $this->total, 2),
+            'total_formatted' => '₱'.number_format((float) $this->total, 2),
+            'total_display' => '₱'.number_format((float) $this->total, 2),
             'payment_method' => $this->payment_method,
             'payment_status' => $this->payment_status,
-            'tracking_steps' => $this->tracking_steps ?? \App\Models\Order::buildDefaultTrackingSteps($this->status, $this->placed_at ? $this->placed_at->format('M d, h:i A') : null),
-            'trackingSteps' => $this->tracking_steps ?? \App\Models\Order::buildDefaultTrackingSteps($this->status, $this->placed_at ? $this->placed_at->format('M d, h:i A') : null),
+            'tracking_steps' => $this->tracking_steps ?? Order::buildDefaultTrackingSteps($this->status, $this->placed_at ? $this->placed_at->format('M d, h:i A') : null),
+            'trackingSteps' => $this->tracking_steps ?? Order::buildDefaultTrackingSteps($this->status, $this->placed_at ? $this->placed_at->format('M d, h:i A') : null),
             'shipping_address' => $this->shipping_address,
             'notes' => $this->notes,
             'items' => OrderItemResource::collection($this->whenLoaded('items')),

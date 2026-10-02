@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Models\PrintCategory;
 use App\Models\PrintItem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +20,11 @@ class PrintItemRepository implements PrintItemRepositoryInterface
                     $term = "%{$value}%";
                     $query->where(function ($q) use ($term) {
                         $q->where('name', 'like', $term)
-                          ->orWhere('item_code', 'like', $term)
-                          ->orWhere('paper_type', 'like', $term)
-                          ->orWhere('brand', 'like', $term)
-                          ->orWhere('model', 'like', $term)
-                          ->orWhere('compatibility', 'like', $term);
+                            ->orWhere('item_code', 'like', $term)
+                            ->orWhere('paper_type', 'like', $term)
+                            ->orWhere('brand', 'like', $term)
+                            ->orWhere('model', 'like', $term)
+                            ->orWhere('compatibility', 'like', $term);
                     });
                 }),
                 AllowedFilter::exact('status'),
@@ -89,7 +90,7 @@ class PrintItemRepository implements PrintItemRepositoryInterface
             'active' => PrintItem::where('status', 'active')->count(),
             'draft' => PrintItem::where('status', 'draft')->count(),
             'inactive' => PrintItem::where('status', 'inactive')->count(),
-            'categories' => \App\Models\PrintCategory::count(),
+            'categories' => PrintCategory::count(),
         ];
     }
 }

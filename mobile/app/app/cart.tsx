@@ -19,9 +19,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandColors, IconColors } from '@/constants/theme';
+import PhilippineAddressModal from '@/components/philippine-address-modal';
 import { useAuth } from '@/contexts/auth-context';
 import { CartItem, useCart } from '@/contexts/cart-context';
-import { createOrder } from '@/utils/api';
+import { CustomerAddress, createOrder, fetchCustomerAddress } from '@/utils/api';
 
 // ─── Full-screen loading overlay ─────────────────────────────────────────────
 
@@ -59,6 +60,28 @@ export default function CartScreen() {
   const [loadingLabel, setLoadingLabel] = useState('');
   const [copiedRef, setCopiedRef] = useState(false);
 
+  // Philippine Delivery Address state
+  const [savedAddress, setSavedAddress] = useState<CustomerAddress | null>(null);
+  const [hasCompleteAddress, setHasCompleteAddress] = useState(false);
+  const [loadingAddress, setLoadingAddress] = useState(false);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+
+  // Load customer's saved address
+  React.useEffect(() => {
+    if (user?.email) {
+      setLoadingAddress(true);
+      fetchCustomerAddress(user.email)
+        .then((res) => {
+          setSavedAddress(res.address);
+          setHasCompleteAddress(res.has_complete_address);
+        })
+        .finally(() => setLoadingAddress(false));
+    } else {
+      setSavedAddress(null);
+      setHasCompleteAddress(false);
+    }
+  }, [user?.email]);
+
   const handleCopyReference = async () => {
     if (!placedOrderId) return;
     await Clipboard.setStringAsync(placedOrderId);
@@ -78,14 +101,47 @@ export default function CartScreen() {
 
   const handleCheckout = async () => {
     if (items.length === 0 || isSubmitting) return;
-    setLoadingLabel('Placing your order…');
+
+    // 1. Validate user authentication
+    if (!user?.email) {
+      Alert.alert(
+        'Account Required',
+        'Please sign in or create an account with a Philippine delivery address before submitting an order.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: () => router.push('/login') },
+        ]
+      );
+      return;
+    }
+
+    // 2. Frontend validation: require complete saved Philippine delivery address
+    if (!hasCompleteAddress || !savedAddress) {
+      Alert.alert(
+        'Delivery Address Required',
+        'Before a customer is allowed to place an order, a complete Philippine delivery address (Region, Province, City, Barangay, Street) must be saved in your account.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add Address Now',
+            onPress: () => setShowAddressModal(true),
+          },
+        ]
+      );
+      return;
+    }
+
+    setLoadingLabel('Verifying address & placing order…');
     setIsSubmitting(true);
 
     try {
       const orderPayload = {
-        customer_name: user?.name || 'Mobile App Customer',
-        customer_email: user?.email || undefined,
+        customer_name: user?.name || savedAddress.recipient_name || 'Mobile App Customer',
+        customer_email: user?.email,
+        customer_phone: savedAddress.phone_number || undefined,
+        customer_address_id: savedAddress.id,
         payment_method: 'Cash on Delivery',
+        notes: savedAddress.delivery_instructions || undefined,
         items: items.map((it) => ({
           product_id: it.productId,
           name: it.name,
@@ -106,14 +162,30 @@ export default function CartScreen() {
       };
 
       const created = await createOrder(orderPayload);
-      const orderNum = created?.order_number || `RD-${Date.now().toString().slice(-4)}`;
+      const orderNum = created?.order_number || `RD-${created?.id || Date.now().toString().slice(-4)}`;
       setPlacedOrderId(orderNum);
       setOrderSuccessModal(true);
-    } catch (err) {
+    } catch (err: any) {
       console.warn('[Cart] Checkout failed:', err);
-      const fallbackId = `RD-${Date.now().toString().slice(-4)}`;
-      setPlacedOrderId(fallbackId);
-      setOrderSuccessModal(true);
+      const errData = err?.data;
+      const errMsg = errData?.message || err?.message || 'Failed to place order. Please verify your address and try again.';
+
+      // If backend rejected due to address requirement, redirect to address form
+      if (errData?.action === 'redirect_to_address_form' || errData?.error_code?.includes('ADDRESS')) {
+        Alert.alert(
+          'Address Incomplete',
+          errMsg,
+          [
+            {
+              text: 'Complete Address',
+              onPress: () => setShowAddressModal(true),
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      } else {
+        Alert.alert('Order Placement Error', errMsg);
+      }
     } finally {
       setIsSubmitting(false);
       setLoadingLabel('');
@@ -218,6 +290,77 @@ export default function CartScreen() {
               </Text>
             </View>
           </View>
+
+          {/* ── Philippine Delivery Address ───────────────────── */}
+          {loadingAddress ? (
+            <View style={styles.addressLoadingCard}>
+              <ActivityIndicator size="small" color={BrandColors.primary} />
+              <Text style={styles.addressLoadingText}>Verifying saved Philippine delivery address…</Text>
+            </View>
+          ) : savedAddress && hasCompleteAddress ? (
+            <View style={styles.addressCard}>
+              <View style={styles.addressCardHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="location-sharp" size={17} color={BrandColors.primary} />
+                  <Text style={styles.addressCardTitle}>Delivery Address</Text>
+                </View>
+                <View style={styles.addressPsgcBadge}>
+                  <Ionicons name="shield-checkmark" size={11} color="#059669" />
+                  <Text style={styles.addressPsgcBadgeText}>PSGC Verified</Text>
+                </View>
+              </View>
+
+              <View style={styles.addressCardBody}>
+                <Text style={styles.addressRecipient}>
+                  {savedAddress.recipient_name} • {savedAddress.phone_number}
+                </Text>
+                <Text style={styles.addressStreet}>
+                  {savedAddress.street_address}, Brgy. {savedAddress.barangay_name}
+                </Text>
+                <Text style={styles.addressRegion}>
+                  {savedAddress.city_name}, {savedAddress.province_name} {savedAddress.postal_code || ''}
+                </Text>
+                <Text style={styles.addressRegionSub}>
+                  {savedAddress.region_name}
+                </Text>
+                {savedAddress.delivery_instructions ? (
+                  <View style={styles.addressInstructionBox}>
+                    <Ionicons name="information-circle-outline" size={13} color="#6B7280" />
+                    <Text style={styles.addressInstructionText}>
+                      Note: {savedAddress.delivery_instructions}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <Pressable
+                onPress={() => setShowAddressModal(true)}
+                style={({ pressed }) => [styles.addressEditBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Ionicons name="create-outline" size={15} color={BrandColors.primary} />
+                <Text style={styles.addressEditBtnText}>Change Delivery Address</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.addressRequiredCard}>
+              <View style={styles.addressRequiredHeader}>
+                <Ionicons name="alert-circle" size={24} color="#D97706" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.addressRequiredTitle}>Philippine Address Required</Text>
+                  <Text style={styles.addressRequiredSubtitle}>
+                    A complete Philippine address (PSGC Region, Province, City, Barangay, Street) must be saved before checkout.
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => setShowAddressModal(true)}
+                style={({ pressed }) => [styles.addressAddBtn, pressed && { opacity: 0.85 }]}
+              >
+                <Ionicons name="add-circle" size={16} color="#FFFFFF" />
+                <Text style={styles.addressAddBtnText}>Add Philippine Address</Text>
+              </Pressable>
+            </View>
+          )}
 
           {/* ── Order Summary ──────────────────────────────────── */}
           <View style={styles.summaryCard}>
@@ -349,6 +492,18 @@ export default function CartScreen() {
           </Pressable>
         </View>
       </Modal>
+
+      {/* ── Philippine Address Modal ────────────────────────────── */}
+      <PhilippineAddressModal
+        visible={showAddressModal}
+        onClose={() => setShowAddressModal(false)}
+        email={user?.email}
+        initialAddress={savedAddress}
+        onAddressSaved={(addr) => {
+          setSavedAddress(addr);
+          setHasCompleteAddress(true);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -928,4 +1083,140 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sheetSecondaryBtnText: { fontSize: 15, fontWeight: '600', color: '#6B7280', fontFamily: 'Inter_600SemiBold' },
+
+  // Delivery Address Card Styles
+  addressLoadingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  addressLoadingText: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  addressCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 10,
+  },
+  addressCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  addressCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  addressPsgcBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  addressPsgcBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  addressCardBody: {
+    gap: 3,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    padding: 12,
+  },
+  addressRecipient: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  addressStreet: {
+    fontSize: 13,
+    color: '#374151',
+  },
+  addressRegion: {
+    fontSize: 12,
+    color: '#4B5563',
+  },
+  addressRegionSub: {
+    fontSize: 11,
+    color: '#6B7280',
+  },
+  addressInstructionBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 4,
+    paddingTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E7EB',
+  },
+  addressInstructionText: {
+    fontSize: 11.5,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+  addressEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  addressEditBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: BrandColors.primary,
+  },
+  addressRequiredCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#FCD34D',
+    gap: 12,
+  },
+  addressRequiredHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  addressRequiredTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  addressRequiredSubtitle: {
+    fontSize: 12,
+    color: '#B45309',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  addressAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: BrandColors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  addressAddBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });

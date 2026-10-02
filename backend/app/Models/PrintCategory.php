@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\PrintCategoryStatus;
-
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

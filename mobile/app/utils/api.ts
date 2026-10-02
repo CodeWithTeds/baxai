@@ -187,7 +187,186 @@ export async function fetchOrderDetails(id: string | number, email?: string): Pr
   return null;
 }
 
+export interface PsgcItem {
+  code: string;
+  name: string;
+  short_name?: string;
+  region_code?: string;
+  province_code?: string;
+  city_code?: string;
+}
+
+export interface CustomerAddress {
+  id?: number;
+  customer_id?: number;
+  is_default?: boolean;
+  recipient_name: string;
+  phone_number: string;
+  region_code: string;
+  region_name: string;
+  province_code: string;
+  province_name: string;
+  city_code: string;
+  city_name: string;
+  barangay_code: string;
+  barangay_name: string;
+  street_address: string;
+  postal_code?: string | null;
+  delivery_instructions?: string | null;
+  formatted_address?: string;
+}
+
+export async function fetchPsgcRegions(): Promise<PsgcItem[]> {
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/psgc/regions`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const items = json.data || json;
+        if (Array.isArray(items)) return items;
+      }
+    } catch (err) {
+      console.warn(`[Api] Failed to fetch regions from ${baseUrl}:`, err);
+    }
+  }
+  return [];
+}
+
+export async function fetchPsgcProvinces(regionCode: string): Promise<PsgcItem[]> {
+  if (!regionCode) return [];
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/psgc/provinces?region_code=${encodeURIComponent(regionCode)}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const items = json.data || json;
+        if (Array.isArray(items)) return items;
+      }
+    } catch (err) {
+      console.warn(`[Api] Failed to fetch provinces from ${baseUrl}:`, err);
+    }
+  }
+  return [];
+}
+
+export async function fetchPsgcCities(provinceCode?: string, regionCode?: string): Promise<PsgcItem[]> {
+  if (!provinceCode && !regionCode) return [];
+  const query = provinceCode
+    ? `province_code=${encodeURIComponent(provinceCode)}`
+    : `region_code=${encodeURIComponent(regionCode!)}`;
+
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/psgc/cities?${query}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const items = json.data || json;
+        if (Array.isArray(items)) return items;
+      }
+    } catch (err) {
+      console.warn(`[Api] Failed to fetch cities from ${baseUrl}:`, err);
+    }
+  }
+  return [];
+}
+
+export async function fetchPsgcBarangays(cityCode: string): Promise<PsgcItem[]> {
+  if (!cityCode) return [];
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/psgc/barangays?city_code=${encodeURIComponent(cityCode)}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const items = json.data || json;
+        if (Array.isArray(items)) return items;
+      }
+    } catch (err) {
+      console.warn(`[Api] Failed to fetch barangays from ${baseUrl}:`, err);
+    }
+  }
+  return [];
+}
+
+export async function fetchCustomerAddress(
+  email?: string,
+  customerId?: number
+): Promise<{ has_complete_address: boolean; address: CustomerAddress | null }> {
+  const query = customerId
+    ? `customer_id=${customerId}`
+    : email
+      ? `email=${encodeURIComponent(email.trim().toLowerCase())}`
+      : '';
+
+  if (!query) return { has_complete_address: false, address: null };
+
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/customer/address?${query}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return {
+          has_complete_address: Boolean(json.has_complete_address),
+          address: json.address || null,
+        };
+      }
+    } catch (err) {
+      console.warn(`[Api] Failed to fetch customer address from ${baseUrl}:`, err);
+    }
+  }
+  return { has_complete_address: false, address: null };
+}
+
+export async function saveCustomerAddress(
+  payload: Record<string, any>
+): Promise<{ status: string; message: string; address: CustomerAddress; has_complete_address: boolean }> {
+  let lastError: any = null;
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/customer/address`, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (res.ok) {
+        return json;
+      } else {
+        const err = new Error(json?.message || 'Failed to save Philippine delivery address');
+        (err as any).data = json;
+        (err as any).status = res.status;
+        throw err;
+      }
+    } catch (err: any) {
+      if (err?.status === 422 || err?.status === 400) {
+        throw err;
+      }
+      lastError = err;
+      console.warn(`[Api] Failed to save address on ${baseUrl}:`, err);
+    }
+  }
+  throw lastError || new Error('Could not connect to server to save address');
+}
+
 export async function createOrder(payload: Record<string, any>): Promise<Record<string, any>> {
+  let lastError: any = null;
   for (const origin of API_BASE_URLS) {
     const baseUrl = sanitizeOrigin(origin);
     try {
@@ -196,14 +375,30 @@ export async function createOrder(payload: Record<string, any>): Promise<Record<
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
+      const json = await res.json().catch(() => null);
+
       if (res.ok) {
-        const json = await res.json();
         return json.data || json;
       }
-    } catch (err) {
+
+      // If backend returned a validation error (e.g. 422 ADDRESS_REQUIRED or ADDRESS_INCOMPLETE),
+      // bubble it up immediately!
+      if (res.status === 422 || res.status === 400 || res.status === 403) {
+        const err = new Error(json?.message || 'Order could not be created');
+        (err as any).status = res.status;
+        (err as any).data = json;
+        throw err;
+      }
+    } catch (err: any) {
+      if (err?.status === 422 || err?.status === 400 || err?.status === 403) {
+        throw err;
+      }
+      lastError = err;
       console.warn(`[Api] Failed to create order on ${baseUrl}:`, err);
     }
   }
-  throw new Error('Could not reach any API server to create order');
+  throw lastError || new Error('Could not reach any API server to create order');
 }
+
 

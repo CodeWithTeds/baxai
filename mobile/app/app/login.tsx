@@ -24,6 +24,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import { BrandColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
+import { apiLogin } from '@/utils/auth-api';
 import { syncCustomerToBackend } from '@/utils/customer-sync';
 
 export default function LoginScreen() {
@@ -34,53 +35,86 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const triggerHaptic = async () => {
+  const triggerHaptic = async (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
     if (Platform.OS !== 'web') {
       try {
-        await Haptics.selectionAsync();
+        await Haptics.impactAsync(style);
       } catch {}
     }
   };
 
   const handleLoginSubmit = async () => {
     await triggerHaptic();
+    setErrorMessage(null);
 
     const cleanIdentifier = identifier.trim();
     const cleanPassword = password.trim();
 
     if (!cleanIdentifier) {
-      Alert.alert('Required Field', 'Please enter your Email Address or Username.');
+      setErrorMessage('Please enter your Email Address or Username.');
       return;
     }
 
     if (!cleanPassword) {
-      Alert.alert('Required Field', 'Please enter your Password.');
+      setErrorMessage('Please enter your Password.');
       return;
     }
 
     setLoading(true);
+    Keyboard.dismiss();
 
     try {
-      const email = cleanIdentifier.includes('@')
-        ? cleanIdentifier.toLowerCase()
-        : `${cleanIdentifier.toLowerCase()}@gmail.com`;
-      const displayName = cleanIdentifier.split('@')[0];
+      const res = await apiLogin({
+        identifier: cleanIdentifier,
+        password: cleanPassword,
+      });
 
-      await login(email, displayName);
-      await syncCustomerToBackend(email, displayName);
+      if (res.needs_verification || res.status === 'unverified') {
+        triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+        const userEmail = res.email || (cleanIdentifier.includes('@') ? cleanIdentifier : '');
+        Alert.alert(
+          'Email Verification Required',
+          res.message || 'Please enter the 4-digit code sent to your email to activate your account.',
+          [
+            {
+              text: 'Enter Code',
+              onPress: () => {
+                router.push({
+                  pathname: '/verify-code',
+                  params: {
+                    email: userEmail,
+                    type: 'email_verification',
+                  },
+                } as any);
+              },
+            },
+          ]
+        );
+        return;
+      }
 
-      router.replace({
-        pathname: '/(tabs)',
-        params: {
-          authSuccess: '1',
-          email,
-          name: displayName,
-        },
-      } as any);
+      if (res.status === 'success' && res.access_token && res.user) {
+        triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+        await login(res.access_token, res.user);
+        await syncCustomerToBackend(res.user.email, res.user.name);
+
+        router.replace({
+          pathname: '/(tabs)',
+          params: {
+            authSuccess: '1',
+            email: res.user.email,
+            name: res.user.name,
+          },
+        } as any);
+      } else {
+        setErrorMessage(res.message || 'Invalid email/username or password. Please try again.');
+        triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+      }
     } catch (err: any) {
       console.error('[LoginScreen] Sign-in error:', err);
-      Alert.alert('Sign In Error', err?.message || 'Could not complete sign in.');
+      setErrorMessage(err?.message || 'Could not complete sign in. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -89,6 +123,11 @@ export default function LoginScreen() {
   const handleGoToRegister = async () => {
     await triggerHaptic();
     router.replace('/register');
+  };
+
+  const handleGoToForgotPassword = async () => {
+    await triggerHaptic();
+    router.push('/forgot-password');
   };
 
   return (
@@ -139,6 +178,14 @@ export default function LoginScreen() {
                 <Text style={styles.cardSubtitle}>Sign in with Email / Username & Password</Text>
               </View>
 
+              {/* Error Banner */}
+              {errorMessage && (
+                <View style={styles.errorBanner}>
+                  <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                  <Text style={styles.errorBannerText}>{errorMessage}</Text>
+                </View>
+              )}
+
               {/* Email / Username Field */}
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>Email Address or Username</Text>
@@ -148,9 +195,13 @@ export default function LoginScreen() {
                     placeholder="email@example.com or username"
                     placeholderTextColor="#9CA3AF"
                     value={identifier}
-                    onChangeText={setIdentifier}
+                    onChangeText={(val) => {
+                      setIdentifier(val);
+                      if (errorMessage) setErrorMessage(null);
+                    }}
                     autoCapitalize="none"
-                    keyboardType="email-address"
+                    autoCorrect={false}
+                    returnKeyType="next"
                     style={styles.textInput}
                   />
                 </View>
@@ -158,15 +209,25 @@ export default function LoginScreen() {
 
               {/* Password Field */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Password</Text>
+                <View style={styles.labelRow}>
+                  <Text style={styles.fieldLabel}>Password</Text>
+                  <Pressable hitSlop={8} onPress={handleGoToForgotPassword}>
+                    <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                  </Pressable>
+                </View>
                 <View style={styles.inputWrap}>
                   <Ionicons name="lock-closed-outline" size={18} color="#9CA3AF" style={styles.inputIcon} />
                   <TextInput
                     placeholder="Enter your password"
                     placeholderTextColor="#9CA3AF"
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={(val) => {
+                      setPassword(val);
+                      if (errorMessage) setErrorMessage(null);
+                    }}
                     secureTextEntry={!showPassword}
+                    returnKeyType="done"
+                    onSubmitEditing={handleLoginSubmit}
                     style={styles.textInput}
                   />
                   <Pressable
@@ -229,10 +290,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   backBtn: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   brandGroup: {
     flexDirection: 'row',
@@ -241,89 +307,118 @@ const styles = StyleSheet.create({
   },
   brandTitle: {
     color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 1,
     fontFamily: 'Manrope_700Bold',
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'flex-end',
-    paddingBottom: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    justifyContent: 'center',
   },
   mascotArea: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
+    marginVertical: 12,
   },
   mascotWrap: {
-    width: 120,
-    height: 120,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   mascotImg: {
-    width: '100%',
-    height: '100%',
+    width: 70,
+    height: 70,
   },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    marginHorizontal: 16,
-    paddingTop: 24,
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    gap: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOpacity: 0.12,
-        shadowRadius: 20,
-        shadowOffset: { width: 0, height: -4 },
-      },
-      android: { elevation: 8 },
-    }),
+    padding: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
   cardHeader: {
+    marginBottom: 20,
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
   },
   cardTitle: {
     fontSize: 22,
-    fontWeight: '700',
-    color: '#1A1C1E',
+    fontWeight: '800',
+    color: '#111827',
     fontFamily: 'Manrope_700Bold',
-    textAlign: 'center',
   },
   cardSubtitle: {
     fontSize: 13,
     color: '#6B7280',
+    marginTop: 4,
     fontFamily: 'Inter_400Regular',
     textAlign: 'center',
   },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#B91C1C',
+    fontFamily: 'Inter_500Medium',
+  },
   fieldGroup: {
-    gap: 6,
+    marginBottom: 16,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   fieldLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: '#374151',
     fontFamily: 'Inter_600SemiBold',
+    marginBottom: 6,
+  },
+  forgotPasswordText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0052CC',
+    fontFamily: 'Inter_600SemiBold',
   },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
     borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 12,
+    height: 48,
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
   textInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: '#111827',
     fontFamily: 'Inter_400Regular',
   },
@@ -331,46 +426,42 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   submitBtn: {
+    backgroundColor: '#0052CC',
+    borderRadius: 14,
+    height: 50,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: BrandColors.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
     gap: 8,
     marginTop: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: BrandColors.primary,
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
-      },
-      android: { elevation: 4 },
-    }),
+    shadowColor: '#0052CC',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   submitBtnPressed: {
-    opacity: 0.9,
+    backgroundColor: '#003D9B',
     transform: [{ scale: 0.99 }],
   },
   submitBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
     color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
     fontFamily: 'Manrope_700Bold',
   },
   registerLinkBtn: {
+    marginTop: 20,
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   registerLinkBtnPressed: {
     opacity: 0.7,
   },
   registerLinkText: {
-    fontSize: 14,
+    color: '#0052CC',
+    fontSize: 13,
     fontWeight: '600',
-    color: BrandColors.primary,
     fontFamily: 'Inter_600SemiBold',
   },
 });

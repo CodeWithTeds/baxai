@@ -16,7 +16,6 @@ use Illuminate\Support\ServiceProvider;
 
 class RepositoryServiceProvider extends ServiceProvider
 {
-
     /**
      * Register any application services.
      */

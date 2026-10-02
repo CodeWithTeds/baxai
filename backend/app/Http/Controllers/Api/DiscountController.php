@@ -16,8 +16,8 @@ class DiscountController extends Controller
             $cat = $request->input('category');
             $query->where(function ($q) use ($cat) {
                 $q->where('applicable_category', $cat)
-                  ->orWhere('applicable_category', 'All Services')
-                  ->orWhereNull('applicable_category');
+                    ->orWhere('applicable_category', 'All Services')
+                    ->orWhereNull('applicable_category');
             });
         }
 
@@ -34,7 +34,7 @@ class DiscountController extends Controller
 
         $discount = Discount::where('code', $code)->first();
 
-        if (!$discount) {
+        if (! $discount) {
             return response()->json([
                 'success' => false,
                 'message' => 'Coupon code not found.',
@@ -58,7 +58,7 @@ class DiscountController extends Controller
         if ($discount->min_order_amount > 0 && $orderAmount < $discount->min_order_amount) {
             return response()->json([
                 'success' => false,
-                'message' => 'Minimum order amount of ₱' . number_format($discount->min_order_amount, 2) . ' required.',
+                'message' => 'Minimum order amount of ₱'.number_format($discount->min_order_amount, 2).' required.',
             ], 422);
         }
 

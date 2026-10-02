@@ -7,7 +7,6 @@ use App\Models\User;
 
 class TaskPolicy extends BasePolicy
 {
-
     public function viewAny(User $user): bool
     {
         return true;

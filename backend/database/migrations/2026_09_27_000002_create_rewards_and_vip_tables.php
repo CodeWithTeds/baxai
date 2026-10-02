@@ -9,10 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('customers', function (Blueprint $table): void {
-            if (!Schema::hasColumn('customers', 'loyalty_points')) {
+            if (! Schema::hasColumn('customers', 'loyalty_points')) {
                 $table->integer('loyalty_points')->default(0)->after('total_spent');
             }
-            if (!Schema::hasColumn('customers', 'vip_tier')) {
+            if (! Schema::hasColumn('customers', 'vip_tier')) {
                 $table->string('vip_tier')->default('Bronze')->after('loyalty_points');
             }
         });

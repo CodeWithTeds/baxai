@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Customer;
-use App\Models\Reward;
 use App\Models\User;
 
 test('authenticated user can view rewards page', function () {

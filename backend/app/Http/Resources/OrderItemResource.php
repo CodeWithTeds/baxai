@@ -26,11 +26,11 @@ class OrderItemResource extends JsonResource
             'base_price' => (float) $this->base_price,
             'addon_price' => (float) $this->addon_price,
             'unit_price' => (float) $this->unit_price,
-            'price' => '₱' . number_format((float) $this->unit_price, 2),
+            'price' => '₱'.number_format((float) $this->unit_price, 2),
             'quantity' => (int) $this->quantity,
             'qty' => (int) $this->quantity,
             'total_price' => (float) $this->total_price,
-            'total' => '₱' . number_format((float) $this->total_price, 2),
+            'total' => '₱'.number_format((float) $this->total_price, 2),
         ];
     }
 }

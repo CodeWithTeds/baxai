@@ -23,10 +23,31 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'max:255', 'regex:/^[A-Za-z\s]+$/'],
-            'username' => ['required', 'min:3', 'max:30', 'alpha_dash', 'unique:users,username'],
-            'email' => ['required', 'email', 'ends_with:@gmail.com,@yahoo.com', 'unique:users,email'],
-            'password' => ['required', 'min:8', 'confirmed'],
+            'name' => ['required', 'string', 'min:2', 'max:255'],
+            'username' => ['required', 'string', 'min:3', 'max:30', 'alpha_dash', 'unique:users,username'],
+            'email' => ['required', 'string', 'email:rfc,filter', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ];
+    }
+
+    /**
+     * Custom validation messages.
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Please enter your full name.',
+            'name.min' => 'Full name must be at least 2 characters.',
+            'username.required' => 'Please choose a username.',
+            'username.min' => 'Username must be at least 3 characters.',
+            'username.alpha_dash' => 'Username may only contain letters, numbers, dashes and underscores.',
+            'username.unique' => 'This username is already taken. Please choose another.',
+            'email.required' => 'Please enter your email address.',
+            'email.email' => 'Please enter a valid email address.',
+            'email.unique' => 'An account with this email already exists.',
+            'password.required' => 'Please create a password.',
+            'password.min' => 'Password must be at least 8 characters.',
+            'password.confirmed' => 'Password confirmation does not match.',
         ];
     }
 }

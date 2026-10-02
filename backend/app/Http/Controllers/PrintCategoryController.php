@@ -19,11 +19,29 @@ class PrintCategoryController extends Controller
         protected PrintCategoryService $service,
     ) {}
 
-    public function index(Request $request): Response { return Inertia::render('printing/categories/index', ['categories' => $this->categories->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 10)), 'filters' => $request->only('filter', 'sort', 'per_page'), 'stats' => $this->categories->getStats()]); }
+    public function index(Request $request): Response
+    {
+        return Inertia::render('printing/categories/index', ['categories' => $this->categories->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 10)), 'filters' => $request->only('filter', 'sort', 'per_page'), 'stats' => $this->categories->getStats()]);
+    }
 
-    public function store(StorePrintCategoryRequest $request): RedirectResponse { $this->service->create($request->validated()); return redirect()->back(); }
+    public function store(StorePrintCategoryRequest $request): RedirectResponse
+    {
+        $this->service->create($request->validated());
 
-    public function update(UpdatePrintCategoryRequest $request, PrintCategory $printCategory): RedirectResponse { $this->service->update($printCategory, $request->validated()); return redirect()->back(); }
+        return redirect()->back();
+    }
 
-    public function destroy(PrintCategory $printCategory): RedirectResponse { $this->categories->delete($printCategory); return redirect()->back(); }
+    public function update(UpdatePrintCategoryRequest $request, PrintCategory $printCategory): RedirectResponse
+    {
+        $this->service->update($printCategory, $request->validated());
+
+        return redirect()->back();
+    }
+
+    public function destroy(PrintCategory $printCategory): RedirectResponse
+    {
+        $this->categories->delete($printCategory);
+
+        return redirect()->back();
+    }
 }

@@ -16,6 +16,7 @@ class Order extends Model
     protected $fillable = [
         'order_number',
         'customer_id',
+        'customer_address_id',
         'customer_name',
         'customer_email',
         'customer_phone',
@@ -53,6 +54,11 @@ class Order extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function customerAddress(): BelongsTo
+    {
+        return $this->belongsTo(CustomerAddress::class, 'customer_address_id');
     }
 
     public function scopeActive($query)

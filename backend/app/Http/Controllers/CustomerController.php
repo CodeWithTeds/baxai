@@ -20,23 +20,59 @@ class CustomerController extends Controller
         protected CustomerService $service,
     ) {}
 
-    public function index(Request $request): Response { return Inertia::render('customers/index', ['customers' => $this->customers->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 10)), 'filters' => $request->only('filter', 'sort', 'per_page'), 'stats' => $this->customers->getStats()]); }
+    public function index(Request $request): Response
+    {
+        return Inertia::render('customers/index', ['customers' => $this->customers->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 10)), 'filters' => $request->only('filter', 'sort', 'per_page'), 'stats' => $this->customers->getStats()]);
+    }
 
-    public function create(): Response { return Inertia::render('customers/create'); }
+    public function create(): Response
+    {
+        return Inertia::render('customers/create');
+    }
 
-    public function store(StoreCustomerRequest $request): RedirectResponse { $this->service->create($request->validated()); return redirect()->route('customers.index')->with('success', 'Customer created successfully.'); }
+    public function store(StoreCustomerRequest $request): RedirectResponse
+    {
+        $this->service->create($request->validated());
 
-    public function show(Customer $customer): Response { return Inertia::render('customers/show', ['customer' => $customer]); }
+        return redirect()->route('customers.index')->with('success', 'Customer created successfully.');
+    }
 
-    public function edit(Customer $customer): Response { return Inertia::render('customers/edit', ['customer' => $customer]); }
+    public function show(Customer $customer): Response
+    {
+        return Inertia::render('customers/show', ['customer' => $customer]);
+    }
 
-    public function update(UpdateCustomerRequest $request, Customer $customer): RedirectResponse { $this->service->update($customer, $request->validated()); return redirect()->route('customers.index')->with('success', 'Customer updated successfully.'); }
+    public function edit(Customer $customer): Response
+    {
+        return Inertia::render('customers/edit', ['customer' => $customer]);
+    }
 
-    public function destroy(Customer $customer): RedirectResponse { $this->customers->delete($customer); return redirect()->route('customers.index')->with('success', 'Customer archived successfully.'); }
+    public function update(UpdateCustomerRequest $request, Customer $customer): RedirectResponse
+    {
+        $this->service->update($customer, $request->validated());
 
-    public function bulkActivate(BulkCustomerRequest $request): RedirectResponse { return redirect()->route('customers.index')->with('success', $this->customers->bulkUpdateStatus($request->validated()['ids'], 'active').' customers activated.'); }
+        return redirect()->route('customers.index')->with('success', 'Customer updated successfully.');
+    }
 
-    public function bulkArchive(BulkCustomerRequest $request): RedirectResponse { return redirect()->route('customers.index')->with('success', $this->customers->bulkUpdateStatus($request->validated()['ids'], 'archived').' customers archived.'); }
+    public function destroy(Customer $customer): RedirectResponse
+    {
+        $this->customers->delete($customer);
 
-    public function bulkDestroy(BulkCustomerRequest $request): RedirectResponse { return redirect()->route('customers.index')->with('success', $this->customers->bulkDelete($request->validated()['ids']).' customers deleted.'); }
+        return redirect()->route('customers.index')->with('success', 'Customer archived successfully.');
+    }
+
+    public function bulkActivate(BulkCustomerRequest $request): RedirectResponse
+    {
+        return redirect()->route('customers.index')->with('success', $this->customers->bulkUpdateStatus($request->validated()['ids'], 'active').' customers activated.');
+    }
+
+    public function bulkArchive(BulkCustomerRequest $request): RedirectResponse
+    {
+        return redirect()->route('customers.index')->with('success', $this->customers->bulkUpdateStatus($request->validated()['ids'], 'archived').' customers archived.');
+    }
+
+    public function bulkDestroy(BulkCustomerRequest $request): RedirectResponse
+    {
+        return redirect()->route('customers.index')->with('success', $this->customers->bulkDelete($request->validated()['ids']).' customers deleted.');
+    }
 }

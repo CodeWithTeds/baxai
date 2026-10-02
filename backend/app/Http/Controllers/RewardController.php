@@ -30,9 +30,9 @@ class RewardController extends Controller
         if ($search) {
             $customerQuery->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('customer_code', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('company', 'like', "%{$search}%");
+                    ->orWhere('customer_code', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('company', 'like', "%{$search}%");
             });
         }
 
@@ -93,7 +93,7 @@ class RewardController extends Controller
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:rewards,code,' . $reward->id,
+            'code' => 'required|string|max:50|unique:rewards,code,'.$reward->id,
             'description' => 'nullable|string',
             'points_required' => 'required|integer|min:1',
             'reward_type' => 'required|string|in:voucher,free_sample,tier_upgrade,express_production',
@@ -133,17 +133,22 @@ class RewardController extends Controller
         // Check if new balance qualifies customer for a higher VIP Tier
         $tier = 'Bronze';
         $spent = (float) $customer->total_spent;
-        if ($spent >= 100000) $tier = 'VIP Diamond';
-        elseif ($spent >= 50000) $tier = 'Platinum';
-        elseif ($spent >= 15000) $tier = 'Gold';
-        elseif ($spent >= 5000) $tier = 'Silver';
+        if ($spent >= 100000) {
+            $tier = 'VIP Diamond';
+        } elseif ($spent >= 50000) {
+            $tier = 'Platinum';
+        } elseif ($spent >= 15000) {
+            $tier = 'Gold';
+        } elseif ($spent >= 5000) {
+            $tier = 'Silver';
+        }
 
         $customer->update([
             'loyalty_points' => $newBalance,
             'vip_tier' => $tier,
         ]);
 
-        $msg = $validated['points'] >= 0 ? "Added {$validated['points']} points to {$customer->name}." : "Deducted " . abs($validated['points']) . " points from {$customer->name}.";
+        $msg = $validated['points'] >= 0 ? "Added {$validated['points']} points to {$customer->name}." : 'Deducted '.abs($validated['points'])." points from {$customer->name}.";
 
         return redirect()->back()->with('flash', [
             'success' => $msg,
@@ -173,7 +178,7 @@ class RewardController extends Controller
         $reward->increment('claims_count');
 
         // Create claim record
-        $code = 'CLAIM-' . strtoupper(substr(md5(uniqid()), 0, 8));
+        $code = 'CLAIM-'.strtoupper(substr(md5(uniqid()), 0, 8));
         CustomerReward::create([
             'customer_id' => $customer->id,
             'reward_id' => $reward->id,

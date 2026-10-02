@@ -16,6 +16,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.14",
+        "schoolees/laravel-psgc": "*",
         "spatie/laravel-query-builder": "*"
     },
     "require-dev": {
