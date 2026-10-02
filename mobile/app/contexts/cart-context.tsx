@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/contexts/auth-context';
 
 export interface CartCustomization {
   text?: string;
@@ -50,45 +51,67 @@ interface CartContextType {
   closeCart: () => void;
 }
 
-const CART_STORAGE_KEY = '@placides_cart_v1';
-
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // Load persisted cart on mount
+  // Derive isolated storage key per user so users never see each other's carts
+  const cartStorageKey = useMemo(() => {
+    if (user?.id) return `@nuyda_cart_user_${user.id}`;
+    if (user?.email) return `@nuyda_cart_user_${user.email.trim().toLowerCase()}`;
+    return `@nuyda_cart_guest`;
+  }, [user?.id, user?.email]);
+
+  // Load user-specific persisted cart on mount or when user changes
   useEffect(() => {
+    let isCancelled = false;
+
     (async () => {
       try {
-        const stored = await AsyncStorage.getItem(CART_STORAGE_KEY);
+        // Clear obsolete legacy shared key so old unowned test items never leak
+        await AsyncStorage.removeItem('@placides_cart_v1').catch(() => {});
+
+        const stored = await AsyncStorage.getItem(cartStorageKey);
+        if (isCancelled) return;
+
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed)) {
             setItems(parsed);
+          } else {
+            setItems([]);
           }
+        } else {
+          setItems([]);
         }
       } catch (err) {
         console.warn('[CartContext] Failed to load cart from storage:', err);
+        if (!isCancelled) setItems([]);
       } finally {
-        setIsLoaded(true);
+        if (!isCancelled) setIsLoaded(true);
       }
     })();
-  }, []);
 
-  // Save cart changes to storage
+    return () => {
+      isCancelled = true;
+    };
+  }, [cartStorageKey]);
+
+  // Save cart changes to storage under the active user's key
   useEffect(() => {
     if (!isLoaded) return;
     (async () => {
       try {
-        await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+        await AsyncStorage.setItem(cartStorageKey, JSON.stringify(items));
       } catch (err) {
         console.warn('[CartContext] Failed to persist cart:', err);
       }
     })();
-  }, [items, isLoaded]);
+  }, [items, isLoaded, cartStorageKey]);
 
   const addItem = (itemData: Omit<CartItem, 'id' | 'addedAt'>) => {
     const newItem: CartItem = {
@@ -123,8 +146,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const clearCart = () => {
+  const clearCart = async () => {
     setItems([]);
+    try {
+      await AsyncStorage.removeItem(cartStorageKey);
+      await AsyncStorage.removeItem('@placides_cart_v1').catch(() => {});
+    } catch {}
   };
 
   const openCart = () => setIsCartOpen(true);

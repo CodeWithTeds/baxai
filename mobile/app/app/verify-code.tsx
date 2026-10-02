@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
@@ -21,7 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
-import { BrandColors, IconColors } from '@/constants/theme';
+import { BrandColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { apiResendCode, apiVerifyEmail, apiVerifyResetCode } from '@/utils/auth-api';
 import { syncCustomerToBackend } from '@/utils/customer-sync';
@@ -200,21 +199,16 @@ export default function VerifyCodeScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
-      {/* Header Bar */}
-      <View style={styles.header}>
+      {/* Top Navigation Row (Header removed, only minimal squircle back button) */}
+      <View style={styles.topNav}>
         <Pressable
           hitSlop={12}
           onPress={() => router.back()}
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}>
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}>
+          <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
-        <View style={styles.brandGroup}>
-          <Ionicons name="shield-checkmark" size={20} color="#FFFFFF" />
-          <Text style={styles.brandTitle}>NUYDA SECURITY</Text>
-        </View>
-        <View style={{ width: 32 }} />
       </View>
 
       <KeyboardAvoidingView
@@ -227,111 +221,103 @@ export default function VerifyCodeScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
 
-            {/* Mascot / Icon Badge */}
-            <View style={styles.mascotArea}>
-              <Animated.View entering={FadeInUp.delay(100).duration(500)} style={styles.iconWrap}>
-                <View style={[styles.bigIconBadge, { backgroundColor: isPasswordReset ? '#FEF3C7' : '#EDE9FE' }]}>
-                  <Ionicons
-                    name={isPasswordReset ? 'key-outline' : 'mail-unread-outline'}
-                    size={48}
-                    color={isPasswordReset ? '#D97706' : '#7C3AED'}
-                  />
-                </View>
-              </Animated.View>
-            </View>
-
-            {/* Verification Card */}
-            <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>
-                  {isPasswordReset ? 'Reset Verification Code' : 'Verify Your Email'}
-                </Text>
-                <Text style={styles.cardSubtitle}>
-                  Please enter the 4-digit code sent to:
-                </Text>
-                <View style={styles.emailBadge}>
-                  <Ionicons name="mail" size={13} color="#0052CC" />
-                  <Text style={styles.emailBadgeText} numberOfLines={1}>
-                    {email || 'your email'}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Error Banner */}
-              {errorMessage && (
-                <View style={styles.errorBanner}>
-                  <Ionicons name="alert-circle" size={16} color="#DC2626" />
-                  <Text style={styles.errorBannerText}>{errorMessage}</Text>
-                </View>
-              )}
-
-              {/* 4-Digit Input Boxes */}
-              <View style={styles.codeRow}>
-                {digits.map((digit, idx) => {
-                  const isFocused = Boolean(digit);
-                  return (
-                    <View
-                      key={idx}
-                      style={[
-                        styles.digitBox,
-                        isFocused && styles.digitBoxActive,
-                        Boolean(errorMessage) && styles.digitBoxError,
-                      ]}>
-                      <TextInput
-                        ref={inputRefs[idx]}
-                        value={digit}
-                        onChangeText={(val) => handleDigitChange(val, idx)}
-                        onKeyPress={(e) => handleKeyPress(e, idx)}
-                        keyboardType="number-pad"
-                        maxLength={idx === 0 ? 4 : 1}
-                        selectTextOnFocus
-                        textAlign="center"
-                        style={styles.digitInput}
-                      />
-                    </View>
-                  );
-                })}
-              </View>
-
-              <Text style={styles.expiryNote}>
-                ⏰ The verification code will expire in 10 minutes.
+            {/* Header Block */}
+            <Animated.View entering={FadeInUp.duration(400)} style={styles.headerBlock}>
+              <Text style={styles.title}>
+                {isPasswordReset ? 'Reset Verification' : 'Verify Email'}
+              </Text>
+              <Text style={styles.subtitle}>
+                We sent a 4-digit verification code to
               </Text>
 
-              {/* Verify Button */}
-              <Pressable
-                onPress={handleVerify}
-                disabled={!isComplete || loading}
-                style={({ pressed }) => [
-                  styles.verifyBtn,
-                  !isComplete && styles.verifyBtnDisabled,
-                  pressed && { opacity: 0.85 },
-                ]}>
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                    <Text style={styles.verifyBtnText}>
-                      {isPasswordReset ? 'Verify & Reset Password' : 'Verify & Proceed'}
-                    </Text>
-                  </>
-                )}
-              </Pressable>
-
-              {/* Resend Section */}
-              <View style={styles.resendRow}>
-                <Text style={styles.resendPrompt}>Didn't receive the email? </Text>
-                {countdown > 0 ? (
-                  <Text style={styles.countdownText}>Resend in {countdown}s</Text>
-                ) : (
-                  <Pressable onPress={handleResend} disabled={resending}>
-                    <Text style={styles.resendBtnText}>
-                      {resending ? 'Sending...' : 'Resend Code'}
-                    </Text>
-                  </Pressable>
-                )}
+              {/* Email Chip */}
+              <View style={styles.emailBadge}>
+                <Ionicons name="mail" size={13} color={BrandColors.primary} />
+                <Text style={styles.emailBadgeText} numberOfLines={1}>
+                  {email || 'your email'}
+                </Text>
               </View>
             </Animated.View>
+
+            {/* Error Banner */}
+            {errorMessage && (
+              <Animated.View entering={FadeInDown.duration(250)} style={styles.errorBanner}>
+                <Ionicons name="alert-circle" size={17} color="#DC2626" />
+                <Text style={styles.errorBannerText}>{errorMessage}</Text>
+              </Animated.View>
+            )}
+
+            {/* 4-Digit Input Boxes */}
+            <Animated.View entering={FadeInUp.delay(100).duration(450)} style={styles.codeRow}>
+              {digits.map((digit, idx) => {
+                const isFilled = Boolean(digit);
+                return (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.digitBox,
+                      isFilled && styles.digitBoxActive,
+                      Boolean(errorMessage) && styles.digitBoxError,
+                    ]}>
+                    <TextInput
+                      ref={inputRefs[idx]}
+                      value={digit}
+                      onChangeText={(val) => handleDigitChange(val, idx)}
+                      onKeyPress={(e) => handleKeyPress(e, idx)}
+                      keyboardType="number-pad"
+                      maxLength={idx === 0 ? 4 : 1}
+                      selectTextOnFocus
+                      textAlign="center"
+                      style={styles.digitInput}
+                    />
+                  </View>
+                );
+              })}
+            </Animated.View>
+
+            <Text style={styles.expiryNote}>
+              Code expires in 10 minutes.
+            </Text>
+
+            {/* Verify Action Button */}
+            <Pressable
+              onPress={handleVerify}
+              disabled={!isComplete || loading}
+              style={({ pressed }) => [
+                styles.primaryBtn,
+                !isComplete && styles.primaryBtnDisabled,
+                pressed && isComplete && styles.primaryBtnPressed,
+              ]}
+              android_ripple={{ color: '#003D9B' }}>
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.primaryBtnText}>
+                  {isPasswordReset ? 'Verify Code' : 'Verify & Proceed'}
+                </Text>
+              )}
+            </Pressable>
+
+            {/* Resend Section */}
+            <View style={styles.resendRow}>
+              <Text style={styles.resendPrompt}>Didn't receive the email? </Text>
+              {countdown > 0 ? (
+                <Text style={styles.countdownText}>Resend in {countdown}s</Text>
+              ) : (
+                <Pressable onPress={handleResend} disabled={resending}>
+                  <Text style={styles.resendBtnText}>
+                    {resending ? 'Sending...' : 'Resend Code'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+
+            {/* Footer */}
+            <View style={styles.footerWrap}>
+              <Text style={styles.footerText}>
+                Need assistance? Contact our support team.
+              </Text>
+            </View>
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
@@ -342,105 +328,77 @@ export default function VerifyCodeScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0052CC',
+    backgroundColor: '#F8F9FA',
   },
-  header: {
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
+  topNav: {
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === 'android' ? 12 : 6,
+    paddingBottom: 8,
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+      },
+      android: { elevation: 2 },
+    }),
   },
-  brandGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  brandTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1,
-    fontFamily: 'Manrope_700Bold',
+  backBtnPressed: {
+    backgroundColor: '#F3F4F6',
+    transform: [{ scale: 0.96 }],
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
-  },
-  mascotArea: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  iconWrap: {
-    marginTop: 10,
-  },
-  bigIconBadge: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 32,
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
   },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
+  headerBlock: {
+    marginBottom: 28,
   },
-  cardHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  cardTitle: {
-    fontSize: 22,
+  title: {
+    fontSize: 32,
     fontWeight: '800',
     color: '#111827',
     fontFamily: 'Manrope_700Bold',
-    textAlign: 'center',
+    letterSpacing: -0.5,
   },
-  cardSubtitle: {
-    fontSize: 13,
+  subtitle: {
+    fontSize: 14,
     color: '#6B7280',
+    marginTop: 8,
     fontFamily: 'Inter_400Regular',
-    marginTop: 6,
-    textAlign: 'center',
   },
   emailBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 12,
     marginTop: 10,
+    alignSelf: 'flex-start',
     maxWidth: '100%',
   },
   emailBadgeText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0052CC',
+    color: BrandColors.primary,
     fontFamily: 'Inter_600SemiBold',
   },
   errorBanner: {
@@ -449,14 +407,15 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FCA5A5',
-    borderRadius: 12,
-    padding: 12,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginBottom: 20,
   },
   errorBannerText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 13,
     color: '#B91C1C',
     fontFamily: 'Inter_500Medium',
   },
@@ -464,21 +423,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   digitBox: {
     flex: 1,
-    height: 64,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 2,
+    height: 66,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
     borderColor: '#E5E7EB',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+      },
+      android: { elevation: 1 },
+    }),
   },
   digitBoxActive: {
-    borderColor: '#0052CC',
-    backgroundColor: '#EFF6FF',
+    borderColor: BrandColors.primary,
+    backgroundColor: '#F8FAFF',
   },
   digitBoxError: {
     borderColor: '#EF4444',
@@ -487,49 +455,56 @@ const styles = StyleSheet.create({
   digitInput: {
     width: '100%',
     height: '100%',
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     color: '#111827',
     fontFamily: 'Courier',
     textAlign: 'center',
   },
   expiryNote: {
-    fontSize: 11,
-    color: '#6B7280',
+    fontSize: 12,
+    color: '#9CA3AF',
     textAlign: 'center',
     marginBottom: 24,
     fontFamily: 'Inter_400Regular',
   },
-  verifyBtn: {
-    flexDirection: 'row',
+  primaryBtn: {
+    backgroundColor: BrandColors.primary,
+    borderRadius: 18,
+    height: 54,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#0052CC',
-    height: 52,
-    borderRadius: 14,
-    shadowColor: '#0052CC',
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: BrandColors.primary,
+        shadowOpacity: 0.28,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+      },
+      android: { elevation: 4 },
+    }),
   },
-  verifyBtnDisabled: {
-    backgroundColor: '#9CA3AF',
+  primaryBtnDisabled: {
+    backgroundColor: '#D1D5DB',
     shadowOpacity: 0,
     elevation: 0,
   },
-  verifyBtnText: {
+  primaryBtnPressed: {
+    backgroundColor: BrandColors.tertiary,
+    transform: [{ scale: 0.99 }],
+  },
+  primaryBtnText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     fontFamily: 'Manrope_700Bold',
+    letterSpacing: 0.2,
   },
   resendRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 22,
   },
   resendPrompt: {
     fontSize: 13,
@@ -545,7 +520,17 @@ const styles = StyleSheet.create({
   resendBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0052CC',
+    color: BrandColors.primary,
     fontFamily: 'Inter_600SemiBold',
+  },
+  footerWrap: {
+    alignItems: 'center',
+    marginTop: 28,
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
   },
 });

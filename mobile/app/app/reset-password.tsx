@@ -38,6 +38,7 @@ export default function ResetPasswordScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const triggerHaptic = async (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
     if (Platform.OS !== 'web') {
@@ -112,21 +113,16 @@ export default function ResetPasswordScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
-      {/* Header Bar */}
-      <View style={styles.header}>
+      {/* Top Navigation Row with Modern Squircle Back Button */}
+      <View style={styles.topNav}>
         <Pressable
           hitSlop={12}
           onPress={() => router.back()}
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}>
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}>
+          <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
-        <View style={styles.brandGroup}>
-          <Ionicons name="key" size={20} color="#FFFFFF" />
-          <Text style={styles.brandTitle}>RESET PASSWORD</Text>
-        </View>
-        <View style={{ width: 32 }} />
       </View>
 
       <KeyboardAvoidingView
@@ -137,39 +133,35 @@ export default function ResetPasswordScreen() {
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={true}
             showsVerticalScrollIndicator={false}>
 
-            {/* Icon Area */}
-            <View style={styles.iconArea}>
-              <Animated.View entering={FadeInUp.delay(100).duration(500)}>
-                <View style={styles.bigIconBadge}>
-                  <Ionicons name="lock-closed" size={44} color="#0052CC" />
-                </View>
+            {/* Header Block Matching Ref Modern Design */}
+            <Animated.View entering={FadeInUp.duration(400)} style={styles.headerBlock}>
+              <Text style={styles.title}>Reset password</Text>
+              <Text style={styles.subtitle}>
+                Choose a strong password with at least 8 characters.
+              </Text>
+            </Animated.View>
+
+            {/* Error Banner */}
+            {errorMessage && (
+              <Animated.View entering={FadeInDown.duration(250)} style={styles.errorBanner}>
+                <Ionicons name="alert-circle" size={17} color="#DC2626" />
+                <Text style={styles.errorBannerText}>{errorMessage}</Text>
               </Animated.View>
-            </View>
+            )}
 
-            {/* Reset Card */}
-            <Animated.View entering={FadeInDown.delay(200).duration(600)} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>Set New Password</Text>
-                <Text style={styles.cardSubtitle}>
-                  Please choose a strong password with at least 8 characters.
-                </Text>
-              </View>
-
-              {/* Error Banner */}
-              {errorMessage && (
-                <View style={styles.errorBanner}>
-                  <Ionicons name="alert-circle" size={16} color="#DC2626" />
-                  <Text style={styles.errorBannerText}>{errorMessage}</Text>
-                </View>
-              )}
-
-              {/* New Password Field */}
+            {/* Form */}
+            <Animated.View entering={FadeInUp.delay(100).duration(450)} style={styles.formContainer}>
+              {/* New Password */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>New Password</Text>
-                <View style={styles.inputWrap}>
-                  <Ionicons name="lock-closed-outline" size={18} color="#9CA3AF" style={styles.inputIcon} />
+                <Text style={styles.fieldLabel}>New password</Text>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    focusedField === 'password' && styles.inputContainerFocused,
+                  ]}>
                   <TextInput
                     placeholder="At least 8 characters"
                     placeholderTextColor="#9CA3AF"
@@ -178,12 +170,15 @@ export default function ResetPasswordScreen() {
                       setPassword(val);
                       if (errorMessage) setErrorMessage(null);
                     }}
+                    onFocus={() => setFocusedField('password')}
+                    onBlur={() => setFocusedField(null)}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    style={styles.input}
+                    returnKeyType="next"
+                    style={styles.textInput}
                   />
-                  <Pressable hitSlop={10} onPress={() => setShowPassword(!showPassword)}>
+                  <Pressable hitSlop={10} onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                       size={20}
@@ -193,11 +188,14 @@ export default function ResetPasswordScreen() {
                 </View>
               </View>
 
-              {/* Confirm Password Field */}
+              {/* Confirm New Password */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Confirm New Password</Text>
-                <View style={styles.inputWrap}>
-                  <Ionicons name="lock-closed-outline" size={18} color="#9CA3AF" style={styles.inputIcon} />
+                <Text style={styles.fieldLabel}>Confirm new password</Text>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    focusedField === 'confirm' && styles.inputContainerFocused,
+                  ]}>
                   <TextInput
                     placeholder="Re-type your new password"
                     placeholderTextColor="#9CA3AF"
@@ -206,12 +204,16 @@ export default function ResetPasswordScreen() {
                       setPasswordConfirmation(val);
                       if (errorMessage) setErrorMessage(null);
                     }}
+                    onFocus={() => setFocusedField('confirm')}
+                    onBlur={() => setFocusedField(null)}
                     secureTextEntry={!showConfirmPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    style={styles.input}
+                    returnKeyType="done"
+                    onSubmitEditing={handleResetPassword}
+                    style={styles.textInput}
                   />
-                  <Pressable hitSlop={10} onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                  <Pressable hitSlop={10} onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeBtn}>
                     <Ionicons
                       name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
                       size={20}
@@ -221,22 +223,22 @@ export default function ResetPasswordScreen() {
                 </View>
               </View>
 
-              {/* Password Checklist */}
+              {/* Password Checklist Badges */}
               <View style={styles.checklist}>
                 <View style={styles.checkItem}>
                   <Ionicons
                     name={hasMinLength ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={15}
+                    size={14}
                     color={hasMinLength ? '#10B981' : '#9CA3AF'}
                   />
                   <Text style={[styles.checkText, hasMinLength && styles.checkTextActive]}>
-                    At least 8 characters long
+                    8+ characters
                   </Text>
                 </View>
                 <View style={styles.checkItem}>
                   <Ionicons
                     name={passwordsMatch ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={15}
+                    size={14}
                     color={passwordsMatch ? '#10B981' : '#9CA3AF'}
                   />
                   <Text style={[styles.checkText, passwordsMatch && styles.checkTextActive]}>
@@ -250,17 +252,15 @@ export default function ResetPasswordScreen() {
                 onPress={handleResetPassword}
                 disabled={loading || !hasMinLength || !passwordsMatch}
                 style={({ pressed }) => [
-                  styles.submitBtn,
-                  (!hasMinLength || !passwordsMatch || loading) && styles.submitBtnDisabled,
-                  pressed && { opacity: 0.85 },
-                ]}>
+                  styles.primaryBtn,
+                  (!hasMinLength || !passwordsMatch || loading) && styles.primaryBtnDisabled,
+                  pressed && hasMinLength && passwordsMatch && styles.primaryBtnPressed,
+                ]}
+                android_ripple={{ color: '#003D9B' }}>
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <>
-                    <Ionicons name="checkmark-done" size={20} color="#FFFFFF" />
-                    <Text style={styles.submitBtnText}>Update Password</Text>
-                  </>
+                  <Text style={styles.primaryBtnText}>Update Password</Text>
                 )}
               </Pressable>
             </Animated.View>
@@ -274,88 +274,59 @@ export default function ResetPasswordScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0052CC',
+    backgroundColor: '#F8F9FA',
   },
-  header: {
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
+  topNav: {
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === 'android' ? 12 : 6,
+    paddingBottom: 8,
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+      },
+      android: { elevation: 2 },
+    }),
   },
-  brandGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  brandTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1,
-    fontFamily: 'Manrope_700Bold',
+  backBtnPressed: {
+    backgroundColor: '#F3F4F6',
+    transform: [{ scale: 0.96 }],
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: 36,
-  },
-  iconArea: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  bigIconBadge: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
+    paddingBottom: 32,
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
   },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
+  headerBlock: {
+    marginBottom: 26,
   },
-  cardHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  cardTitle: {
-    fontSize: 22,
+  title: {
+    fontSize: 32,
     fontWeight: '800',
     color: '#111827',
     fontFamily: 'Manrope_700Bold',
-    textAlign: 'center',
+    letterSpacing: -0.5,
   },
-  cardSubtitle: {
-    fontSize: 13,
+  subtitle: {
+    fontSize: 14,
     color: '#6B7280',
+    marginTop: 8,
+    lineHeight: 20,
     fontFamily: 'Inter_400Regular',
-    marginTop: 6,
-    lineHeight: 18,
-    textAlign: 'center',
   },
   errorBanner: {
     flexDirection: 'row',
@@ -363,16 +334,20 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FCA5A5',
-    borderRadius: 12,
-    padding: 12,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginBottom: 18,
   },
   errorBannerText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 13,
     color: '#B91C1C',
     fontFamily: 'Inter_500Medium',
+  },
+  formContainer: {
+    width: '100%',
   },
   fieldGroup: {
     marginBottom: 16,
@@ -382,38 +357,58 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#374151',
     fontFamily: 'Inter_600SemiBold',
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  inputWrap: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 50,
+    borderRadius: 16,
+    height: 54,
+    paddingHorizontal: 16,
   },
-  inputIcon: {
-    marginRight: 10,
+  inputContainerFocused: {
+    borderColor: BrandColors.primary,
+    backgroundColor: '#FFFFFF',
+    ...Platform.select({
+      ios: {
+        shadowColor: BrandColors.primary,
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+      },
+      android: { elevation: 2 },
+    }),
   },
-  input: {
+  textInput: {
     flex: 1,
     fontSize: 15,
     color: '#111827',
     fontFamily: 'Inter_400Regular',
   },
+  eyeBtn: {
+    padding: 6,
+    marginLeft: 6,
+  },
   checklist: {
-    backgroundColor: '#F9FAFB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 12,
-    padding: 12,
-    marginVertical: 14,
-    gap: 8,
+    marginTop: 2,
+    marginBottom: 18,
   },
   checkItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   checkText: {
     fontSize: 12,
@@ -425,30 +420,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: 'Inter_600SemiBold',
   },
-  submitBtn: {
-    flexDirection: 'row',
+  primaryBtn: {
+    backgroundColor: BrandColors.primary,
+    borderRadius: 18,
+    height: 54,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#0052CC',
-    height: 52,
-    borderRadius: 14,
-    shadowColor: '#0052CC',
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-    marginTop: 6,
+    ...Platform.select({
+      ios: {
+        shadowColor: BrandColors.primary,
+        shadowOpacity: 0.28,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+      },
+      android: { elevation: 4 },
+    }),
   },
-  submitBtnDisabled: {
-    backgroundColor: '#9CA3AF',
+  primaryBtnDisabled: {
+    backgroundColor: '#D1D5DB',
     shadowOpacity: 0,
     elevation: 0,
   },
-  submitBtnText: {
+  primaryBtnPressed: {
+    backgroundColor: BrandColors.tertiary,
+    transform: [{ scale: 0.99 }],
+  },
+  primaryBtnText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     fontFamily: 'Manrope_700Bold',
+    letterSpacing: 0.2,
   },
 });

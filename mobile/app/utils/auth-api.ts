@@ -128,13 +128,16 @@ async function postToAuthEndpoint(endpoint: string, payload: Record<string, any>
 // ─── Exported Auth API Methods ───────────────────────────────────────────────
 
 export async function apiRegister(payload: {
-  name: string;
   username: string;
   email: string;
   password: string;
   password_confirmation: string;
+  name?: string;
 }): Promise<AuthResponse> {
-  return postToAuthEndpoint('register', payload);
+  return postToAuthEndpoint('register', {
+    ...payload,
+    name: payload.name || payload.username,
+  });
 }
 
 export async function apiLogin(payload: {

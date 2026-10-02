@@ -80,16 +80,21 @@ export default function RootLayout() {
       <AuthProvider>
         <LanguageProvider>
           <CartProvider>
-            <Stack>
+            <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" options={{ headerShown: false, animation: 'fade' }} />
               <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
               <Stack.Screen name="register" options={{ headerShown: false, animation: 'slide_from_right' }} />
               <Stack.Screen name="login" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="verify-code" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="reset-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="delivery-address" options={{ headerShown: false, animation: 'slide_from_right' }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="order/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
               <Stack.Screen name="mug-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
               <Stack.Screen name="pin-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
               <Stack.Screen name="cart" options={{ headerShown: false, animation: 'slide_from_right' }} />
+              <Stack.Screen name="legal" options={{ presentation: 'modal', headerShown: false }} />
               <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
             </Stack>
             <StatusBar style="auto" />

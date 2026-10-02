@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,13 +14,13 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { BrandColors } from '@/constants/theme';
+import { LegalModal, LegalTab } from '@/components/legal-modal';
 import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
 import { apiLogin } from '@/utils/auth-api';
@@ -31,11 +30,25 @@ export default function LoginScreen() {
   const { t } = useLanguage();
   const { login } = useAuth();
 
+  const identifierInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+
   const [identifier, setIdentifier] = useState(''); // Email or Username
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [focusedField, setFocusedField] = useState<'identifier' | 'password' | null>(null);
+  const [legalModalVisible, setLegalModalVisible] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<LegalTab>('terms');
+
+  // Auto-focus email/username input so keyboard pops up when screen opens
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      identifierInputRef.current?.focus();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, []);
 
   const triggerHaptic = async (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
     if (Platform.OS !== 'web') {
@@ -53,12 +66,12 @@ export default function LoginScreen() {
     const cleanPassword = password.trim();
 
     if (!cleanIdentifier) {
-      setErrorMessage('Please enter your Email Address or Username.');
+      setErrorMessage('Please enter your email or username.');
       return;
     }
 
     if (!cleanPassword) {
-      setErrorMessage('Please enter your Password.');
+      setErrorMessage('Please enter your password.');
       return;
     }
 
@@ -130,152 +143,193 @@ export default function LoginScreen() {
     router.push('/forgot-password');
   };
 
+  const handleOpenLegal = async (tab: LegalTab) => {
+    await triggerHaptic();
+    setLegalModalTab(tab);
+    setLegalModalVisible(true);
+  };
+
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
-      {/* Header Bar */}
-      <View style={styles.header}>
+      {/* Top Navigation Row with Modern Squircle Back Button */}
+      <View style={styles.topNav}>
         <Pressable
           hitSlop={12}
           onPress={() => router.back()}
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}>
-          <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}>
+          <Ionicons name="chevron-back" size={20} color="#111827" />
         </Pressable>
-        <View style={styles.brandGroup}>
-          <Ionicons name="print" size={20} color="#FFFFFF" />
-          <Text style={styles.brandTitle}>{t.brandName}</Text>
-        </View>
-        <View style={{ width: 32 }} />
       </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
         style={{ flex: 1 }}>
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets={true}
-            showsVerticalScrollIndicator={false}>
-            
-            {/* Mascot Area */}
-            <View style={styles.mascotArea}>
-              <Animated.View entering={FadeInUp.delay(100).duration(500)} style={styles.mascotWrap}>
-                <Image
-                  source={require('@/assets/images/owl-mascot.png')}
-                  style={styles.mascotImg}
-                  contentFit="contain"
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          showsVerticalScrollIndicator={false}>
+
+          {/* Header Title & Subtitle Matching Ref Design */}
+          <Animated.View entering={FadeInUp.duration(400)} style={styles.headerBlock}>
+            <Text style={styles.title}>Log in</Text>
+            <Text style={styles.subtitle}>
+              By logging in, you agree to our{' '}
+              <Text
+                onPress={() => handleOpenLegal('terms')}
+                suppressHighlighting={false}
+                style={styles.subtitleLink}>
+                Terms of Use
+              </Text>.
+            </Text>
+          </Animated.View>
+
+          {/* Error Banner */}
+          {errorMessage && (
+            <Animated.View entering={FadeInDown.duration(250)} style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={17} color="#DC2626" />
+              <Text style={styles.errorBannerText}>{errorMessage}</Text>
+            </Animated.View>
+          )}
+
+          {/* Form Fields */}
+          <Animated.View entering={FadeInUp.delay(100).duration(450)} style={styles.formContainer}>
+            {/* Email / Username Field */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Email or Username</Text>
+              <Pressable
+                onPress={() => identifierInputRef.current?.focus()}
+                style={[
+                  styles.inputContainer,
+                  focusedField === 'identifier' && styles.inputContainerFocused,
+                ]}>
+                <TextInput
+                  ref={identifierInputRef}
+                  placeholder="Your email or username"
+                  placeholderTextColor="#9CA3AF"
+                  value={identifier}
+                  onChangeText={(val) => {
+                    setIdentifier(val);
+                    if (errorMessage) setErrorMessage(null);
+                  }}
+                  onFocus={() => setFocusedField('identifier')}
+                  onBlur={() => setFocusedField(null)}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  style={styles.textInput}
                 />
-              </Animated.View>
+              </Pressable>
             </View>
 
-            {/* Auth Card */}
-            <Animated.View entering={FadeInUp.delay(200).duration(600)} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{t.welcomeBack}</Text>
-                <Text style={styles.cardSubtitle}>Sign in with Email / Username & Password</Text>
+            {/* Password Field */}
+            <View style={styles.fieldGroup}>
+              <View style={styles.passwordLabelRow}>
+                <Text style={styles.fieldLabel}>Password</Text>
+                <Pressable hitSlop={8} onPress={handleGoToForgotPassword}>
+                  <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                </Pressable>
               </View>
-
-              {/* Error Banner */}
-              {errorMessage && (
-                <View style={styles.errorBanner}>
-                  <Ionicons name="alert-circle" size={16} color="#DC2626" />
-                  <Text style={styles.errorBannerText}>{errorMessage}</Text>
-                </View>
-              )}
-
-              {/* Email / Username Field */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Email Address or Username</Text>
-                <View style={styles.inputWrap}>
-                  <Ionicons name="person-outline" size={18} color="#9CA3AF" style={styles.inputIcon} />
-                  <TextInput
-                    placeholder="email@example.com or username"
-                    placeholderTextColor="#9CA3AF"
-                    value={identifier}
-                    onChangeText={(val) => {
-                      setIdentifier(val);
-                      if (errorMessage) setErrorMessage(null);
-                    }}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    returnKeyType="next"
-                    style={styles.textInput}
+              <Pressable
+                onPress={() => passwordInputRef.current?.focus()}
+                style={[
+                  styles.inputContainer,
+                  focusedField === 'password' && styles.inputContainerFocused,
+                ]}>
+                <TextInput
+                  ref={passwordInputRef}
+                  placeholder="Your password"
+                  placeholderTextColor="#9CA3AF"
+                  value={password}
+                  onChangeText={(val) => {
+                    setPassword(val);
+                    if (errorMessage) setErrorMessage(null);
+                  }}
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => setFocusedField(null)}
+                  secureTextEntry={!showPassword}
+                  returnKeyType="done"
+                  onSubmitEditing={handleLoginSubmit}
+                  style={styles.textInput}
+                />
+                <Pressable
+                  hitSlop={10}
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.eyeBtn}>
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color="#6B7280"
                   />
-                </View>
-              </View>
+                </Pressable>
+              </Pressable>
+            </View>
 
-              {/* Password Field */}
-              <View style={styles.fieldGroup}>
-                <View style={styles.labelRow}>
-                  <Text style={styles.fieldLabel}>Password</Text>
-                  <Pressable hitSlop={8} onPress={handleGoToForgotPassword}>
-                    <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-                  </Pressable>
-                </View>
-                <View style={styles.inputWrap}>
-                  <Ionicons name="lock-closed-outline" size={18} color="#9CA3AF" style={styles.inputIcon} />
-                  <TextInput
-                    placeholder="Enter your password"
-                    placeholderTextColor="#9CA3AF"
-                    value={password}
-                    onChangeText={(val) => {
-                      setPassword(val);
-                      if (errorMessage) setErrorMessage(null);
-                    }}
-                    secureTextEntry={!showPassword}
-                    returnKeyType="done"
-                    onSubmitEditing={handleLoginSubmit}
-                    style={styles.textInput}
-                  />
-                  <Pressable
-                    hitSlop={8}
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeBtn}>
-                    <Ionicons
-                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={20}
-                      color="#6B7280"
-                    />
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Submit Sign In Button */}
+              {/* Primary Connect / Log In Button */}
               <Pressable
                 onPress={handleLoginSubmit}
                 disabled={loading}
                 style={({ pressed }) => [
-                  styles.submitBtn,
-                  pressed && styles.submitBtnPressed,
+                  styles.primaryBtn,
+                  pressed && styles.primaryBtnPressed,
                   loading && { opacity: 0.8 },
                 ]}
                 android_ripple={{ color: '#003D9B' }}>
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
-                  <>
-                    <Text style={styles.submitBtnText}>Sign In</Text>
-                    <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-                  </>
+                  <Text style={styles.primaryBtnText}>Connect</Text>
                 )}
               </Pressable>
+            </Animated.View>
 
-              {/* Don't have an account */}
+            {/* Divider "Or" */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>Or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Alternate Action Buttons (Ref Style) */}
+            <View style={styles.altButtonsGroup}>
+              {/* Register / Sign Up Button */}
               <Pressable
                 onPress={handleGoToRegister}
                 style={({ pressed }) => [
-                  styles.registerLinkBtn,
-                  pressed && styles.registerLinkBtnPressed,
+                  styles.socialBtn,
+                  pressed && styles.socialBtnPressed,
                 ]}>
-                <Text style={styles.registerLinkText}>{t.dontHaveAccountLink}</Text>
+                <Ionicons name="person-add-outline" size={18} color={BrandColors.primary} />
+                <Text style={styles.socialBtnText}>Create an account</Text>
               </Pressable>
-            </Animated.View>
+            </View>
+
+            {/* Footer Terms & Privacy */}
+            <View style={styles.footerWrap}>
+              <Text style={styles.footerText}>
+                For more information, please see our{' '}
+                <Text
+                  onPress={() => handleOpenLegal('privacy')}
+                  suppressHighlighting={false}
+                  style={styles.footerLink}>
+                  Privacy policy
+                </Text>.
+              </Text>
+            </View>
           </ScrollView>
-        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+
+      {/* Interactive Legal Modal */}
+      <LegalModal
+        visible={legalModalVisible}
+        initialTab={legalModalTab}
+        onClose={() => setLegalModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -283,86 +337,65 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0052CC',
+    backgroundColor: '#F8F9FA',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  topNav: {
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === 'android' ? 12 : 6,
+    paddingBottom: 8,
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+      },
+      android: { elevation: 2 },
+    }),
   },
-  brandGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  brandTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1,
-    fontFamily: 'Manrope_700Bold',
+  backBtnPressed: {
+    backgroundColor: '#F3F4F6',
+    transform: [{ scale: 0.96 }],
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 32,
     justifyContent: 'center',
   },
-  mascotArea: {
-    alignItems: 'center',
-    marginVertical: 12,
+  headerBlock: {
+    marginBottom: 26,
   },
-  mascotWrap: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  mascotImg: {
-    width: 70,
-    height: 70,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
-  cardHeader: {
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  cardTitle: {
-    fontSize: 22,
+  title: {
+    fontSize: 32,
     fontWeight: '800',
     color: '#111827',
     fontFamily: 'Manrope_700Bold',
+    letterSpacing: -0.5,
   },
-  cardSubtitle: {
-    fontSize: 13,
+  subtitle: {
+    fontSize: 14,
     color: '#6B7280',
-    marginTop: 4,
+    marginTop: 8,
+    lineHeight: 20,
     fontFamily: 'Inter_400Regular',
-    textAlign: 'center',
+  },
+  subtitleLink: {
+    color: '#111827',
+    fontWeight: '700',
+    fontFamily: 'Inter_600SemiBold',
+    textDecorationLine: 'underline',
   },
   errorBanner: {
     flexDirection: 'row',
@@ -370,98 +403,169 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FCA5A5',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
   },
   errorBannerText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 13,
     color: '#B91C1C',
     fontFamily: 'Inter_500Medium',
   },
-  fieldGroup: {
-    marginBottom: 16,
+  formContainer: {
+    width: '100%',
   },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
+  fieldGroup: {
+    marginBottom: 18,
   },
   fieldLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: '#374151',
     fontFamily: 'Inter_600SemiBold',
-    marginBottom: 6,
+    marginBottom: 7,
+  },
+  passwordLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 7,
   },
   forgotPasswordText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0052CC',
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: BrandColors.primary,
     fontFamily: 'Inter_600SemiBold',
   },
-  inputWrap: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
-    borderRadius: 14,
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 12,
-    height: 48,
+    borderRadius: 16,
+    height: 54,
+    paddingHorizontal: 16,
   },
-  inputIcon: {
-    marginRight: 8,
+  inputContainerFocused: {
+    borderColor: BrandColors.primary,
+    backgroundColor: '#FFFFFF',
+    ...Platform.select({
+      ios: {
+        shadowColor: BrandColors.primary,
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+      },
+      android: { elevation: 2 },
+    }),
   },
   textInput: {
     flex: 1,
-    fontSize: 14,
+    height: '100%',
+    fontSize: 15,
     color: '#111827',
     fontFamily: 'Inter_400Regular',
   },
   eyeBtn: {
-    padding: 4,
+    padding: 6,
+    marginLeft: 6,
   },
-  submitBtn: {
-    backgroundColor: '#0052CC',
-    borderRadius: 14,
-    height: 50,
+  primaryBtn: {
+    backgroundColor: BrandColors.primary,
+    borderRadius: 18,
+    height: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: BrandColors.primary,
+        shadowOpacity: 0.28,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+      },
+      android: { elevation: 4 },
+    }),
+  },
+  primaryBtnPressed: {
+    backgroundColor: BrandColors.tertiary,
+    transform: [{ scale: 0.99 }],
+  },
+  primaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
+    letterSpacing: 0.2,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 22,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    marginHorizontal: 14,
+    color: '#9CA3AF',
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: 'Inter_500Medium',
+  },
+  altButtonsGroup: {
+    gap: 12,
+  },
+  socialBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 18,
+    height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 8,
-    shadowColor: '#0052CC',
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    gap: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.03,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
+      },
+      android: { elevation: 1 },
+    }),
   },
-  submitBtnPressed: {
-    backgroundColor: '#003D9B',
+  socialBtnPressed: {
+    backgroundColor: '#F3F4F6',
     transform: [{ scale: 0.99 }],
   },
-  submitBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-    fontFamily: 'Manrope_700Bold',
-  },
-  registerLinkBtn: {
-    marginTop: 20,
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  registerLinkBtnPressed: {
-    opacity: 0.7,
-  },
-  registerLinkText: {
-    color: '#0052CC',
-    fontSize: 13,
+  socialBtnText: {
+    color: '#111827',
+    fontSize: 14.5,
     fontWeight: '600',
     fontFamily: 'Inter_600SemiBold',
+  },
+  footerWrap: {
+    alignItems: 'center',
+    marginTop: 26,
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+  },
+  footerLink: {
+    color: '#4B5563',
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    textDecorationLine: 'underline',
   },
 });

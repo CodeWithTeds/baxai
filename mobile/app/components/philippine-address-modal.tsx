@@ -344,7 +344,7 @@ export default function PhilippineAddressModal({
             >
               {/* Badge info */}
               <View style={styles.infoBanner}>
-                <Ionicons name="location-outline" size={18} color="#0D9488" />
+                <Ionicons name="location-outline" size={18} color="#4B5563" />
                 <Text style={styles.infoBannerText}>
                   Philippine Standard Geographic Code (PSGC) verified address is required for checkout.
                 </Text>
@@ -737,16 +737,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#F0FDFA',
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#CCFBF1',
+    borderColor: '#E5E7EB',
     borderRadius: 12,
     padding: 12,
   },
   infoBannerText: {
     flex: 1,
     fontSize: 12,
-    color: '#0F766E',
+    color: '#4B5563',
     lineHeight: 17,
   },
   sectionHeading: {

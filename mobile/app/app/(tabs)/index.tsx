@@ -115,7 +115,7 @@ export default function HomeScreen() {
           image: getProductImage(p),
           price: p.base_price ? `₱${p.base_price}` : '₱9.99',
           badge: p.badge || (is3D ? '3D Interactive' : 'Bestseller'),
-          badgeColor: p.badge ? BrandColors.primary : '#7C3AED',
+          badgeColor: BrandColors.primary,
           name: p.name,
           rating: '4.9',
           reviews: '180',
@@ -136,7 +136,7 @@ export default function HomeScreen() {
           image: getProductImage({ name: pi.name, category: pi.category?.name }),
           price: pi.base_price ? `₱${pi.base_price}` : '₱3.50',
           badge: pi.category?.name || 'Print Item',
-          badgeColor: '#D97706',
+          badgeColor: '#4B5563',
           name: pi.name,
           rating: '4.8',
           reviews: '95',
@@ -168,7 +168,7 @@ export default function HomeScreen() {
             image: require('@/assets/images/custom-thirts.jpg'),
             price: '₱15.00',
             badge: t.fastTurnaround,
-            badgeColor: '#F53003',
+            badgeColor: '#4B5563',
             name: t.prodTshirt,
             rating: '4.9',
             reviews: '120',
@@ -196,46 +196,31 @@ export default function HomeScreen() {
     {
       id: 'mugs',
       label: t.catMugs,
-      icon: 'cafe' as const,
-      color: '#0284C7',
-      bg: '#E0F2FE',
-      borderColor: '#0284C7',
+      icon: 'cafe-outline' as const,
       is3D: true,
     },
     {
       id: 'pins',
       label: t.catPins,
-      icon: 'pricetag' as const,
-      color: '#7C3AED',
-      bg: '#F5F3FF',
-      borderColor: '#7C3AED',
+      icon: 'pricetag-outline' as const,
       is3D: true,
     },
     {
       id: 'apparel',
       label: t.prodTshirt || 'T-Shirts',
-      icon: 'shirt' as const,
-      color: '#2563EB',
-      bg: '#EFF6FF',
-      borderColor: '#2563EB',
+      icon: 'shirt-outline' as const,
       is3D: true,
     },
     {
       id: 'calendars',
       label: t.catCalendars,
-      icon: 'calendar' as const,
-      color: '#DC2626',
-      bg: '#FEF2F2',
-      borderColor: '#DC2626',
+      icon: 'calendar-outline' as const,
       is3D: false,
     },
     {
       id: 'totes',
       label: t.catTotes,
-      icon: 'bag' as const,
-      color: '#059669',
-      bg: '#ECFDF5',
-      borderColor: '#059669',
+      icon: 'bag-outline' as const,
       is3D: false,
     },
   ];
@@ -245,19 +230,13 @@ export default function HomeScreen() {
       id: 'stickers',
       label: t.catStickers,
       sublabel: 'Custom',
-      icon: 'layers' as const,
-      color: '#D97706',
-      bg: '#FEF3C7',
-      borderColor: '#D97706',
+      icon: 'layers-outline' as const,
     },
     {
       id: 'printing',
       label: t.catPrinting,
       sublabel: 'General',
-      icon: 'print' as const,
-      color: '#9333EA',
-      bg: '#FAF5FF',
-      borderColor: '#9333EA',
+      icon: 'print-outline' as const,
     },
   ];
 
@@ -387,18 +366,10 @@ export default function HomeScreen() {
                 key={cat.id}
                 onPress={() => handleCategoryPress(cat.id)}
                 style={({ pressed }) => [styles.catItem, pressed && styles.catItemPressed]}>
-                <View
-                  style={[
-                    styles.catIconBox,
-                    {
-                      backgroundColor: cat.bg,
-                      borderColor: cat.borderColor,
-                      borderWidth: 1.5,
-                    },
-                  ]}>
-                  <Ionicons name={cat.icon} size={28} color={cat.color} />
+                <View style={styles.catIconBox}>
+                  <Ionicons name={cat.icon} size={26} color="#1F2937" />
                   {cat.is3D && (
-                    <View style={[styles.cat3DBadge, { backgroundColor: cat.color }]}>
+                    <View style={styles.cat3DBadge}>
                       <Text style={styles.cat3DText}>3D</Text>
                     </View>
                   )}
@@ -422,10 +393,10 @@ export default function HomeScreen() {
                 style={({ pressed }) => [styles.wideCatItem, pressed && styles.wideCatItemPressed]}>
                 <View style={styles.wideCatTextGroup}>
                   <Text style={styles.wideCatSublabel}>{cat.sublabel}</Text>
-                  <Text style={[styles.wideCatLabel, { color: cat.color }]}>{cat.label}</Text>
+                  <Text style={styles.wideCatLabel}>{cat.label}</Text>
                 </View>
-                <View style={[styles.wideCatIconBox, { backgroundColor: cat.bg, borderColor: cat.borderColor }]}>
-                  <Ionicons name={cat.icon} size={22} color={cat.color} />
+                <View style={styles.wideCatIconBox}>
+                  <Ionicons name={cat.icon} size={20} color="#1F2937" />
                 </View>
               </Pressable>
             ))}
@@ -644,6 +615,8 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 16,
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 6,
@@ -651,16 +624,16 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOpacity: 0.05,
+        shadowOpacity: 0.04,
         shadowRadius: 6,
         shadowOffset: { width: 0, height: 2 },
       },
-      android: { elevation: 2 },
+      android: { elevation: 1 },
     }),
   },
   catIconBox3D: {
-    borderWidth: 1.5,
-    borderColor: BrandColors.primary,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
   },
   cat3DBadge: {
     position: 'absolute',
@@ -668,8 +641,8 @@ const styles = StyleSheet.create({
     right: -4,
     backgroundColor: BrandColors.primary,
     paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 8,
+    paddingVertical: 1.5,
+    borderRadius: 6,
   },
   cat3DText: {
     color: '#FFFFFF',
@@ -693,6 +666,8 @@ const styles = StyleSheet.create({
   wideCatItem: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     padding: 14,
     borderRadius: 14,
     flexDirection: 'row',
@@ -701,11 +676,11 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.03,
+        shadowRadius: 5,
+        shadowOffset: { width: 0, height: 1 },
       },
-      android: { elevation: 2 },
+      android: { elevation: 1 },
     }),
   },
   wideCatItemPressed: {
@@ -727,10 +702,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Manrope_700Bold',
   },
   wideCatIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1.5,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -745,19 +722,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
       },
-      android: { elevation: 3 },
+      android: { elevation: 2 },
     }),
   },
   featuredCard3D: {
-    borderWidth: 1.5,
-    borderColor: BrandColors.primary,
+    borderColor: '#D1D5DB',
   },
   featuredCardPressed: {
     opacity: 0.85,

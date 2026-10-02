@@ -4,15 +4,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
+import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { BrandColors } from '@/constants/theme';
+import { LegalModal, LegalTab } from '@/components/legal-modal';
 import { useLanguage } from '@/contexts/language-context';
 
 export default function WelcomeScreen() {
   const { t } = useLanguage();
+  const [legalModalVisible, setLegalModalVisible] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<LegalTab>('terms');
 
   const triggerHaptic = async () => {
     if (Platform.OS !== 'web') {
@@ -30,6 +34,12 @@ export default function WelcomeScreen() {
   const handleLogin = async () => {
     await triggerHaptic();
     router.push('/login');
+  };
+
+  const handleOpenLegal = async (tab: LegalTab) => {
+    await triggerHaptic();
+    setLegalModalTab(tab);
+    setLegalModalVisible(true);
   };
 
   return (
@@ -109,9 +119,19 @@ export default function WelcomeScreen() {
             <Animated.View entering={FadeInDown.delay(400).duration(400)}>
               <Text style={styles.termsText}>
                 {t.termsPrefix}
-                <Text style={styles.termsLink}>{t.termsOfService}</Text>
+                <Text
+                  onPress={() => handleOpenLegal('terms')}
+                  suppressHighlighting={false}
+                  style={styles.termsLink}>
+                  {t.termsOfService}
+                </Text>
                 {t.termsMiddle}
-                <Text style={styles.termsLink}>{t.privacyPolicy}</Text>
+                <Text
+                  onPress={() => handleOpenLegal('privacy')}
+                  suppressHighlighting={false}
+                  style={styles.termsLink}>
+                  {t.privacyPolicy}
+                </Text>
               </Text>
             </Animated.View>
           </View>
@@ -120,6 +140,13 @@ export default function WelcomeScreen() {
           <SafeAreaView edges={['bottom']} />
         </Animated.View>
       </View>
+
+      {/* Interactive Legal Modal */}
+      <LegalModal
+        visible={legalModalVisible}
+        initialTab={legalModalTab}
+        onClose={() => setLegalModalVisible(false)}
+      />
     </View>
   );
 }

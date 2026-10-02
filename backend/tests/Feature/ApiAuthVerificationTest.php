@@ -22,12 +22,11 @@ class ApiAuthVerificationTest extends TestCase
         $response->assertStatus(422)
             ->assertJsonPath('status', 'error')
             ->assertJsonStructure([
-                'data' => ['name', 'username', 'email', 'password'],
+                'data' => ['username', 'email', 'password'],
             ]);
 
         // Password confirmation mismatch & short password & short username
         $response = $this->postJson('/api/v1/register', [
-            'name' => 'A',
             'username' => 'ab',
             'email' => 'invalid-email',
             'password' => '123',
@@ -36,8 +35,34 @@ class ApiAuthVerificationTest extends TestCase
         $response->assertStatus(422)
             ->assertJsonPath('status', 'error')
             ->assertJsonStructure([
-                'data' => ['name', 'username', 'email', 'password'],
+                'data' => ['username', 'email', 'password'],
             ]);
+    }
+
+    public function test_registration_without_name_defaults_to_username(): void
+    {
+        Mail::fake();
+
+        $response = $this->postJson('/api/v1/register', [
+            'username' => 'mariadelacruz',
+            'email' => 'maria@example.com',
+            'password' => 'SecretPassword123',
+            'password_confirmation' => 'SecretPassword123',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'status' => 'success',
+                'data' => [
+                    'needs_verification' => true,
+                    'email' => 'maria@example.com',
+                ],
+            ]);
+
+        $user = User::where('email', 'maria@example.com')->first();
+        $this->assertNotNull($user);
+        $this->assertEquals('mariadelacruz', $user->name);
+        $this->assertEquals('mariadelacruz', $user->username);
     }
 
     public function test_successful_registration_creates_unverified_user_and_sends_4_digit_code(): void

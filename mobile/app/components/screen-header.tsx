@@ -4,7 +4,7 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
-import { BrandColors, IconColors } from '@/constants/theme';
+import { BrandColors } from '@/constants/theme';
 import { useLanguage } from '@/contexts/language-context';
 import ProfileModal from '@/components/profile-modal';
 import { CartHeaderButton } from '@/components/cart-header-button';
@@ -80,7 +80,7 @@ export default function ScreenHeader({
       {/* ── Search bar (optional) ────────────────────────────── */}
       {!hideSearch && (
         <Animated.View entering={FadeIn.duration(400)} style={styles.searchWrap}>
-          <Ionicons name="search" size={18} color={IconColors.search} style={styles.searchIcon} />
+          <Ionicons name="search" size={18} color="#9CA3AF" style={styles.searchIcon} />
           <TextInput
             placeholder={effectivePlaceholder}
             placeholderTextColor="#9CA3AF"
@@ -90,7 +90,7 @@ export default function ScreenHeader({
             onChangeText={onSearchChange}
           />
           <Pressable hitSlop={8} style={styles.filterBtn} onPress={onFilterPress}>
-            <Ionicons name="options" size={20} color={IconColors.home} />
+            <Ionicons name="options-outline" size={20} color="#4B5563" />
           </Pressable>
         </Animated.View>
       )}

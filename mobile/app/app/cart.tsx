@@ -242,8 +242,8 @@ export default function CartScreen() {
       {/* ── Main Content ──────────────────────────────────────── */}
       {items.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <View style={[styles.emptyIconCircle, { backgroundColor: IconColors.cartBg }]}>
-            <Ionicons name="cart" size={54} color={IconColors.cart} />
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name="cart-outline" size={48} color="#9CA3AF" />
           </View>
           <Text style={styles.emptyTitle}>Your cart is empty</Text>
           <Text style={styles.emptySubtitle}>
@@ -251,9 +251,9 @@ export default function CartScreen() {
           </Text>
           <Pressable
             onPress={() => router.replace('/(tabs)/services')}
-            style={({ pressed }) => [styles.browseBtn, { backgroundColor: IconColors.home }, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.browseBtn, { backgroundColor: BrandColors.primary }, pressed && { opacity: 0.85 }]}
           >
-            <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+            <Ionicons name="sparkles-outline" size={18} color="#FFFFFF" />
             <Text style={styles.browseBtnText}>Browse Products</Text>
           </Pressable>
         </View>
@@ -344,7 +344,9 @@ export default function CartScreen() {
           ) : (
             <View style={styles.addressRequiredCard}>
               <View style={styles.addressRequiredHeader}>
-                <Ionicons name="alert-circle" size={24} color="#D97706" />
+                <View style={styles.addressRequiredIconBox}>
+                  <Ionicons name="location-outline" size={20} color="#1F2937" />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.addressRequiredTitle}>Philippine Address Required</Text>
                   <Text style={styles.addressRequiredSubtitle}>
@@ -356,7 +358,7 @@ export default function CartScreen() {
                 onPress={() => setShowAddressModal(true)}
                 style={({ pressed }) => [styles.addressAddBtn, pressed && { opacity: 0.85 }]}
               >
-                <Ionicons name="add-circle" size={16} color="#FFFFFF" />
+                <Ionicons name="add-circle-outline" size={16} color="#FFFFFF" />
                 <Text style={styles.addressAddBtnText}>Add Philippine Address</Text>
               </Pressable>
             </View>
@@ -420,8 +422,8 @@ export default function CartScreen() {
             onPress={() => router.push('/(tabs)/services')}
             style={({ pressed }) => [styles.continueBtn, pressed && { opacity: 0.7 }]}
           >
-            <Ionicons name="add-circle" size={18} color={IconColors.home} />
-            <Text style={[styles.continueBtnText, { color: IconColors.home }]}>Add More Products</Text>
+            <Ionicons name="add-circle-outline" size={18} color={BrandColors.primary} />
+            <Text style={[styles.continueBtnText, { color: BrandColors.primary }]}>Add More Products</Text>
           </Pressable>
         </ScrollView>
       )}
@@ -905,23 +907,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#FFFFFF',
     padding: 14,
     borderRadius: 14,
     marginVertical: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#BFDBFE',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   perkIconWrap: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  perkTitle: { fontSize: 13, fontWeight: '700', color: '#1E40AF', fontFamily: 'Manrope_700Bold' },
-  perkDesc: { fontSize: 11, color: '#1E3A8A', lineHeight: 16, marginTop: 2, fontFamily: 'Inter_400Regular' },
+  perkTitle: { fontSize: 13, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold' },
+  perkDesc: { fontSize: 11, color: '#6B7280', lineHeight: 16, marginTop: 2, fontFamily: 'Inter_400Regular' },
 
   // Summary card
   summaryCard: {
@@ -1181,28 +1183,45 @@ const styles = StyleSheet.create({
     color: BrandColors.primary,
   },
   addressRequiredCard: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#FCD34D',
-    gap: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 14,
+    marginVertical: 4,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+      android: { elevation: 2 },
+    }),
   },
   addressRequiredHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
   },
+  addressRequiredIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   addressRequiredTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#92400E',
+    color: '#111827',
+    fontFamily: 'Manrope_700Bold',
   },
   addressRequiredSubtitle: {
     fontSize: 12,
-    color: '#B45309',
+    color: '#6B7280',
     marginTop: 2,
-    lineHeight: 16,
+    lineHeight: 17,
+    fontFamily: 'Inter_400Regular',
   },
   addressAddBtn: {
     flexDirection: 'row',
@@ -1210,13 +1229,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: BrandColors.primary,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 12,
   },
   addressAddBtnText: {
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+    fontFamily: 'Manrope_700Bold',
   },
 });

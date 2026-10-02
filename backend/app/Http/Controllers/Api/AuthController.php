@@ -29,9 +29,12 @@ class AuthController extends Controller
     {
         $validated = $request->validated();
 
+        $username = trim($validated['username']);
+        $name = !empty($validated['name']) ? trim($validated['name']) : $username;
+
         $user = User::create([
-            'name' => trim($validated['name']),
-            'username' => trim($validated['username']),
+            'name' => $name,
+            'username' => $username,
             'email' => strtolower(trim($validated['email'])),
             'password' => Hash::make($validated['password']),
             'email_verified_at' => null,

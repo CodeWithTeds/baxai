@@ -95,21 +95,30 @@ function getProductImage(item: { thumbnail?: string | null; fallback_image?: str
   return require('@/assets/images/custom-mugs.jpeg');
 }
 
+export const CATEGORY_ICONS: Record<CategoryId, keyof typeof Ionicons.glyphMap> = {
+  all: 'grid-outline',
+  mugs: 'cafe-outline',
+  pins: 'pricetag-outline',
+  tshirts: 'shirt-outline',
+  stickers: 'layers-outline',
+  tote_bags: 'bag-outline',
+  calendars: 'calendar-outline',
+  printing: 'print-outline',
+};
+
 const CATEGORY_TABS: {
   id: CategoryId;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-  bg: string;
 }[] = [
-  { id: 'all', label: 'All Categories', icon: 'grid', color: '#4F46E5', bg: '#EEF2FF' },
-  { id: 'mugs', label: 'Mugs', icon: 'cafe', color: '#0284C7', bg: '#E0F2FE' },
-  { id: 'pins', label: 'Pins', icon: 'pricetag', color: '#7C3AED', bg: '#EDE9FE' },
-  { id: 'tshirts', label: 'T-Shirts', icon: 'shirt', color: '#2563EB', bg: '#EFF6FF' },
-  { id: 'stickers', label: 'Stickers', icon: 'layers', color: '#D97706', bg: '#FEF3C7' },
-  { id: 'tote_bags', label: 'Tote Bags', icon: 'bag', color: '#059669', bg: '#ECFDF5' },
-  { id: 'calendars', label: 'Calendars', icon: 'calendar', color: '#DC2626', bg: '#FEF2F2' },
-  { id: 'printing', label: 'Printing', icon: 'print', color: '#9333EA', bg: '#FAF5FF' },
+  { id: 'all', label: 'All Categories', icon: 'grid-outline' },
+  { id: 'mugs', label: 'Mugs', icon: 'cafe-outline' },
+  { id: 'pins', label: 'Pins', icon: 'pricetag-outline' },
+  { id: 'tshirts', label: 'T-Shirts', icon: 'shirt-outline' },
+  { id: 'stickers', label: 'Stickers', icon: 'layers-outline' },
+  { id: 'tote_bags', label: 'Tote Bags', icon: 'bag-outline' },
+  { id: 'calendars', label: 'Calendars', icon: 'calendar-outline' },
+  { id: 'printing', label: 'Printing', icon: 'print-outline' },
 ];
 
 const CUSTOMIZABLE_CATEGORY_CARDS: CategoryCardItem[] = [
@@ -127,7 +136,7 @@ const CUSTOMIZABLE_CATEGORY_CARDS: CategoryCardItem[] = [
     description: 'Custom button pins in multiple shapes & sizes',
     image: require('@/assets/images/button-pins.jpg'),
     badge: 'Customizable',
-    badgeColor: '#7C3AED',
+    badgeColor: '#0052CC',
   },
   {
     id: 'tshirts',
@@ -135,7 +144,7 @@ const CUSTOMIZABLE_CATEGORY_CARDS: CategoryCardItem[] = [
     description: 'Custom printed cotton t-shirts & apparel',
     image: require('@/assets/images/custom-thirts.jpg'),
     badge: 'Customizable',
-    badgeColor: '#2563EB',
+    badgeColor: '#0052CC',
   },
   {
     id: 'stickers',
@@ -143,7 +152,7 @@ const CUSTOMIZABLE_CATEGORY_CARDS: CategoryCardItem[] = [
     description: 'Waterproof die-cut vinyl stickers & decals',
     image: require('@/assets/images/custom-stickers.jpg'),
     badge: 'Customizable',
-    badgeColor: '#D97706',
+    badgeColor: '#0052CC',
   },
   {
     id: 'tote_bags',
@@ -151,7 +160,7 @@ const CUSTOMIZABLE_CATEGORY_CARDS: CategoryCardItem[] = [
     description: 'Heavy canvas tote bags with custom prints',
     image: require('@/assets/images/tote-bags.jpg'),
     badge: 'Customizable',
-    badgeColor: '#059669',
+    badgeColor: '#0052CC',
   },
   {
     id: 'calendars',
@@ -159,7 +168,7 @@ const CUSTOMIZABLE_CATEGORY_CARDS: CategoryCardItem[] = [
     description: 'Personalized desk & wall calendars',
     image: require('@/assets/images/calendars.jpg'),
     badge: 'Customizable',
-    badgeColor: '#DC2626',
+    badgeColor: '#0052CC',
   },
   {
     id: 'printing',
@@ -167,13 +176,14 @@ const CUSTOMIZABLE_CATEGORY_CARDS: CategoryCardItem[] = [
     description: 'General print services & custom promotional items',
     image: require('@/assets/images/custom-mugs.jpeg'),
     badge: 'Customizable',
-    badgeColor: '#4B5563',
+    badgeColor: '#0052CC',
   },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function GridCategoryCard({ item, onPress }: { item: CategoryCardItem; onPress?: () => void }) {
+  const iconName = CATEGORY_ICONS[item.id] || 'grid-outline';
   return (
     <Pressable
       onPress={onPress}
@@ -185,6 +195,9 @@ function GridCategoryCard({ item, onPress }: { item: CategoryCardItem; onPress?:
           style={styles.gridImg}
           contentFit="cover"
         />
+        <View style={styles.catCardIconBadge}>
+          <Ionicons name={iconName} size={15} color="#1F2937" />
+        </View>
         <View style={[styles.badge, { backgroundColor: item.badgeColor }]}>
           <Text style={styles.badgeText}>{item.badge}</Text>
         </View>
@@ -455,12 +468,12 @@ export default function ServicesScreen() {
                 ]}>
                 <View style={[
                   styles.catChipIconWrap,
-                  { backgroundColor: isSelected ? 'rgba(255,255,255,0.22)' : tab.bg }
+                  isSelected ? styles.catChipIconWrapActive : styles.catChipIconWrapInactive,
                 ]}>
                   <Ionicons
                     name={tab.icon}
-                    size={12}
-                    color={isSelected ? '#FFFFFF' : tab.color}
+                    size={13}
+                    color={isSelected ? '#FFFFFF' : '#374151'}
                   />
                 </View>
                 <Text style={[styles.catChipText, isSelected && styles.catChipTextActive]}>
@@ -505,9 +518,16 @@ export default function ServicesScreen() {
               /* ── MODE 2: Show Products inside the selected Category ── */
               <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.gridSection}>
                 <View style={styles.categoryHeaderBanner}>
-                  <Text style={styles.categoryBannerTitle}>
-                    {CATEGORY_TABS.find((t) => t.id === selectedCategory)?.label || 'Products'}
-                  </Text>
+                  <View style={styles.categoryBannerTitleGroup}>
+                    <Ionicons
+                      name={CATEGORY_ICONS[selectedCategory] || 'grid-outline'}
+                      size={18}
+                      color="#1F2937"
+                    />
+                    <Text style={styles.categoryBannerTitle}>
+                      {CATEGORY_TABS.find((t) => t.id === selectedCategory)?.label || 'Products'}
+                    </Text>
+                  </View>
                   <Pressable
                     onPress={() => { setSelectedCategory('all'); setQuery(''); }}
                     style={styles.backToCatBtn}>
@@ -679,9 +699,9 @@ const styles = StyleSheet.create({
   catChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E5E7EB',
@@ -698,9 +718,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 6,
   },
+  catChipIconWrapInactive: {
+    backgroundColor: '#F3F4F6',
+  },
+  catChipIconWrapActive: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
   catChipText: {
     fontSize: 13,
-    color: '#4B5563',
+    color: '#374151',
     fontWeight: '600',
     fontFamily: 'Manrope_600SemiBold',
   },
@@ -725,6 +751,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  categoryBannerTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   categoryBannerTitle: {
     fontSize: 16,
@@ -774,7 +805,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     ...CARD_SHADOW,
+  },
+  catCardIconBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#FFFFFF',
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 1 },
+      },
+      android: { elevation: 2 },
+    }),
   },
   gridImgWrap: {
     height: 130,
@@ -804,8 +859,8 @@ const styles = StyleSheet.create({
 
   // ── Shared card pieces ─────────────────────────────────────
   card3D: {
-    borderWidth: 1.5,
-    borderColor: BrandColors.primary,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
   },
   cardPressed: {
     opacity: 0.85,
