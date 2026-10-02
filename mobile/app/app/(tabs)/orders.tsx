@@ -134,9 +134,9 @@ function OrderCard({
               <Text style={styles.orderNumber}>#{orderNum}</Text>
               <Ionicons
                 name={copied ? 'checkmark-circle' : 'copy-outline'}
-                size={13}
+                size={12}
                 color={copied ? IconColors.success : IconColors.copy}
-                style={{ marginLeft: 5 }}
+                style={{ marginLeft: 4 }}
               />
               {copied && <Text style={[styles.orderCopiedText, { color: IconColors.success }]}>Copied!</Text>}
             </Pressable>
@@ -155,20 +155,20 @@ function OrderCard({
               <ExpoImage source={{ uri: previewImage }} style={styles.productImg} contentFit="cover" />
             ) : (
               <View style={[styles.imgFallback, { backgroundColor: IconColors.ordersBg }]}>
-                <Ionicons name="cube" size={26} color={IconColors.orders} />
+                <Ionicons name="cube" size={20} color={IconColors.orders} />
               </View>
             )}
           </View>
 
           <View style={styles.productInfo}>
-            <Text style={styles.productName} numberOfLines={2}>{productName}</Text>
+            <Text style={styles.productName} numberOfLines={1}>{productName}</Text>
             <Text style={styles.productSub}>
               {lineItems.length > 1 ? `${lineItems.length} items` : `Qty: ${totalQty}`}
             </Text>
             <Text style={styles.totalText}>{totalDisplay}</Text>
           </View>
 
-          <Ionicons name="chevron-forward" size={18} color={IconColors.orders} />
+          <Ionicons name="chevron-forward" size={15} color="#CBD5E1" />
         </View>
 
         {/* ── Order Badges (Courier, Discount, Proof) ──────── */}
@@ -176,7 +176,7 @@ function OrderCard({
           <View style={styles.cardBadgesRow}>
             {courierName && (
               <View style={styles.courierChip}>
-                <Ionicons name="airplane" size={10} color={BrandColors.primary} />
+                <Ionicons name="airplane" size={9} color={BrandColors.primary} />
                 <Text style={styles.courierChipText} numberOfLines={1}>
                   {courierName}{trackingNum ? ` • ${trackingNum}` : ''}
                 </Text>
@@ -184,13 +184,13 @@ function OrderCard({
             )}
             {hasDiscount ? (
               <View style={styles.discountChip}>
-                <Ionicons name="pricetag" size={10} color="#059669" />
+                <Ionicons name="pricetag" size={9} color="#059669" />
                 <Text style={styles.discountChipText}>Discount Applied</Text>
               </View>
             ) : null}
             {hasProof && (
               <View style={styles.proofChip}>
-                <Ionicons name="sparkles" size={10} color="#7C3AED" />
+                <Ionicons name="sparkles" size={9} color="#7C3AED" />
                 <Text style={styles.proofChipText}>Proof Attached</Text>
               </View>
             )}
@@ -204,7 +204,7 @@ function OrderCard({
             hitSlop={8}
             style={({ pressed }) => [styles.footerBtn, styles.footerBtnDetails, pressed && { opacity: 0.7 }]}
           >
-            <Ionicons name="document-text-outline" size={13} color="#475569" />
+            <Ionicons name="document-text-outline" size={12} color="#475569" />
             <Text style={styles.footerBtnDetailsText}>Details</Text>
           </Pressable>
 
@@ -216,7 +216,7 @@ function OrderCard({
                 onPress={handleTrackPress}
                 style={({ pressed }) => [styles.footerBtn, styles.footerBtnTrackLive, pressed && { opacity: 0.85 }]}
               >
-                <Ionicons name="airplane" size={13} color="#38BDF8" />
+                <Ionicons name="airplane" size={12} color="#38BDF8" />
                 <Text style={styles.footerBtnTrackLiveText}>Live Track</Text>
                 <View style={styles.liveTrackBeaconDot} />
               </Pressable>
@@ -227,7 +227,7 @@ function OrderCard({
                 onPress={() => onCancelPress?.(item)}
                 style={({ pressed }) => [styles.footerBtn, styles.footerBtnCancelModern, pressed && { opacity: 0.75 }]}
               >
-                <Ionicons name="close-circle-outline" size={13} color="#E11D48" />
+                <Ionicons name="close-circle-outline" size={12} color="#E11D48" />
                 <Text style={styles.footerBtnCancelModernText}>Cancel</Text>
               </Pressable>
             </>
@@ -240,7 +240,7 @@ function OrderCard({
               style={({ pressed }) => [styles.footerBtn, styles.footerBtnGray, pressed && { opacity: 0.7 }]}
             >
               <View style={[styles.btnIconBadge, { backgroundColor: IconColors.servicesBg }]}>
-                <Ionicons name="repeat" size={12} color={IconColors.services} />
+                <Ionicons name="repeat" size={11} color={IconColors.services} />
               </View>
               <Text style={[styles.footerBtnText, { color: IconColors.services }]}>Reorder</Text>
             </Pressable>
@@ -477,8 +477,8 @@ export default function OrdersScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const SHADOW = Platform.select({
-  ios:     { shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
-  android: { elevation: 3 },
+  ios:     { shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  android: { elevation: 2 },
 });
 
 const styles = StyleSheet.create({
@@ -487,55 +487,55 @@ const styles = StyleSheet.create({
   // Tab toggle
   toggleContainer: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 4,
+    paddingHorizontal: 14,
+    paddingBottom: 8,
+    paddingTop: 2,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 3 } },
-      android: { elevation: 3 },
+      ios: { shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 3, shadowOffset: { width: 0, height: 2 } },
+      android: { elevation: 2 },
     }),
   },
   toggleWrap: {
     flexDirection: 'row',
     backgroundColor: '#F3F4F6',
-    borderRadius: 14,
-    padding: 4,
+    borderRadius: 12,
+    padding: 3,
   },
   toggleTab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 11,
-    gap: 6,
+    paddingVertical: 7,
+    borderRadius: 9,
+    gap: 5,
   },
   toggleTabActive: {
     backgroundColor: '#FFFFFF',
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+      ios: { shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
       android: { elevation: 2 },
     }),
   },
-  toggleText: { fontSize: 13, fontWeight: '600', color: '#9CA3AF', fontFamily: 'Inter_600SemiBold' },
+  toggleText: { fontSize: 12, fontWeight: '600', color: '#9CA3AF', fontFamily: 'Inter_600SemiBold' },
   toggleTextActive: { color: '#111827' },
   toggleBadge: {
     backgroundColor: '#E5E7EB',
-    borderRadius: 10,
-    paddingHorizontal: 7,
+    borderRadius: 8,
+    paddingHorizontal: 6,
     paddingVertical: 1,
   },
   toggleBadgeActive: { backgroundColor: BrandColors.primary },
-  toggleBadgeText: { fontSize: 11, fontWeight: '700', color: '#6B7280', fontFamily: 'Manrope_700Bold' },
+  toggleBadgeText: { fontSize: 10, fontWeight: '700', color: '#6B7280', fontFamily: 'Manrope_700Bold' },
   toggleBadgeTextActive: { color: '#FFFFFF' },
 
-  scroll: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 24 },
+  scroll: { paddingTop: 10, paddingHorizontal: 12, paddingBottom: 20 },
 
   // Card
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    marginBottom: 14,
+    borderRadius: 14,
+    marginBottom: 10,
     overflow: 'hidden',
     ...SHADOW,
   },
@@ -545,48 +545,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 13,
+    paddingTop: 10,
+    paddingBottom: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#F3F4F6',
   },
-  orderNumber: { fontSize: 17, fontWeight: '800', color: '#111827', fontFamily: 'Manrope_700Bold' },
+  orderNumber: { fontSize: 14, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold' },
   orderNumCopyRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   orderCopiedText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: '#059669',
     marginLeft: 4,
     fontFamily: 'Manrope_700Bold',
   },
-  orderDate:   { fontSize: 12, color: '#9CA3AF', fontFamily: 'Inter_400Regular', marginTop: 2 },
+  orderDate:   { fontSize: 11, color: '#9CA3AF', fontFamily: 'Inter_400Regular', marginTop: 1 },
 
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
-  pillDot: { width: 6, height: 6, borderRadius: 3 },
-  pillText: { fontSize: 12, fontWeight: '700', fontFamily: 'Manrope_700Bold' },
+  pillDot: { width: 5, height: 5, borderRadius: 2.5 },
+  pillText: { fontSize: 11, fontWeight: '700', fontFamily: 'Manrope_700Bold' },
 
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 14,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    gap: 10,
   },
   imgWrap: {
-    width: 76,
-    height: 76,
-    borderRadius: 14,
+    width: 52,
+    height: 52,
+    borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#F9FAFB',
     flexShrink: 0,
@@ -595,32 +595,32 @@ const styles = StyleSheet.create({
   },
   productImg:    { width: '100%', height: '100%' },
   imgFallback:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  productInfo:   { flex: 1, gap: 4 },
-  productName:   { fontSize: 14, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold', lineHeight: 20 },
-  productSub:    { fontSize: 12, color: '#9CA3AF', fontFamily: 'Inter_400Regular' },
-  totalText:     { fontSize: 19, fontWeight: '900', color: BrandColors.primary, fontFamily: 'Manrope_700Bold' },
+  productInfo:   { flex: 1, gap: 2 },
+  productName:   { fontSize: 13, fontWeight: '700', color: '#111827', fontFamily: 'Manrope_700Bold', lineHeight: 17 },
+  productSub:    { fontSize: 11, color: '#9CA3AF', fontFamily: 'Inter_400Regular' },
+  totalText:     { fontSize: 14, fontWeight: '800', color: BrandColors.primary, fontFamily: 'Manrope_700Bold' },
 
   cardBadgesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingBottom: 10,
+    gap: 5,
+    paddingHorizontal: 13,
+    paddingBottom: 6,
   },
   courierChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#EFF6FF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#BFDBFE',
     maxWidth: '100%',
   },
   courierChipText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
     color: BrandColors.primary,
     fontFamily: 'Inter_600SemiBold',
@@ -628,16 +628,16 @@ const styles = StyleSheet.create({
   discountChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#A7F3D0',
   },
   discountChipText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
     color: '#059669',
     fontFamily: 'Inter_600SemiBold',
@@ -645,16 +645,16 @@ const styles = StyleSheet.create({
   proofChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#F5F3FF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#DDD6FE',
   },
   proofChipText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
     color: '#7C3AED',
     fontFamily: 'Inter_600SemiBold',
@@ -662,31 +662,31 @@ const styles = StyleSheet.create({
 
   cardFooter: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    paddingTop: 2,
+    gap: 6,
+    paddingHorizontal: 13,
+    paddingBottom: 9,
+    paddingTop: 5,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#F3F4F6',
   },
   footerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     backgroundColor: '#EFF6FF',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
+    borderRadius: 8,
   },
   footerBtnGray: { backgroundColor: '#F3F4F6' },
-  footerBtnText: { fontSize: 12, fontWeight: '600', color: BrandColors.primary, fontFamily: 'Inter_600SemiBold' },
+  footerBtnText: { fontSize: 11, fontWeight: '600', color: BrandColors.primary, fontFamily: 'Inter_600SemiBold' },
   footerBtnDetails: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   footerBtnDetailsText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#475569',
     fontFamily: 'Inter_600SemiBold',
@@ -695,15 +695,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
   },
   footerBtnTrackLiveText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
     fontFamily: 'Manrope_700Bold',
   },
   liveTrackBeaconDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: '#10B981',
     marginLeft: 2,
   },
@@ -713,16 +713,16 @@ const styles = StyleSheet.create({
     borderColor: '#FECDD3',
   },
   footerBtnCancelModernText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#E11D48',
     fontFamily: 'Inter_600SemiBold',
   },
 
   btnIconBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 2,
