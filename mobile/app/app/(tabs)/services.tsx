@@ -110,11 +110,12 @@ const CATEGORY_TABS: {
   id: CategoryId;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
+  is3D?: boolean;
 }[] = [
-  { id: 'all', label: 'All Categories', icon: 'grid-outline' },
-  { id: 'mugs', label: 'Mugs', icon: 'cafe-outline' },
-  { id: 'pins', label: 'Pins', icon: 'pricetag-outline' },
-  { id: 'tshirts', label: 'T-Shirts', icon: 'shirt-outline' },
+  { id: 'all', label: 'All', icon: 'grid-outline' },
+  { id: 'mugs', label: 'Mugs', icon: 'cafe-outline', is3D: true },
+  { id: 'pins', label: 'Pins', icon: 'pricetag-outline', is3D: true },
+  { id: 'tshirts', label: 'T-Shirts', icon: 'shirt-outline', is3D: true },
   { id: 'stickers', label: 'Stickers', icon: 'layers-outline' },
   { id: 'tote_bags', label: 'Tote Bags', icon: 'bag-outline' },
   { id: 'calendars', label: 'Calendars', icon: 'calendar-outline' },
@@ -462,21 +463,31 @@ export default function ServicesScreen() {
                 key={tab.id}
                 onPress={() => setSelectedCategory(tab.id)}
                 style={({ pressed }) => [
-                  styles.catChip,
-                  isSelected && styles.catChipActive,
-                  pressed && { opacity: 0.8 },
+                  styles.catItem,
+                  pressed && styles.catItemPressed,
                 ]}>
-                <View style={[
-                  styles.catChipIconWrap,
-                  isSelected ? styles.catChipIconWrapActive : styles.catChipIconWrapInactive,
-                ]}>
+                <View
+                  style={[
+                    styles.catIconBox,
+                    isSelected && styles.catIconBoxActive,
+                  ]}>
                   <Ionicons
                     name={tab.icon}
-                    size={13}
-                    color={isSelected ? '#FFFFFF' : '#374151'}
+                    size={18}
+                    color={isSelected ? BrandColors.primary : '#1F2937'}
                   />
+                  {tab.is3D && (
+                    <View style={styles.cat3DBadge}>
+                      <Text style={styles.cat3DText}>3D</Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={[styles.catChipText, isSelected && styles.catChipTextActive]}>
+                <Text
+                  style={[
+                    styles.catLabel,
+                    isSelected && styles.catLabelActive,
+                  ]}
+                  numberOfLines={1}>
                   {tab.label}
                 </Text>
               </Pressable>
@@ -496,65 +507,51 @@ export default function ServicesScreen() {
         {loading ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color={BrandColors.primary} />
-            <Text style={styles.loadingText}>Fetching customizable categories & products...</Text>
+            <Text style={styles.loadingText}>Fetching customizable products...</Text>
           </View>
         ) : (
-          <>
-            {/* ── MODE 1: Show Categories when 'all' selected and query is empty ── */}
-            {selectedCategory === 'all' && query.length === 0 ? (
-              <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.gridSection}>
-                <Text style={styles.sectionHeaderTitle}>Customizable Categories</Text>
-                <View style={styles.gridRow}>
-                  {CUSTOMIZABLE_CATEGORY_CARDS.map((cat) => (
-                    <GridCategoryCard
-                      key={cat.id}
-                      item={cat}
-                      onPress={() => setSelectedCategory(cat.id)}
-                    />
-                  ))}
-                </View>
-              </Animated.View>
-            ) : (
-              /* ── MODE 2: Show Products inside the selected Category ── */
-              <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.gridSection}>
-                <View style={styles.categoryHeaderBanner}>
-                  <View style={styles.categoryBannerTitleGroup}>
-                    <Ionicons
-                      name={CATEGORY_ICONS[selectedCategory] || 'grid-outline'}
-                      size={18}
-                      color="#1F2937"
-                    />
-                    <Text style={styles.categoryBannerTitle}>
-                      {CATEGORY_TABS.find((t) => t.id === selectedCategory)?.label || 'Products'}
-                    </Text>
-                  </View>
-                  <Pressable
-                    onPress={() => { setSelectedCategory('all'); setQuery(''); }}
-                    style={styles.backToCatBtn}>
-                    <Text style={styles.backToCatText}>View All Categories</Text>
-                  </Pressable>
-                </View>
+          <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.gridSection}>
+            <View style={styles.categoryHeaderBanner}>
+              <View style={styles.categoryBannerTitleGroup}>
+                <Ionicons
+                  name={CATEGORY_ICONS[selectedCategory] || 'grid-outline'}
+                  size={16}
+                  color={BrandColors.primary}
+                />
+                <Text style={styles.categoryBannerTitle}>
+                  {CATEGORY_TABS.find((t) => t.id === selectedCategory)?.label || 'All Products'}
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: '#6B7280' }}>
+                    {' '}({filteredServices.length})
+                  </Text>
+                </Text>
+              </View>
+              {selectedCategory !== 'all' && (
+                <Pressable
+                  onPress={() => { setSelectedCategory('all'); setQuery(''); }}
+                  style={styles.backToCatBtn}>
+                  <Text style={styles.backToCatText}>Show All</Text>
+                </Pressable>
+              )}
+            </View>
 
-                {filteredServices.length > 0 ? (
-                  <View style={styles.gridRow}>
-                    {filteredServices.map((item) => (
-                      <GridServiceCard key={item.id} item={item} onPress={() => handlePress(item)} />
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.emptyWrap}>
-                    <Ionicons name="search-outline" size={40} color="#D1D5DB" />
-                    <Text style={styles.emptyText}>
-                      No customizable products found in this category.
-                    </Text>
-                    <Pressable style={styles.resetFilterBtn} onPress={() => { setSelectedCategory('all'); setQuery(''); }}>
-                      <Text style={styles.resetFilterText}>View All Categories</Text>
-                    </Pressable>
-                  </View>
-                )}
-              </Animated.View>
+            {filteredServices.length > 0 ? (
+              <View style={styles.gridRow}>
+                {filteredServices.map((item) => (
+                  <GridServiceCard key={item.id} item={item} onPress={() => handlePress(item)} />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyWrap}>
+                <Ionicons name="search-outline" size={40} color="#D1D5DB" />
+                <Text style={styles.emptyText}>
+                  No customizable products found in this category.
+                </Text>
+                <Pressable style={styles.resetFilterBtn} onPress={() => { setSelectedCategory('all'); setQuery(''); }}>
+                  <Text style={styles.resetFilterText}>View All Products</Text>
+                </Pressable>
+              </View>
             )}
-          </>
+          </Animated.View>
         )}
 
         <View style={styles.bottomSpacer} />
@@ -690,48 +687,68 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   catBarScroll: {
     paddingHorizontal: 16,
     gap: 8,
   },
-  catChip: {
-    flexDirection: 'row',
+  catItem: {
     alignItems: 'center',
+    width: 58,
+  },
+  catItemPressed: {
+    opacity: 0.75,
+  },
+  catIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 13,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E5E7EB',
-  },
-  catChipActive: {
-    backgroundColor: BrandColors.primary,
-    borderColor: BrandColors.primary,
-  },
-  catChipIconWrap: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 6,
+    alignItems: 'center',
+    marginBottom: 3,
+    position: 'relative',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.04,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 1 },
+      },
+      android: { elevation: 1 },
+    }),
   },
-  catChipIconWrapInactive: {
-    backgroundColor: '#F3F4F6',
+  catIconBoxActive: {
+    borderColor: BrandColors.primary,
+    backgroundColor: '#EFF6FF',
   },
-  catChipIconWrapActive: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
+  cat3DBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: BrandColors.primary,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 5,
   },
-  catChipText: {
-    fontSize: 13,
-    color: '#374151',
-    fontWeight: '600',
-    fontFamily: 'Manrope_600SemiBold',
-  },
-  catChipTextActive: {
+  cat3DText: {
     color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
+    fontFamily: 'Manrope_700Bold',
+  },
+  catLabel: {
+    fontSize: 10,
+    color: '#4B5563',
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+    textAlign: 'center',
+  },
+  catLabelActive: {
+    color: BrandColors.primary,
     fontWeight: '700',
     fontFamily: 'Manrope_700Bold',
   },

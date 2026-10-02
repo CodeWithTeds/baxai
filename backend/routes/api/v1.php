@@ -87,6 +87,7 @@ Route::post('customer/address', [CustomerAddressController::class, 'saveAddress'
 // Orders API
 Route::apiResource('orders', OrderController::class);
 Route::post('orders/{id}/status', [OrderController::class, 'updateStatus']);
+Route::post('orders/{id}/cancel', [OrderController::class, 'cancel']);
 
 // Discounts & Coupons API
 Route::get('discounts', [ApiDiscountController::class, 'index']);

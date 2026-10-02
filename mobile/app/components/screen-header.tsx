@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,8 @@ import { CartHeaderButton } from '@/components/cart-header-button';
 interface ScreenHeaderProps {
   /** Center brand/page title */
   title?: string;
+  /** Force showing brand logo instead of text */
+  showLogo?: boolean;
   /** Hide the search bar entirely */
   hideSearch?: boolean;
   /** Hide the cart button */
@@ -36,6 +39,7 @@ interface ScreenHeaderProps {
 
 export default function ScreenHeader({
   title = 'NUYDA ENTERPRISE',
+  showLogo,
   hideSearch = false,
   hideCart = false,
   searchPlaceholder,
@@ -48,6 +52,7 @@ export default function ScreenHeader({
   const { t } = useLanguage();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const effectivePlaceholder = searchPlaceholder ?? t.searchPlaceholder;
+  const isLogo = showLogo ?? (!title || title === 'NUYDA ENTERPRISE' || title === t.brandName);
 
   const handleAvatarPress = () => {
     if (onAvatarPress) {
@@ -66,7 +71,18 @@ export default function ScreenHeader({
             <Ionicons name="menu" size={26} color={BrandColors.primary} />
           </Pressable>
 
-          <Text style={styles.brandName}>{title}</Text>
+          {isLogo ? (
+            <View style={styles.logoWrap} pointerEvents="none">
+              <Image
+                source={require('@/assets/images/logo.png')}
+                style={styles.brandLogo}
+                contentFit="contain"
+                priority="high"
+              />
+            </View>
+          ) : (
+            <Text style={styles.brandName} numberOfLines={1}>{title}</Text>
+          )}
 
           <View style={styles.rightActions}>
             {!hideCart && <CartHeaderButton tintColor={BrandColors.primary} />}
@@ -111,12 +127,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   topBar: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: '#FFFFFF',
+    minHeight: 52,
+  },
+  logoWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandLogo: {
+    width: 52,
+    height: 38,
   },
   iconBtn: {
     padding: 4,

@@ -130,13 +130,42 @@ export interface ApiOrder {
   status: 'in_progress' | 'processing' | 'delivered' | 'cancelled' | string;
   placed_at?: string;
   placedOn?: string;
+  expected_delivery?: string;
+  expectedDelivery?: string;
+  courier_name?: string;
+  courierName?: string;
+  tracking_number?: string;
+  trackingNumber?: string;
+  tracking_url?: string;
+  trackingUrl?: string;
+  shipped_at?: string;
+  delivered_at?: string;
+  cancelled_at?: string;
+  cancellation_reason?: string;
+  can_cancel?: boolean;
+  canCancel?: boolean;
+  subtotal?: number | string;
+  subtotal_formatted?: string;
+  customization_total?: number | string;
+  customization_total_formatted?: string;
+  shipping_fee?: number | string;
+  shipping_fee_formatted?: string;
+  delivery?: string;
+  discount_total?: number | string;
+  discount_total_formatted?: string;
   total?: number | string;
   total_formatted?: string;
   total_display?: string;
+  payment_method?: string;
+  payment_status?: string;
   productName?: string;
   image?: string | null;
   items?: any[];
   lineItems?: any[];
+  tracking_steps?: any[];
+  trackingSteps?: any[];
+  shipping_address?: any;
+  notes?: string;
 }
 
 export async function fetchOrders(email?: string): Promise<ApiOrder[]> {
@@ -185,6 +214,43 @@ export async function fetchOrderDetails(id: string | number, email?: string): Pr
     }
   }
   return null;
+}
+
+export async function apiCancelOrder(
+  id: string | number,
+  reason: string = 'Cancelled by customer'
+): Promise<{ success: boolean; message?: string; order?: ApiOrder }> {
+  const cleanId = String(id).trim().replace(/^#/, '');
+
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/orders/${encodeURIComponent(cleanId)}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ reason }),
+      });
+      const json = await res.json();
+      if (res.ok && (json.status === 'success' || json.order)) {
+        return {
+          success: true,
+          message: json.message,
+          order: json.order?.data || json.order,
+        };
+      } else {
+        return {
+          success: false,
+          message: json.message || 'Failed to cancel order.',
+        };
+      }
+    } catch (err) {
+      console.warn(`[Api] Failed to cancel order at ${baseUrl}:`, err);
+    }
+  }
+  return { success: false, message: 'Could not connect to server to cancel order.' };
 }
 
 export interface PsgcItem {

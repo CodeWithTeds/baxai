@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
@@ -8,7 +9,6 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import { BrandColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { CustomerAddress, fetchCustomerAddress, getApiBaseUrls } from '@/utils/api';
-import PhilippineAddressModal from './philippine-address-modal';
 
 interface Props {
   visible: boolean;
@@ -27,7 +27,13 @@ export default function ProfileModal({ visible, onClose, email: propEmail, name:
   const [address, setAddress] = useState<CustomerAddress | null>(null);
   const [hasCompleteAddress, setHasCompleteAddress] = useState(false);
   const [loadingAddress, setLoadingAddress] = useState(false);
-  const [showAddressModal, setShowAddressModal] = useState(false);
+
+  const handleEditAddress = () => {
+    onClose();
+    setTimeout(() => {
+      router.push('/delivery-address');
+    }, 120);
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -68,7 +74,14 @@ export default function ProfileModal({ visible, onClose, email: propEmail, name:
           <Animated.View entering={FadeInUp.duration(300)} style={styles.card}>
             {/* Header Bar */}
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>User Profile</Text>
+              <View style={styles.headerTitleRow}>
+                <Image
+                  source={require('@/assets/images/logo.png')}
+                  style={styles.headerLogo}
+                  contentFit="contain"
+                />
+                <Text style={styles.headerTitle}>User Profile</Text>
+              </View>
               <Pressable hitSlop={10} onPress={onClose} style={styles.closeBtn}>
                 <Ionicons name="close" size={20} color="#6B7280" />
               </Pressable>
@@ -131,7 +144,7 @@ export default function ProfileModal({ visible, onClose, email: propEmail, name:
                   </Text>
                   <Pressable
                     style={styles.editAddressBtn}
-                    onPress={() => setShowAddressModal(true)}
+                    onPress={handleEditAddress}
                   >
                     <Ionicons name="create-outline" size={14} color={BrandColors.primary} />
                     <Text style={styles.editAddressBtnText}>Edit Address</Text>
@@ -144,7 +157,7 @@ export default function ProfileModal({ visible, onClose, email: propEmail, name:
                   </Text>
                   <Pressable
                     style={styles.addAddressBtn}
-                    onPress={() => setShowAddressModal(true)}
+                    onPress={handleEditAddress}
                   >
                     <Ionicons name="add-circle-outline" size={15} color="#FFFFFF" />
                     <Text style={styles.addAddressBtnText}>Set Up Philippine Address</Text>
@@ -172,18 +185,6 @@ export default function ProfileModal({ visible, onClose, email: propEmail, name:
           </Animated.View>
         </View>
       </Modal>
-
-      {/* Philippine Address Modal */}
-      <PhilippineAddressModal
-        visible={showAddressModal}
-        onClose={() => setShowAddressModal(false)}
-        email={user?.email || propEmail}
-        initialAddress={address}
-        onAddressSaved={(saved) => {
-          setAddress(saved);
-          setHasCompleteAddress(true);
-        }}
-      />
     </>
   );
 }
@@ -218,6 +219,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerLogo: {
+    width: 28,
+    height: 21,
   },
   headerTitle: {
     fontSize: 17,

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useState } from 'react';
 import {
   Modal,
@@ -43,7 +44,11 @@ export function LegalModal({
           <View style={styles.pillHandle} />
           <View style={styles.headerRow}>
             <View style={styles.brandTitleRow}>
-              <Ionicons name="shield-checkmark" size={20} color={BrandColors.primary} />
+              <Image
+                source={require('@/assets/images/logo.png')}
+                style={styles.headerLogo}
+                contentFit="contain"
+              />
               <Text style={styles.headerTitle}>NUYDA ENTERPRISE Legal</Text>
             </View>
             <Pressable
@@ -308,6 +313,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  headerLogo: {
+    width: 26,
+    height: 20,
   },
   headerTitle: {
     fontSize: 17,

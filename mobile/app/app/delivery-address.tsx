@@ -95,7 +95,23 @@ export default function DeliveryAddressScreen() {
       const provs = await fetchPsgcProvinces(addr.region_code);
       setProvinces(provs);
 
-      if (addr.province_code) {
+      if (provs.length === 0) {
+        // Direct cities under region (like NCR)
+        const cityList = await fetchPsgcCities(undefined, addr.region_code);
+        setCities(cityList);
+
+        if (addr.city_code) {
+          const cityItem: PsgcItem = { code: addr.city_code, name: addr.city_name };
+          setSelectedCity(cityItem);
+
+          const brgyList = await fetchPsgcBarangays(addr.city_code);
+          setBarangays(brgyList);
+
+          if (addr.barangay_code) {
+            setSelectedBarangay({ code: addr.barangay_code, name: addr.barangay_name });
+          }
+        }
+      } else if (addr.province_code) {
         const provItem: PsgcItem = { code: addr.province_code, name: addr.province_name };
         setSelectedProvince(provItem);
 
@@ -142,8 +158,16 @@ export default function DeliveryAddressScreen() {
     try {
       const provs = await fetchPsgcProvinces(region.code);
       setProvinces(provs);
+
+      // If region has NO provinces (e.g. NCR), automatically load its cities directly!
+      if (provs.length === 0) {
+        setLoadingCities(true);
+        const cityList = await fetchPsgcCities(undefined, region.code);
+        setCities(cityList);
+      }
     } finally {
       setLoadingProvinces(false);
+      setLoadingCities(false);
     }
   };
 
@@ -199,7 +223,8 @@ export default function DeliveryAddressScreen() {
       Alert.alert('Required Selection', 'Please select a Philippine Region from the dropdown.');
       return;
     }
-    if (!selectedProvince) {
+    const regionHasProvinces = provinces.length > 0;
+    if (regionHasProvinces && !selectedProvince) {
       Alert.alert('Required Selection', 'Please select a Province from the dropdown.');
       return;
     }
@@ -224,8 +249,8 @@ export default function DeliveryAddressScreen() {
       phone_number: phoneNumber.trim(),
       region_code: selectedRegion.code,
       region_name: selectedRegion.name,
-      province_code: selectedProvince.code,
-      province_name: selectedProvince.name,
+      province_code: selectedProvince ? selectedProvince.code : null,
+      province_name: selectedProvince ? selectedProvince.name : null,
       city_code: selectedCity.code,
       city_name: selectedCity.name,
       barangay_code: selectedBarangay.code,
@@ -392,26 +417,32 @@ export default function DeliveryAddressScreen() {
 
             {/* Province */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>2. Province *</Text>
+              <Text style={styles.fieldLabel}>
+                2. Province {selectedRegion && provinces.length === 0 && !loadingProvinces ? '(Not Applicable)' : '*'}
+              </Text>
               <Pressable
                 style={[
                   styles.dropdownTrigger,
-                  (!selectedRegion || loadingProvinces) && styles.dropdownDisabled,
+                  (!selectedRegion || loadingProvinces || (selectedRegion && provinces.length === 0 && !loadingProvinces)) && styles.dropdownDisabled,
                 ]}
                 onPress={() => {
                   if (!selectedRegion) {
                     Alert.alert('Hierarchy Warning', 'Please select a Region first.');
                     return;
                   }
+                  if (provinces.length === 0) {
+                    Alert.alert('Not Applicable', 'This region (e.g. NCR) has no provinces. Please select your City directly below.');
+                    return;
+                  }
                   setPickerSearchQuery('');
                   setActivePicker('province');
                 }}
-                disabled={!selectedRegion || loadingProvinces}
+                disabled={!selectedRegion || loadingProvinces || (selectedRegion && provinces.length === 0 && !loadingProvinces)}
               >
                 <Text
                   style={[
                     styles.dropdownTriggerText,
-                    !selectedProvince && styles.dropdownPlaceholder,
+                    (!selectedProvince || (selectedRegion && provinces.length === 0)) && styles.dropdownPlaceholder,
                   ]}
                   numberOfLines={1}
                 >
@@ -419,9 +450,11 @@ export default function DeliveryAddressScreen() {
                     ? 'Loading provinces…'
                     : !selectedRegion
                       ? 'Select Region first'
-                      : selectedProvince
-                        ? selectedProvince.name
-                        : 'Select Province'}
+                      : provinces.length === 0
+                        ? 'N/A (Direct to City / Municipality)'
+                        : selectedProvince
+                          ? selectedProvince.name
+                          : 'Select Province'}
                 </Text>
                 {loadingProvinces ? (
                   <ActivityIndicator size="small" color={BrandColors.primary} />
@@ -437,17 +470,21 @@ export default function DeliveryAddressScreen() {
               <Pressable
                 style={[
                   styles.dropdownTrigger,
-                  (!selectedProvince || loadingCities) && styles.dropdownDisabled,
+                  (!selectedRegion || loadingCities || (provinces.length > 0 && !selectedProvince)) && styles.dropdownDisabled,
                 ]}
                 onPress={() => {
-                  if (!selectedProvince) {
+                  if (!selectedRegion) {
+                    Alert.alert('Hierarchy Warning', 'Please select a Region first.');
+                    return;
+                  }
+                  if (provinces.length > 0 && !selectedProvince) {
                     Alert.alert('Hierarchy Warning', 'Please select a Province first.');
                     return;
                   }
                   setPickerSearchQuery('');
                   setActivePicker('city');
                 }}
-                disabled={!selectedProvince || loadingCities}
+                disabled={!selectedRegion || loadingCities || (provinces.length > 0 && !selectedProvince)}
               >
                 <Text
                   style={[

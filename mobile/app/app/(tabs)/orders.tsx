@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Platform,
   Pressable,
@@ -26,7 +27,9 @@ import {
 import { BrandColors, IconColors } from '@/constants/theme';
 import { useAuth } from '@/contexts/auth-context';
 import { useLanguage } from '@/contexts/language-context';
-import { ApiOrder, fetchOrders } from '@/utils/api';
+import { useOrderNotification } from '@/contexts/order-notification-context';
+import CancelOrderModal from '@/components/cancel-order-modal';
+import { ApiOrder, apiCancelOrder, fetchOrders } from '@/utils/api';
 
 // ─── Status pill colors ───────────────────────────────────────────────────────
 
@@ -39,7 +42,15 @@ const STATUS_PILL: Record<string, { bg: string; text: string; dot: string; label
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
+function OrderCard({
+  item,
+  index,
+  onCancelPress,
+}: {
+  item: ApiOrder | Order;
+  index: number;
+  onCancelPress?: (order: ApiOrder | Order) => void;
+}) {
   const { t } = useLanguage();
   const slideAnim = useRef(new Animated.Value(30)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -92,6 +103,19 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
   const totalQty     = lineItems.length > 0
     ? lineItems.reduce((s: number, li: any) => s + (li.quantity || li.qty || 1), 0)
     : 1;
+
+  const courierName = (item as any).courierName || (item as any).courier_name;
+  const trackingNum = (item as any).trackingNumber || (item as any).tracking_number;
+  const discountVal = (item as any).discountTotal || (item as any).discount_total;
+  const hasDiscount = (typeof discountVal === 'number' && discountVal > 0) || (item as any).discount_total_formatted;
+  const hasProof    = lineItems.some((li: any) => li?.customization?.imageUri || li?.banner_image);
+
+  const handleTrackPress = () => {
+    router.push({
+      pathname: '/order/[id]',
+      params: { id: String(item.id), openTracking: '1' },
+    } as any);
+  };
 
   return (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
@@ -147,30 +171,66 @@ function OrderCard({ item, index }: { item: ApiOrder | Order; index: number }) {
           <Ionicons name="chevron-forward" size={18} color={IconColors.orders} />
         </View>
 
+        {/* ── Order Badges (Courier, Discount, Proof) ──────── */}
+        {(courierName || hasDiscount || hasProof) && (
+          <View style={styles.cardBadgesRow}>
+            {courierName && (
+              <View style={styles.courierChip}>
+                <Ionicons name="airplane" size={10} color={BrandColors.primary} />
+                <Text style={styles.courierChipText} numberOfLines={1}>
+                  {courierName}{trackingNum ? ` • ${trackingNum}` : ''}
+                </Text>
+              </View>
+            )}
+            {hasDiscount ? (
+              <View style={styles.discountChip}>
+                <Ionicons name="pricetag" size={10} color="#059669" />
+                <Text style={styles.discountChipText}>Discount Applied</Text>
+              </View>
+            ) : null}
+            {hasProof && (
+              <View style={styles.proofChip}>
+                <Ionicons name="sparkles" size={10} color="#7C3AED" />
+                <Text style={styles.proofChipText}>Proof Attached</Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* ── Footer CTA row ──────────────────────────────── */}
         <View style={styles.cardFooter}>
           <Pressable
             onPress={handlePress}
             hitSlop={8}
-            style={({ pressed }) => [styles.footerBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.footerBtn, styles.footerBtnDetails, pressed && { opacity: 0.7 }]}
           >
-            <View style={[styles.btnIconBadge, { backgroundColor: IconColors.aiBg }]}>
-              <Ionicons name="document-text" size={12} color={IconColors.ai} />
-            </View>
-            <Text style={[styles.footerBtnText, { color: IconColors.ai }]}>{t.viewDetails}</Text>
+            <Ionicons name="document-text-outline" size={13} color="#475569" />
+            <Text style={styles.footerBtnDetailsText}>Details</Text>
           </Pressable>
 
           {(statusKey === 'in_progress' || statusKey === 'processing') && (
-            <Pressable
-              hitSlop={8}
-              onPress={handlePress}
-              style={({ pressed }) => [styles.footerBtn, styles.footerBtnGray, pressed && { opacity: 0.7 }]}
-            >
-              <View style={[styles.btnIconBadge, { backgroundColor: IconColors.trackingBg }]}>
-                <Ionicons name="location" size={12} color={IconColors.tracking} />
-              </View>
-              <Text style={[styles.footerBtnText, { color: IconColors.tracking }]}>{t.trackOrder}</Text>
-            </Pressable>
+            <>
+              {/* Ultra-Modern Live Track Button */}
+              <Pressable
+                hitSlop={8}
+                onPress={handleTrackPress}
+                style={({ pressed }) => [styles.footerBtn, styles.footerBtnTrackLive, pressed && { opacity: 0.85 }]}
+              >
+                <Ionicons name="airplane" size={13} color="#38BDF8" />
+                <Text style={styles.footerBtnTrackLiveText}>Live Track</Text>
+                <View style={styles.liveTrackBeaconDot} />
+              </Pressable>
+
+              {/* Ultra-Modern Cancel Button */}
+              <Pressable
+                hitSlop={8}
+                onPress={() => onCancelPress?.(item)}
+                style={({ pressed }) => [styles.footerBtn, styles.footerBtnCancelModern, pressed && { opacity: 0.75 }]}
+              >
+                <Ionicons name="close-circle-outline" size={13} color="#E11D48" />
+                <Text style={styles.footerBtnCancelModernText}>Cancel</Text>
+              </Pressable>
+            </>
           )}
 
           {statusKey === 'delivered' && (
@@ -243,6 +303,8 @@ export default function OrdersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { user }  = useAuth();
   const { t }     = useLanguage();
+  const { showPushBanner, checkNow } = useOrderNotification();
+  const [cancelModalOrder, setCancelModalOrder] = useState<ApiOrder | Order | null>(null);
   const userEmail = user?.email;
 
   const loadOrders = useCallback(async (isRefresh = false) => {
@@ -260,6 +322,38 @@ export default function OrdersScreen() {
   }, [userEmail]);
 
   useEffect(() => { loadOrders(); }, [loadOrders]);
+
+  const handleConfirmCancel = async (reason: string) => {
+    if (!cancelModalOrder) return;
+    const targetOrder = cancelModalOrder;
+    const orderNum = targetOrder.orderNumber || (targetOrder as any).order_number || String(targetOrder.id);
+    try {
+      const res = await apiCancelOrder(targetOrder.id, reason);
+      if (res.success) {
+        if (Platform.OS !== 'web') {
+          try {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch {}
+        }
+        setOrders(prev =>
+          prev.map(o => (o.id === targetOrder.id ? { ...o, status: 'cancelled' as any, can_cancel: false } : o))
+        );
+        setCancelModalOrder(null);
+        showPushBanner({
+          orderId: targetOrder.id,
+          orderNumber: String(orderNum),
+          title: `Order #${orderNum} Cancelled`,
+          message: `Reason: ${reason}`,
+          status: 'cancelled',
+        });
+        await checkNow();
+      } else {
+        Alert.alert('Unable to Cancel', res.message || 'Please contact customer support.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Could not complete cancellation.');
+    }
+  };
 
   const activeOrders = orders.filter(o => o.status === 'in_progress' || o.status === 'processing');
   const pastOrders   = orders.filter(o => o.status === 'delivered'   || o.status === 'cancelled');
@@ -355,11 +449,27 @@ export default function OrdersScreen() {
           </View>
         ) : (
           filteredOrders.map((order, i) => (
-            <OrderCard key={String(order.id || order.orderNumber || i)} item={order} index={i} />
+            <OrderCard
+              key={String(order.id || order.orderNumber || i)}
+              item={order}
+              index={i}
+              onCancelPress={(target) => setCancelModalOrder(target)}
+            />
           ))
         )}
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      <CancelOrderModal
+        visible={Boolean(cancelModalOrder)}
+        orderNumber={
+          cancelModalOrder
+            ? String(cancelModalOrder.orderNumber || (cancelModalOrder as any).order_number || cancelModalOrder.id)
+            : ''
+        }
+        onClose={() => setCancelModalOrder(null)}
+        onConfirmCancel={handleConfirmCancel}
+      />
     </View>
   );
 }
@@ -490,6 +600,66 @@ const styles = StyleSheet.create({
   productSub:    { fontSize: 12, color: '#9CA3AF', fontFamily: 'Inter_400Regular' },
   totalText:     { fontSize: 19, fontWeight: '900', color: BrandColors.primary, fontFamily: 'Manrope_700Bold' },
 
+  cardBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+  },
+  courierChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    maxWidth: '100%',
+  },
+  courierChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: BrandColors.primary,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  discountChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  discountChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  proofChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  proofChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#7C3AED',
+    fontFamily: 'Inter_600SemiBold',
+  },
+
   cardFooter: {
     flexDirection: 'row',
     gap: 8,
@@ -510,6 +680,44 @@ const styles = StyleSheet.create({
   },
   footerBtnGray: { backgroundColor: '#F3F4F6' },
   footerBtnText: { fontSize: 12, fontWeight: '600', color: BrandColors.primary, fontFamily: 'Inter_600SemiBold' },
+  footerBtnDetails: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  footerBtnDetailsText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  footerBtnTrackLive: {
+    backgroundColor: '#0F172A',
+  },
+  footerBtnTrackLiveText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'Manrope_700Bold',
+  },
+  liveTrackBeaconDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+    marginLeft: 2,
+  },
+  footerBtnCancelModern: {
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+  },
+  footerBtnCancelModernText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#E11D48',
+    fontFamily: 'Inter_600SemiBold',
+  },
 
   btnIconBadge: {
     width: 20,

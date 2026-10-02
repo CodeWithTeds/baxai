@@ -183,6 +183,9 @@ class OrderController extends Controller
             $grandTotal = max(0, $subtotal + $shippingFee - $discountTotal);
 
             $expectedDeliveryDate = now()->addDays(5)->format('M d');
+            $trackingNum = 'JT-'.mt_rand(100000000, 999999999).'PH';
+            $courierName = 'J&T Express';
+            $trackingUrl = 'https://www.jtexpress.ph/trajectoryQuery?bills='.$trackingNum;
 
             $order = Order::create([
                 'order_number' => $orderNumber,
@@ -201,7 +204,10 @@ class OrderController extends Controller
                 'total' => $grandTotal,
                 'payment_method' => $validated['payment_method'] ?? 'Cash on Delivery',
                 'payment_status' => 'pending',
-                'tracking_steps' => Order::buildDefaultTrackingSteps('in_progress', now()->format('M d, h:i A')),
+                'courier_name' => $courierName,
+                'tracking_number' => $trackingNum,
+                'tracking_url' => $trackingUrl,
+                'tracking_steps' => Order::buildDefaultTrackingSteps('in_progress', now()->format('M d, h:i A'), $courierName, $trackingNum),
                 'shipping_address' => $address->toSnapshot(),
                 'notes' => ($validated['notes'] ?? null) ?: ($address->delivery_instructions ?: null),
             ]);
@@ -323,18 +329,108 @@ class OrderController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $order->status = $validated['status'];
+        $newStatus = $validated['status'];
+
+        if ($newStatus === 'cancelled') {
+            if ($order->status === 'delivered') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Delivered orders cannot be cancelled.',
+                ], 422);
+            }
+
+            $order->cancelled_at = now();
+            $order->cancellation_reason = $validated['notes'] ?? 'Cancelled by customer';
+
+            // Restore inventory if not already cancelled
+            if ($order->status !== 'cancelled') {
+                foreach ($order->items as $item) {
+                    if ($item->product_id) {
+                        $prod = Product::find($item->product_id);
+                        if ($prod && $prod->track_inventory) {
+                            $prod->increment('stock_quantity', $item->quantity);
+                        }
+                    }
+                }
+            }
+        } elseif ($newStatus === 'delivered') {
+            $order->delivered_at = now();
+            $order->payment_status = 'paid';
+        }
+
+        $order->status = $newStatus;
         if (isset($validated['notes'])) {
             $order->notes = $validated['notes'];
         }
 
         $order->tracking_steps = Order::buildDefaultTrackingSteps(
-            $validated['status'],
-            $order->placed_at ? $order->placed_at->format('M d, h:i A') : now()->format('M d, h:i A')
+            $newStatus,
+            $order->placed_at ? $order->placed_at->format('M d, h:i A') : now()->format('M d, h:i A'),
+            $order->courier_name,
+            $order->tracking_number
         );
 
         $order->save();
 
         return (new OrderResource($order->load('items')))->response();
+    }
+
+    /**
+     * Explicit cancel order endpoint for mobile and web clients.
+     */
+    public function cancel(Request $request, string $id): JsonResponse
+    {
+        $order = $this->findOrderByIdentifier($id);
+
+        if (! $order) {
+            return response()->json(['message' => 'Order not found'], 404);
+        }
+
+        if ($order->status === 'delivered') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Delivered orders cannot be cancelled.',
+            ], 422);
+        }
+
+        if ($order->status === 'cancelled') {
+            return response()->json([
+                'status' => 'info',
+                'message' => 'Order is already cancelled.',
+                'order' => new OrderResource($order->load('items')),
+            ]);
+        }
+
+        $reason = $request->input('reason', $request->input('notes', 'Cancelled by customer'));
+
+        $order->status = 'cancelled';
+        $order->cancelled_at = now();
+        $order->cancellation_reason = $reason;
+        $order->notes = $reason;
+
+        // Restore inventory
+        foreach ($order->items as $item) {
+            if ($item->product_id) {
+                $prod = Product::find($item->product_id);
+                if ($prod && $prod->track_inventory) {
+                    $prod->increment('stock_quantity', $item->quantity);
+                }
+            }
+        }
+
+        $order->tracking_steps = Order::buildDefaultTrackingSteps(
+            'cancelled',
+            $order->placed_at ? $order->placed_at->format('M d, h:i A') : now()->format('M d, h:i A'),
+            $order->courier_name,
+            $order->tracking_number
+        );
+
+        $order->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Order #'.$order->order_number.' has been cancelled successfully.',
+            'order' => new OrderResource($order->load('items')),
+        ]);
     }
 }

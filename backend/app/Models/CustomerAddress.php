@@ -72,10 +72,12 @@ class CustomerAddress extends Model
      */
     public function isComplete(): bool
     {
+        $hasProvince = ! empty($this->province_code) && ! empty($this->province_name);
+        $isNcr = (string) $this->region_code === '1300000000' || str_contains((string) $this->region_name, 'NCR');
+
         return ! empty($this->region_code)
             && ! empty($this->region_name)
-            && ! empty($this->province_code)
-            && ! empty($this->province_name)
+            && ($hasProvince || $isNcr)
             && ! empty($this->city_code)
             && ! empty($this->city_name)
             && ! empty($this->barangay_code)

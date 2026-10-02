@@ -58,8 +58,12 @@ export default function WelcomeScreen() {
         {/* Wrap in plain View to avoid Reanimated opacity warning */}
         <View style={styles.headerWrap}>
           <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
-            <Ionicons name="print" size={22} color="#FFFFFF" />
-            <Text style={styles.headerTitle}>{t.brandName}</Text>
+            <Image
+              source={require('@/assets/images/logo.png')}
+              style={styles.headerLogo}
+              contentFit="contain"
+              priority="high"
+            />
           </Animated.View>
         </View>
 
@@ -169,18 +173,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
     paddingTop: 14,
     paddingBottom: 8,
   },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '700',
-    fontFamily: 'Manrope_700Bold',
-    letterSpacing: 0.1,
+  headerLogo: {
+    width: 68,
+    height: 51,
   },
   taglineWrap: {
     alignItems: 'center',

@@ -66,8 +66,8 @@ class CustomerAddressController extends Controller
             'phone_number' => 'required|string|max:50',
             'region_code' => 'required|string|max:20',
             'region_name' => 'required|string|max:255',
-            'province_code' => 'required|string|max:20',
-            'province_name' => 'required|string|max:255',
+            'province_code' => 'nullable|string|max:20',
+            'province_name' => 'nullable|string|max:255',
             'city_code' => 'required|string|max:20',
             'city_name' => 'required|string|max:255',
             'barangay_code' => 'required|string|max:20',
@@ -80,8 +80,6 @@ class CustomerAddressController extends Controller
             'phone_number.required' => 'Contact phone number is required.',
             'region_code.required' => 'Please select a Region from the dropdown.',
             'region_name.required' => 'Region name is required.',
-            'province_code.required' => 'Please select a Province from the dropdown.',
-            'province_name.required' => 'Province name is required.',
             'city_code.required' => 'Please select a City/Municipality from the dropdown.',
             'city_name.required' => 'City/Municipality name is required.',
             'barangay_code.required' => 'Please select a Barangay from the dropdown.',
@@ -99,13 +97,23 @@ class CustomerAddressController extends Controller
             ], 422);
         }
 
-        $provinceExists = Province::where('code', (string) $validated['province_code'])->exists();
-        if (! $provinceExists) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'The selected Province PSGC code is invalid in the database.',
-                'errors' => ['province_code' => ['Invalid Province code']],
-            ], 422);
+        $regionHasProvinces = Province::where('region_code', (string) $validated['region_code'])->exists();
+        if ($regionHasProvinces) {
+            if (empty($validated['province_code'])) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Please select a Province from the dropdown.',
+                    'errors' => ['province_code' => ['Province code is required for this region.']],
+                ], 422);
+            }
+            $provinceExists = Province::where('code', (string) $validated['province_code'])->exists();
+            if (! $provinceExists) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'The selected Province PSGC code is invalid in the database.',
+                    'errors' => ['province_code' => ['Invalid Province code']],
+                ], 422);
+            }
         }
 
         $cityExists = City::where('code', (string) $validated['city_code'])->exists();

@@ -30,6 +30,13 @@ class Order extends Model
         'total',
         'payment_method',
         'payment_status',
+        'courier_name',
+        'tracking_number',
+        'tracking_url',
+        'shipped_at',
+        'delivered_at',
+        'cancelled_at',
+        'cancellation_reason',
         'tracking_steps',
         'shipping_address',
         'notes',
@@ -37,6 +44,9 @@ class Order extends Model
 
     protected $casts = [
         'placed_at' => 'datetime',
+        'shipped_at' => 'datetime',
+        'delivered_at' => 'datetime',
+        'cancelled_at' => 'datetime',
         'subtotal' => 'decimal:2',
         'customization_total' => 'decimal:2',
         'shipping_fee' => 'decimal:2',
@@ -72,18 +82,24 @@ class Order extends Model
     }
 
     /**
-     * Default tracking steps generator based on status
+     * Default tracking steps generator based on status and courier details
      */
-    public static function buildDefaultTrackingSteps(string $status, ?string $placedDate = null): array
-    {
+    public static function buildDefaultTrackingSteps(
+        string $status,
+        ?string $placedDate = null,
+        ?string $courierName = null,
+        ?string $trackingNumber = null
+    ): array {
         $placedDateStr = $placedDate ?: now()->format('M d, h:i A');
+        $courier = $courierName ?: 'J&T Express';
+        $tracking = $trackingNumber ? " ({$trackingNumber})" : '';
 
         switch ($status) {
             case 'delivered':
                 return [
                     ['label' => 'Order Placed', 'subtitle' => $placedDateStr, 'state' => 'done'],
-                    ['label' => 'Production & Printing', 'subtitle' => 'Quality inspected', 'state' => 'done'],
-                    ['label' => 'Shipped', 'subtitle' => 'Dispatched via Express Courier', 'state' => 'done'],
+                    ['label' => 'Production & Printing', 'subtitle' => 'Quality verified by Print Lab', 'state' => 'done'],
+                    ['label' => 'Shipped', 'subtitle' => "Dispatched via {$courier}{$tracking}", 'state' => 'done'],
                     ['label' => 'Delivered', 'subtitle' => 'Package received & signed', 'state' => 'done'],
                 ];
             case 'cancelled':
@@ -97,15 +113,15 @@ class Order extends Model
                 return [
                     ['label' => 'Order Placed', 'subtitle' => $placedDateStr, 'state' => 'done'],
                     ['label' => 'Production & Printing', 'subtitle' => 'In active printing queue', 'state' => 'active'],
-                    ['label' => 'Shipped', 'subtitle' => 'Pending pickup', 'state' => 'pending'],
-                    ['label' => 'Delivered', 'subtitle' => 'Estimated soon', 'state' => 'pending'],
+                    ['label' => 'Shipped', 'subtitle' => "Assigned to {$courier}{$tracking}", 'state' => 'pending'],
+                    ['label' => 'Delivered', 'subtitle' => 'Estimated in 2-3 business days', 'state' => 'pending'],
                 ];
             case 'in_progress':
             default:
                 return [
                     ['label' => 'Order Placed', 'subtitle' => $placedDateStr, 'state' => 'done'],
                     ['label' => 'Finishing & Packaging', 'subtitle' => 'Design proof verified', 'state' => 'active'],
-                    ['label' => 'Shipped', 'subtitle' => 'Pending dispatch', 'state' => 'pending'],
+                    ['label' => 'Shipped', 'subtitle' => "Preparing for {$courier} dispatch", 'state' => 'pending'],
                     ['label' => 'Delivered', 'subtitle' => 'On schedule', 'state' => 'pending'],
                 ];
         }

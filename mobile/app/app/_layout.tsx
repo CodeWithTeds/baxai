@@ -11,6 +11,7 @@ import { LogBox } from 'react-native';
 import { AuthProvider } from '@/contexts/auth-context';
 import { LanguageProvider } from '@/contexts/language-context';
 import { CartProvider } from '@/contexts/cart-context';
+import { OrderNotificationProvider } from '@/contexts/order-notification-context';
 
 // Silence noisy but harmless warnings:
 // - Reanimated opacity layout conflict (FadeIn + opacity style)
@@ -80,24 +81,26 @@ export default function RootLayout() {
       <AuthProvider>
         <LanguageProvider>
           <CartProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" options={{ headerShown: false, animation: 'fade' }} />
-              <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
-              <Stack.Screen name="register" options={{ headerShown: false, animation: 'slide_from_right' }} />
-              <Stack.Screen name="login" options={{ headerShown: false, animation: 'slide_from_right' }} />
-              <Stack.Screen name="verify-code" options={{ headerShown: false, animation: 'slide_from_right' }} />
-              <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
-              <Stack.Screen name="reset-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
-              <Stack.Screen name="delivery-address" options={{ headerShown: false, animation: 'slide_from_right' }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="order/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
-              <Stack.Screen name="mug-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
-              <Stack.Screen name="pin-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
-              <Stack.Screen name="cart" options={{ headerShown: false, animation: 'slide_from_right' }} />
-              <Stack.Screen name="legal" options={{ presentation: 'modal', headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-            </Stack>
-            <StatusBar style="auto" />
+            <OrderNotificationProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" options={{ headerShown: false, animation: 'fade' }} />
+                <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
+                <Stack.Screen name="register" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="login" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="verify-code" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="reset-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="delivery-address" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="order/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="mug-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="pin-3d" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="cart" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="legal" options={{ presentation: 'modal', headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+              </Stack>
+              <StatusBar style="auto" />
+            </OrderNotificationProvider>
           </CartProvider>
         </LanguageProvider>
       </AuthProvider>

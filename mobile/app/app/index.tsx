@@ -36,11 +36,15 @@ export default function LanguageSelectionScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      {/* Header - NUYDA ENTERPRISE */}
+      {/* Header - Brand Logo */}
       <SafeAreaView edges={['top']} style={styles.headerSafe}>
         <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
-          <Ionicons name="print" size={20} color="#FFFFFF" style={styles.headerIcon} />
-          <Text style={styles.headerTitle}>{t.brandName}</Text>
+          <Image
+            source={require('@/assets/images/logo.png')}
+            style={styles.headerLogo}
+            contentFit="contain"
+            priority="high"
+          />
         </Animated.View>
       </SafeAreaView>
 
@@ -114,19 +118,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     paddingTop: 8,
     paddingBottom: 12,
   },
-  headerIcon: {
-    marginTop: 1,
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-    fontFamily: 'Manrope_700Bold',
+  headerLogo: {
+    width: 60,
+    height: 45,
   },
   mascotArea: {
     flex: 1,

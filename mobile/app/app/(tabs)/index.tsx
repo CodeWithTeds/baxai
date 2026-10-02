@@ -195,13 +195,13 @@ export default function HomeScreen() {
   const categories = [
     {
       id: 'mugs',
-      label: t.catMugs,
+      label: t.catMugs || 'Mugs',
       icon: 'cafe-outline' as const,
       is3D: true,
     },
     {
       id: 'pins',
-      label: t.catPins,
+      label: t.catPins || 'Pins',
       icon: 'pricetag-outline' as const,
       is3D: true,
     },
@@ -212,31 +212,28 @@ export default function HomeScreen() {
       is3D: true,
     },
     {
-      id: 'calendars',
-      label: t.catCalendars,
-      icon: 'calendar-outline' as const,
+      id: 'stickers',
+      label: t.catStickers || 'Stickers',
+      icon: 'layers-outline' as const,
       is3D: false,
     },
     {
       id: 'totes',
-      label: t.catTotes,
+      label: t.catTotes || 'Tote Bags',
       icon: 'bag-outline' as const,
       is3D: false,
     },
-  ];
-
-  const wideCategories = [
     {
-      id: 'stickers',
-      label: t.catStickers,
-      sublabel: 'Custom',
-      icon: 'layers-outline' as const,
+      id: 'calendars',
+      label: t.catCalendars || 'Calendars',
+      icon: 'calendar-outline' as const,
+      is3D: false,
     },
     {
       id: 'printing',
-      label: t.catPrinting,
-      sublabel: 'General',
+      label: t.catPrinting || 'Printing',
       icon: 'print-outline' as const,
+      is3D: false,
     },
   ];
 
@@ -311,7 +308,7 @@ export default function HomeScreen() {
       <StatusBar style="dark" />
 
       {/* ── Header + Search ──────────────────────────────────── */}
-      <ScreenHeader onAvatarPress={() => setShowProfileModal(true)} />
+      <ScreenHeader showLogo onAvatarPress={() => setShowProfileModal(true)} />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -359,48 +356,28 @@ export default function HomeScreen() {
         <Animated.View entering={FadeInDown.delay(160).duration(500)} style={styles.section}>
           <Text style={styles.sectionTitle}>{t.categories}</Text>
 
-          {/* Icon grid row */}
-          <View style={styles.catRow}>
+          {/* Unified Category Icons Row */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.catScroll}>
             {categories.map((cat) => (
               <Pressable
                 key={cat.id}
                 onPress={() => handleCategoryPress(cat.id)}
                 style={({ pressed }) => [styles.catItem, pressed && styles.catItemPressed]}>
                 <View style={styles.catIconBox}>
-                  <Ionicons name={cat.icon} size={26} color="#1F2937" />
+                  <Ionicons name={cat.icon} size={22} color="#1F2937" />
                   {cat.is3D && (
                     <View style={styles.cat3DBadge}>
                       <Text style={styles.cat3DText}>3D</Text>
                     </View>
                   )}
                 </View>
-                <Text style={styles.catLabel}>{cat.label}</Text>
+                <Text style={styles.catLabel} numberOfLines={1}>{cat.label}</Text>
               </Pressable>
             ))}
-          </View>
-
-          {/* Wide tiles row */}
-          <View style={styles.wideCatRow}>
-            {wideCategories.map((cat) => (
-              <Pressable
-                key={cat.id}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(tabs)/services',
-                    params: { category: cat.id },
-                  } as any)
-                }
-                style={({ pressed }) => [styles.wideCatItem, pressed && styles.wideCatItemPressed]}>
-                <View style={styles.wideCatTextGroup}>
-                  <Text style={styles.wideCatSublabel}>{cat.sublabel}</Text>
-                  <Text style={styles.wideCatLabel}>{cat.label}</Text>
-                </View>
-                <View style={styles.wideCatIconBox}>
-                  <Ionicons name={cat.icon} size={20} color="#1F2937" />
-                </View>
-              </Pressable>
-            ))}
-          </View>
+          </ScrollView>
         </Animated.View>
 
         {/* ── Featured Services ─────────────────────────────────── */}
@@ -570,21 +547,21 @@ const styles = StyleSheet.create({
 
   // Categories
   section: {
-    marginTop: 20,
+    marginTop: 12,
     paddingHorizontal: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: '#111827',
     fontFamily: 'Manrope_800ExtraBold',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   seeAllBtn: {
     flexDirection: 'row',
@@ -592,41 +569,40 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   seeAllText: {
-    fontSize: 13,
+    fontSize: 12,
     color: BrandColors.primary,
     fontWeight: '700',
     fontFamily: 'Manrope_700Bold',
   },
 
-  catRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  catScroll: {
+    paddingVertical: 2,
     gap: 8,
   },
   catItem: {
     alignItems: 'center',
-    flex: 1,
+    width: 62,
   },
   catItemPressed: {
     opacity: 0.75,
   },
   catIconBox: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
+    width: 50,
+    height: 50,
+    borderRadius: 13,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 3,
     position: 'relative',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
         shadowOpacity: 0.04,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 1 },
       },
       android: { elevation: 1 },
     }),
@@ -637,21 +613,21 @@ const styles = StyleSheet.create({
   },
   cat3DBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -3,
+    right: -3,
     backgroundColor: BrandColors.primary,
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 5,
   },
   cat3DText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '800',
-    fontFamily: 'Manrope_800ExtraBold',
+    fontFamily: 'Manrope_700Bold',
   },
   catLabel: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     color: '#374151',
     fontFamily: 'Inter_600SemiBold',
