@@ -23,6 +23,7 @@ interface PrintItemData {
     min_quantity: number;
     status: string;
     notes: string | null;
+    image_url: string | null;
     sort_order: number;
 }
 
@@ -33,7 +34,8 @@ interface CategoryOption {
 }
 
 export default function EditPrintItem({ item, categories = [] }: { item: PrintItemData; categories: CategoryOption[] }) {
-    const { data, setData, put, processing, errors } = useForm({
+    const { data, setData, post, processing, errors } = useForm({
+        _method: 'put',
         name: item.name ?? '',
         item_code: item.item_code ?? '',
         category_id: item.category_id ?? '',
@@ -52,11 +54,13 @@ export default function EditPrintItem({ item, categories = [] }: { item: PrintIt
         min_quantity: item.min_quantity ?? 1,
         status: item.status ?? 'active',
         notes: item.notes ?? '',
+        image: null as File | null,
+        image_url: item.image_url ?? '',
     });
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/print-items/${item.id}`);
+        post(`/print-items/${item.id}`);
     };
 
     return (

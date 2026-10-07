@@ -43,7 +43,7 @@ const overviewNavItems: NavItem[] = [
 const sellNavItems: NavItem[] = [
     {
         title: 'Orders',
-        href: '#',
+        href: '/orders',
         icon: ShoppingBag,
     },
     {

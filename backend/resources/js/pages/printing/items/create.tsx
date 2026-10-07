@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import InputError from '@/components/input-error';
 import { cn } from '@/lib/utils';
-import { Camera, CheckCircle2, Sparkles } from 'lucide-react';
+import { Camera, CheckCircle2, Image as ImageIcon, Sparkles, Upload, X } from 'lucide-react';
 import CameraScanModal, { RecognizedProductData } from '@/components/camera-scan-modal';
 
 interface PrintCategoryOption {
@@ -59,6 +59,8 @@ const FIELD_LABELS: Record<string, string> = {
     min_quantity: 'Minimum Order Quantity',
     status: 'Status',
     notes: 'Notes',
+    image: 'Item Image',
+    image_url: 'Image URL',
 };
 
 const inputCls =
@@ -105,6 +107,32 @@ export function PrintItemForm({
     const errorEntries = Object.entries((errors ?? {}) as Record<string, string>);
     const [scanModalOpen, setScanModalOpen] = useState(false);
     const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(data.image_url || null);
+
+    useEffect(() => {
+        if (data.image && data.image instanceof File) {
+            const objectUrl = URL.createObjectURL(data.image);
+            setImagePreview(objectUrl);
+            return () => URL.revokeObjectURL(objectUrl);
+        } else if (data.image_url) {
+            setImagePreview(data.image_url);
+        } else {
+            setImagePreview(null);
+        }
+    }, [data.image, data.image_url]);
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setData('image', file);
+        }
+    };
+
+    const removeImage = () => {
+        setData('image', null);
+        setData('image_url', '');
+        setImagePreview(null);
+    };
 
     useEffect(() => {
         if (errorEntries.length > 0) errorBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -248,6 +276,45 @@ export function PrintItemForm({
                                     </SelectContent>
                                 </Select>
                             </Field>
+
+                            <div className="sm:col-span-2">
+                                <Field label="Print Item Image" error={errors.image || errors.image_url}>
+                                    <div className="flex items-center gap-3 border border-dashed border-[#D1D5DB] bg-[#F9FAFB] p-2.5">
+                                        {imagePreview ? (
+                                            <div className="relative h-20 w-20 shrink-0 overflow-hidden border border-[#E5E7EB] bg-white">
+                                                <img src={imagePreview} alt="Preview" className="h-full w-full object-cover" />
+                                                <button
+                                                    type="button"
+                                                    onClick={removeImage}
+                                                    className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-1 text-white hover:bg-black"
+                                                    title="Remove Image"
+                                                >
+                                                    <X size={10} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex h-20 w-20 shrink-0 items-center justify-center border border-dashed border-[#D1D5DB] bg-white text-muted-foreground">
+                                                <ImageIcon size={24} className="text-[#9CA3AF]" />
+                                            </div>
+                                        )}
+
+                                        <div className="flex-1 space-y-1 font-mono text-xs">
+                                            <p className="font-sans text-xs font-semibold text-[#1A1C1E]">Upload Item Photo</p>
+                                            <p className="text-[10px] text-[#6B7280]">PNG, JPG, WEBP or GIF (Max 10MB)</p>
+                                            <label className="inline-flex cursor-pointer items-center gap-1.5 border border-[#D1D5DB] bg-white px-2.5 py-1 text-[11px] font-medium text-[#1A1C1E] shadow-sm hover:bg-gray-50">
+                                                <Upload size={12} className="text-[#4B5563]" />
+                                                <span>{imagePreview ? 'Change Image' : 'Select Image File'}</span>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={handleImageChange}
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+                                </Field>
+                            </div>
 
                             <div className="sm:col-span-2">
                                 <Field label="Description" error={errors.description}>
@@ -442,6 +509,8 @@ export default function CreatePrintItem({ categories = [] }: { categories: Print
         min_quantity: 1,
         status: 'active',
         notes: '',
+        image: null as File | null,
+        image_url: '',
     });
 
     const submit = (e: FormEvent) => {

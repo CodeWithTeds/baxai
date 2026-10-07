@@ -31,6 +31,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'min_quantity',
     'status',
     'notes',
+    'image_url',
     'sort_order',
 ])]
 class PrintItem extends Model

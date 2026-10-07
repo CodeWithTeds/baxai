@@ -63,8 +63,8 @@ export type CategoryCardItem = {
 };
 
 // Helper to determine image source based on dynamic product / print item attributes
-function getProductImage(item: { thumbnail?: string | null; fallback_image?: string | null; name: string; category?: string }): any {
-  const img = item.thumbnail || item.fallback_image;
+function getProductImage(item: { thumbnail?: string | null; fallback_image?: string | null; image_url?: string | null; name: string; category?: string }): any {
+  const img = item.image_url || item.thumbnail || item.fallback_image;
   if (img) {
     const baseUrl = getApiBaseUrls()[0] ?? '';
     const uri = img.startsWith('http')
@@ -345,7 +345,7 @@ export default function ServicesScreen() {
           stock: 50,
           sku: pi.item_code || '',
           viewerType: pi.name.toLowerCase().includes('pin') ? 'pin_cloud' : 'coffee_cup',
-          image: getProductImage({ name: pi.name, category: pi.category?.name }),
+          image: getProductImage({ name: pi.name, category: pi.category?.name, image_url: pi.image_url }),
           badge: pi.category?.name || 'Custom Print',
           badgeColor: '#D97706',
           featured: false,

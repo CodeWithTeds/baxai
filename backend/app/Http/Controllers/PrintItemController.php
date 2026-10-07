@@ -34,7 +34,13 @@ class PrintItemController extends Controller
 
     public function store(StorePrintItemRequest $request): RedirectResponse
     {
-        $this->service->create($request->validated());
+        $data = $request->validated();
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('print-items', 'public');
+            $data['image_url'] = '/storage/'.$path;
+        }
+
+        $this->service->create($data);
 
         return redirect()->route('print-items.index');
     }
@@ -51,7 +57,13 @@ class PrintItemController extends Controller
 
     public function update(UpdatePrintItemRequest $request, PrintItem $printItem): RedirectResponse
     {
-        $this->items->update($printItem, $request->validated());
+        $data = $request->validated();
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('print-items', 'public');
+            $data['image_url'] = '/storage/'.$path;
+        }
+
+        $this->items->update($printItem, $data);
 
         return redirect()->route('print-items.index');
     }

@@ -25,6 +25,7 @@ class PrintItemResource extends JsonResource
             'min_quantity' => (int) $this->min_quantity,
             'status' => $this->status?->value ?? $this->status,
             'notes' => $this->notes,
+            'image_url' => $this->image_url,
             'sort_order' => $this->sort_order,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

@@ -44,6 +44,7 @@ export interface ApiPrintItem {
   base_price?: number | string;
   min_quantity?: number;
   status?: string;
+  image_url?: string | null;
 }
 
 function sanitizeOrigin(url?: string | null): string {

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\PrintItemAiController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DiscountController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PrintCategoryController;
 use App\Http\Controllers\PrintItemController;
 use App\Http\Controllers\ProductController;
@@ -31,6 +32,12 @@ Route::get('models/{file}', function ($file) {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
+
+    // Web bulk actions & orders
+    Route::post('orders/bulk-update-status', [OrderController::class, 'bulkUpdateStatus'])->name('orders.bulk-update-status');
+    Route::post('orders/bulk-destroy', [OrderController::class, 'bulkDestroy'])->name('orders.bulk-destroy');
+    Route::post('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.update-status');
+    Route::resource('orders', OrderController::class);
 
     // Web bulk actions
     Route::post('products/bulk-activate', [ProductController::class, 'bulkActivate'])->name('products.bulk-activate');

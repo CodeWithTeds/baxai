@@ -24,6 +24,7 @@ interface PrintItemDetail {
     min_quantity: number;
     status: string;
     notes: string | null;
+    image_url?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -90,6 +91,12 @@ export default function ShowPrintItem({ item }: { item: PrintItemDetail }) {
             {/* DETAILED BOX CONTENT */}
             <div className="grid gap-3 xl:grid-cols-3">
                 <div className="xl:col-span-2 space-y-3">
+                    {item.image_url && (
+                        <section className="rounded-none border border-[#E5E7EB] bg-white p-4 flex justify-center">
+                            <img src={item.image_url} alt={item.name} className="max-h-64 object-contain border border-[#E5E7EB] p-1" />
+                        </section>
+                    )}
+
                     <section className="rounded-none border border-[#E5E7EB] bg-white p-4">
                         <h3 className="mb-2 font-mono text-xs uppercase tracking-wider text-[#1A1C1E] border-b border-[#E5E7EB] pb-1">
                             Resource Description

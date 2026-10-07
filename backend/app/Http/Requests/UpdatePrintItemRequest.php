@@ -38,6 +38,8 @@ class UpdatePrintItemRequest extends FormRequest
             'min_quantity' => ['sometimes', 'required', 'integer', 'min:1', 'max:100000'],
             'status' => ['sometimes', 'required', 'string', Rule::in(PrintItemStatus::values())],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp,svg', 'max:10240'],
+            'image_url' => ['nullable', 'string', 'max:500'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ];
     }

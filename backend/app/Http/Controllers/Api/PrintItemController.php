@@ -24,10 +24,16 @@ class PrintItemController extends Controller
     {
         return PrintItemResource::collection($this->items->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 15)));
     }
-
+    
     public function store(StorePrintItemRequest $request): JsonResponse
     {
-        return (new PrintItemResource($this->service->create($request->validated())->load('category')))->response()->setStatusCode(201);
+        $data = $request->validated();
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('print-items', 'public');
+            $data['image_url'] = '/storage/'.$path;
+        }
+
+        return (new PrintItemResource($this->service->create($data)->load('category')))->response()->setStatusCode(201);
     }
 
     public function show(PrintItem $printItem): PrintItemResource
@@ -37,7 +43,13 @@ class PrintItemController extends Controller
 
     public function update(UpdatePrintItemRequest $request, PrintItem $printItem): PrintItemResource
     {
-        $this->items->update($printItem, $request->validated());
+        $data = $request->validated();
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('print-items', 'public');
+            $data['image_url'] = '/storage/'.$path;
+        }
+
+        $this->items->update($printItem, $data);
 
         return new PrintItemResource($printItem->fresh()->load('category'));
     }

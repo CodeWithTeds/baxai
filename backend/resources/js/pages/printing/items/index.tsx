@@ -67,6 +67,7 @@ interface PrintItemRow {
     min_quantity: number;
     status: string;
     notes: string | null;
+    image_url?: string | null;
     sort_order: number;
     created_at: string;
     updated_at: string;
@@ -584,8 +585,15 @@ export default function PrintItemsIndex({
                                         />
                                     </td>
                                     <td className="px-2 py-1.5 border-r border-[#E5E7EB]">
-                                        <div className="font-semibold text-[#1A1C1E]">{item.name}</div>
-                                        <div className="font-mono text-[10px] text-[#6B7280]">{item.item_code}</div>
+                                        <div className="flex items-center gap-2">
+                                            {item.image_url ? (
+                                                <img src={item.image_url} alt={item.name} className="h-8 w-8 object-cover border border-[#E5E7EB] shrink-0" />
+                                            ) : null}
+                                            <div>
+                                                <div className="font-semibold text-[#1A1C1E]">{item.name}</div>
+                                                <div className="font-mono text-[10px] text-[#6B7280]">{item.item_code}</div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td className="px-2 py-1.5 border-r border-[#E5E7EB]">
                                         <span className="inline-block rounded-none border border-[#D1D5DB] bg-[#F9FAFB] px-1.5 py-0.5 font-mono text-[10px] uppercase text-[#374151]">
@@ -715,6 +723,12 @@ export default function PrintItemsIndex({
                         </DialogHeader>
 
                         <div className="space-y-3 font-sans text-xs">
+                            {quickViewItem.image_url && (
+                                <div className="flex justify-center border-b border-[#E5E7EB] pb-3">
+                                    <img src={quickViewItem.image_url} alt={quickViewItem.name} className="h-40 max-w-full object-contain border border-[#E5E7EB] bg-white p-1" />
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-2 border-b border-[#E5E7EB] pb-2 font-mono text-[11px]">
                                 <div>
                                     <span className="text-[#6B7280]">Category:</span>{' '}

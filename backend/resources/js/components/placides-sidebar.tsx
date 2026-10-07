@@ -182,7 +182,7 @@ export default function PlacidesSidebar() {
                 </Group>
 
                 <Group label="Sales & Catalog">
-                    <Item label="Orders" dot>
+                    <Item label="Orders" href="/orders" dot>
                         <ShoppingBag size={18} />
                     </Item>
                     <Item label="Products" href="/products">
