@@ -449,8 +449,6 @@ export async function createOrder(payload: Record<string, any>): Promise<Record<
         return json.data || json;
       }
 
-      // If backend returned a validation error (e.g. 422 ADDRESS_REQUIRED or ADDRESS_INCOMPLETE),
-      // bubble it up immediately!
       if (res.status === 422 || res.status === 400 || res.status === 403) {
         const err = new Error(json?.message || 'Order could not be created');
         (err as any).status = res.status;
@@ -466,6 +464,272 @@ export async function createOrder(payload: Record<string, any>): Promise<Record<
     }
   }
   throw lastError || new Error('Could not reach any API server to create order');
+}
+
+// ─── Print Services ───────────────────────────────────────────────────────────
+
+export interface ApiPrintService {
+  id: number | string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  status: string;
+  base_price: number | string;
+  base_price_formatted: string;
+  unit: string;
+  min_quantity: number;
+  max_file_size_mb: number;
+  allowed_file_types: string[];
+  rush_surcharge_type: string;
+  rush_surcharge_amount: number | string;
+  turnaround_time?: string;
+  rush_turnaround_time?: string;
+  sort_order: number;
+  specifications?: ApiPrintServiceSpecification[];
+}
+
+export interface ApiPrintServiceSpecification {
+  id: number | string;
+  name: string;
+  type: string;
+  options: Array<{ label: string; value?: string; price_modifier?: number | string }>;
+  is_required: boolean;
+  sort_order: number;
+}
+
+export interface ApiPrintOrder {
+  id: number | string;
+  order_number: string;
+  orderNumber: string;
+  customer_id: number | string;
+  service_id: number | string;
+  service_name: string;
+  specifications: Array<{ name: string; label: string; price_modifier?: number }>;
+  file_url: string | null;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  quantity: number;
+  unit_price: number | string;
+  unit_price_formatted: string;
+  subtotal: number | string;
+  subtotal_formatted: string;
+  rush_fee: number | string;
+  rush_fee_formatted: string;
+  shipping_fee: number | string;
+  shipping_fee_formatted: string;
+  total: number | string;
+  total_formatted: string;
+  fulfillment_type: string;
+  status: string;
+  payment_method: string;
+  payment_status: string;
+  gcash_reference_number?: string;
+  gcash_screenshot_url?: string | null;
+  courier_name?: string;
+  tracking_number?: string;
+  tracking_url?: string;
+  notes?: string;
+  placed_at?: string;
+  placedOn?: string;
+  shipped_at?: string;
+  delivered_at?: string;
+  cancelled_at?: string;
+  cancellation_reason?: string;
+  can_cancel: boolean;
+  canCancel: boolean;
+  is_pickup: boolean;
+  isPaid: boolean;
+}
+
+export async function fetchPrintServices(): Promise<ApiPrintService[]> {
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/print-services`, {
+        headers: { 'Accept': 'application/json' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const items = json.data || json;
+        if (Array.isArray(items)) return items;
+      }
+    } catch (err) {
+      console.warn(`[Api] Failed to fetch print services from ${baseUrl}:`, err);
+    }
+  }
+  return [];
+}
+
+export async function fetchPrintServiceBySlug(slug: string): Promise<ApiPrintService | null> {
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/print-services/${encodeURIComponent(slug)}`, {
+        headers: { 'Accept': 'application/json' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || json;
+      }
+    } catch (err) {
+      console.warn(`[Api] Failed to fetch print service from ${baseUrl}:`, err);
+    }
+  }
+  return null;
+}
+
+export async function fetchPrintOrders(email?: string): Promise<ApiPrintOrder[]> {
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const url = cleanEmail
+        ? `${baseUrl}/api/v1/print-orders?customer_email=${encodeURIComponent(cleanEmail)}`
+        : `${baseUrl}/api/v1/print-orders`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (res.ok) {
+        const json = await res.json();
+        const items = json.data || json;
+        if (Array.isArray(items)) return items;
+      }
+    } catch (err) {
+      console.warn('[Api] Failed to fetch print orders:', err);
+    }
+  }
+  return [];
+}
+
+export async function fetchPrintOrderDetails(id: string | number, email?: string): Promise<ApiPrintOrder | null> {
+  const cleanId = String(id).trim().replace(/^#/, '');
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const url = cleanEmail
+        ? `${baseUrl}/api/v1/print-orders/${encodeURIComponent(cleanId)}?customer_email=${encodeURIComponent(cleanEmail)}`
+        : `${baseUrl}/api/v1/print-orders/${encodeURIComponent(cleanId)}`;
+      const res = await fetch(url, {
+        headers: { 'Accept': 'application/json' },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const data = json.data || json;
+        if (data && (data.order_number || data.orderNumber || data.id)) {
+          return data;
+        }
+      }
+    } catch (err) {
+      console.warn(`[Api] Failed to fetch print order detail from ${baseUrl}:`, err);
+    }
+  }
+  return null;
+}
+
+export async function createPrintOrder(payload: {
+  service_id: number;
+  specifications: Array<{ name: string; label: string; price_modifier?: number }>;
+  quantity: number;
+  fulfillment_type: 'delivery' | 'pickup';
+  customer_address_id?: number;
+  payment_method: 'cod' | 'gcash';
+  gcash_reference_number?: string;
+  is_rush: boolean;
+  notes?: string;
+  file: File | { uri: string; name: string; type: string };
+  gcash_screenshot?: File | { uri: string; name: string; type: string };
+}): Promise<Record<string, any>> {
+  let lastError: any = null;
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const formData = new FormData();
+      formData.append('service_id', String(payload.service_id));
+      formData.append('specifications', JSON.stringify(payload.specifications));
+      formData.append('quantity', String(payload.quantity));
+      formData.append('fulfillment_type', payload.fulfillment_type);
+      if (payload.customer_address_id) {
+        formData.append('customer_address_id', String(payload.customer_address_id));
+      }
+      formData.append('payment_method', payload.payment_method);
+      if (payload.gcash_reference_number) {
+        formData.append('gcash_reference_number', payload.gcash_reference_number);
+      }
+      formData.append('is_rush', payload.is_rush ? '1' : '0');
+      if (payload.notes) {
+        formData.append('notes', payload.notes);
+      }
+      formData.append('file', payload.file as any);
+      if (payload.gcash_screenshot) {
+        formData.append('gcash_screenshot', payload.gcash_screenshot as any);
+      }
+
+      const res = await fetch(`${baseUrl}/api/v1/print-orders`, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+        body: formData,
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (res.ok) {
+        return json.data || json;
+      }
+
+      if (res.status === 422 || res.status === 400 || res.status === 403) {
+        const err = new Error(json?.message || 'Print order could not be created');
+        (err as any).status = res.status;
+        (err as any).data = json;
+        throw err;
+      }
+    } catch (err: any) {
+      if (err?.status === 422 || err?.status === 400 || err?.status === 403) {
+        throw err;
+      }
+      lastError = err;
+      console.warn(`[Api] Failed to create print order on ${baseUrl}:`, err);
+    }
+  }
+  throw lastError || new Error('Could not reach any API server to create print order');
+}
+
+export async function cancelPrintOrder(
+  id: string | number,
+  reason: string = 'Cancelled by customer'
+): Promise<{ success: boolean; message?: string; order?: ApiPrintOrder }> {
+  const cleanId = String(id).trim().replace(/^#/, '');
+
+  for (const origin of API_BASE_URLS) {
+    const baseUrl = sanitizeOrigin(origin);
+    try {
+      const res = await fetch(`${baseUrl}/api/v1/print-orders/${encodeURIComponent(cleanId)}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ reason }),
+      });
+      const json = await res.json();
+      if (res.ok && (json.status === 'success' || json.order)) {
+        return {
+          success: true,
+          message: json.message,
+          order: json.order?.data || json.order,
+        };
+      } else {
+        return {
+          success: false,
+          message: json.message || 'Failed to cancel print order.',
+        };
+      }
+    } catch (err) {
+      console.warn(`[Api] Failed to cancel print order at ${baseUrl}:`, err);
+    }
+  }
+  return { success: false, message: 'Could not connect to server to cancel print order.' };
 }
 
 

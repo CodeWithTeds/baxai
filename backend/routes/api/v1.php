@@ -13,6 +13,8 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PrintCategoryController;
 use App\Http\Controllers\Api\PrintItemAiController;
 use App\Http\Controllers\Api\PrintItemController;
+use App\Http\Controllers\Api\PrintOrderController;
+use App\Http\Controllers\Api\PrintServiceController;
 use App\Http\Controllers\Api\ProductAiController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\PsgcController;
@@ -71,6 +73,20 @@ Route::post('customers/bulk-destroy', [CustomerController::class, 'bulkDestroy']
 Route::post('print-items/ai-recognize', [PrintItemAiController::class, 'recognize']);
 Route::apiResource('print-items', PrintItemController::class);
 Route::apiResource('print-categories', PrintCategoryController::class);
+
+// Print Services & Print Orders API
+Route::get('print-services', [PrintServiceController::class, 'index']);
+Route::get('print-services/{slug}', [PrintServiceController::class, 'show']);
+Route::post('print-services', [PrintServiceController::class, 'store']);
+Route::put('print-services/{service}', [PrintServiceController::class, 'update']);
+Route::delete('print-services/{service}', [PrintServiceController::class, 'destroy']);
+
+Route::get('print-orders', [PrintOrderController::class, 'index']);
+Route::post('print-orders', [PrintOrderController::class, 'store']);
+Route::get('print-orders/{id}', [PrintOrderController::class, 'show']);
+Route::post('print-orders/{id}/status', [PrintOrderController::class, 'updateStatus']);
+Route::post('print-orders/{id}/cancel', [PrintOrderController::class, 'cancel']);
+Route::get('print-orders/{id}/file', [PrintOrderController::class, 'downloadFile']);
 
 // PSGC Geographic Data API (Philippine Hierarchy: Region -> Province -> City -> Barangay)
 Route::prefix('psgc')->group(function () {
