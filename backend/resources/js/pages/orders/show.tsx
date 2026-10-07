@@ -3,7 +3,7 @@ import { FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { dashboard } from '@/routes';
-import { ArrowLeft, CheckCircle2, Clock, MapPin, PackageCheck, Phone, Mail, Truck, User, XCircle, ExternalLink } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, MapPin, PackageCheck, Phone, Mail, Truck, User, XCircle, ExternalLink, Navigation } from 'lucide-react';
 import {
     Select,
     SelectContent,
@@ -11,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import MapView from '@/components/Map/MapView';
 
 interface OrderItemDetail {
     id: number;
@@ -56,6 +57,20 @@ interface OrderDetail {
     cancellation_reason?: string | null;
     tracking_steps?: { label: string; subtitle?: string; state: 'done' | 'active' | 'pending' }[];
     shipping_address?: any;
+    customer_address?: {
+        id: number;
+        latitude?: number | null;
+        longitude?: number | null;
+        street_address?: string;
+        formatted_address?: string;
+    } | null;
+    customerAddress?: {
+        id: number;
+        latitude?: number | null;
+        longitude?: number | null;
+        street_address?: string;
+        formatted_address?: string;
+    } | null;
     notes?: string | null;
     items?: OrderItemDetail[];
 }
@@ -229,6 +244,30 @@ export default function ShowOrder({ order }: { order: OrderDetail }) {
                                 )}
                             </div>
                         </div>
+
+                        {/* 3D DELIVERY MAP */}
+                        {(() => {
+                            const addr = order.customerAddress || order.customer_address;
+                            const lat = typeof addr?.latitude === 'number' ? addr.latitude : (typeof order.shipping_address?.latitude === 'number' ? order.shipping_address.latitude : null);
+                            const lng = typeof addr?.longitude === 'number' ? addr.longitude : (typeof order.shipping_address?.longitude === 'number' ? order.shipping_address.longitude : null);
+
+                            return (
+                                <div className="mt-3">
+                                    <div className="mb-1.5 flex items-center justify-between text-[11px] font-mono text-[#6B7280]">
+                                        <span className="font-bold text-[#1A1C1E] flex items-center gap-1">
+                                            <MapPin size={12} className="text-blue-600" />
+                                            3D Delivery Location Map
+                                        </span>
+                                        {lat && lng && (
+                                            <span>
+                                                Coordinates: {lat.toFixed(5)}, {lng.toFixed(5)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <MapView latitude={lat} longitude={lng} height="360px" />
+                                </div>
+                            );
+                        })()}
                     </section>
                 </div>
 
@@ -236,71 +275,130 @@ export default function ShowOrder({ order }: { order: OrderDetail }) {
                 <div className="space-y-3">
                     {/* STATUS UPDATE FORM */}
                     <form onSubmit={submitStatusUpdate} className="rounded-none border border-[#E5E7EB] bg-white p-4 font-mono text-xs space-y-3">
-                        <h3 className="uppercase tracking-wider text-[#1A1C1E] border-b border-[#E5E7EB] pb-1 font-bold">
-                            Fulfillment & Courier Settings
-                        </h3>
+                        <div className="flex items-center justify-between border-b border-[#E5E7EB] pb-1">
+                            <h3 className="uppercase tracking-wider text-[#1A1C1E] font-bold">
+                                Fulfillment & Courier Settings
+                            </h3>
+                            {(order.status === 'delivered' || order.status === 'cancelled') && (
+                                <span className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 px-1.5 py-0.5 border border-amber-200">
+                                    Terminal Locked
+                                </span>
+                            )}
+                        </div>
+
+                        {errors.status && (
+                            <div className="border border-red-200 bg-red-50 p-2 text-[11px] text-red-700">
+                                {errors.status}
+                            </div>
+                        )}
 
                         <div className="space-y-1">
-                            <p className="text-[10px] text-[#6B7280]">Fulfillment Status</p>
-                            <Select value={data.status} onValueChange={(v) => setData('status', v)}>
-                                <SelectTrigger className="h-8 rounded-none border-[#D1D5DB] text-xs font-mono w-full">
+                            <label className="text-[10px] text-[#6B7280] font-bold">
+                                Fulfillment Status <span className="text-red-500">*</span>
+                            </label>
+                            <Select
+                                value={data.status}
+                                onValueChange={(v) => setData('status', v)}
+                                disabled={order.status === 'delivered' || order.status === 'cancelled'}
+                            >
+                                <SelectTrigger className="h-8 rounded-none border-[#D1D5DB] text-xs font-mono w-full disabled:opacity-60 disabled:cursor-not-allowed">
                                     <SelectValue placeholder="Select Status" />
                                 </SelectTrigger>
-                                <SelectContent className="rounded-none">
+                                <SelectContent className="rounded-none font-mono text-xs">
                                     <SelectItem value="in_progress" className="text-xs">In Progress</SelectItem>
                                     <SelectItem value="processing" className="text-xs">Printing / Processing</SelectItem>
                                     <SelectItem value="delivered" className="text-xs">Delivered</SelectItem>
                                     <SelectItem value="cancelled" className="text-xs">Cancelled</SelectItem>
                                 </SelectContent>
                             </Select>
+                            {order.status === 'delivered' && (
+                                <p className="text-[10px] text-slate-500">Delivered orders cannot be moved to another status.</p>
+                            )}
+                            {order.status === 'cancelled' && (
+                                <p className="text-[10px] text-slate-500">Cancelled orders are terminal and cannot be re-opened.</p>
+                            )}
                         </div>
 
                         <div className="space-y-1">
-                            <p className="text-[10px] text-[#6B7280]">Payment Status</p>
+                            <label className="text-[10px] text-[#6B7280] font-bold">Payment Status</label>
                             <Select value={data.payment_status} onValueChange={(v) => setData('payment_status', v)}>
                                 <SelectTrigger className="h-8 rounded-none border-[#D1D5DB] text-xs font-mono w-full">
                                     <SelectValue placeholder="Select Payment Status" />
                                 </SelectTrigger>
-                                <SelectContent className="rounded-none">
+                                <SelectContent className="rounded-none font-mono text-xs">
                                     <SelectItem value="pending" className="text-xs">Pending</SelectItem>
                                     <SelectItem value="paid" className="text-xs">Paid</SelectItem>
                                     <SelectItem value="failed" className="text-xs">Failed</SelectItem>
                                     <SelectItem value="refunded" className="text-xs">Refunded</SelectItem>
                                 </SelectContent>
                             </Select>
+                            {errors.payment_status && <p className="text-[10px] text-red-600">{errors.payment_status}</p>}
                         </div>
 
                         <div className="space-y-1">
-                            <p className="text-[10px] text-[#6B7280]">Courier Name</p>
+                            <label className="text-[10px] text-[#6B7280] font-bold flex items-center justify-between">
+                                <span>Courier Name</span>
+                                {(data.status === 'processing' || data.status === 'delivered') && (
+                                    <span className="text-red-500 text-[9px] uppercase font-bold">Required for {data.status}</span>
+                                )}
+                            </label>
                             <Input
                                 value={data.courier_name}
                                 onChange={(e) => setData('courier_name', e.target.value)}
                                 placeholder="e.g. J&T Express, Lalamove, Flash"
                                 className={inputCls}
                             />
+                            {errors.courier_name && <p className="text-[10px] text-red-600">{errors.courier_name}</p>}
                         </div>
 
                         <div className="space-y-1">
-                            <p className="text-[10px] text-[#6B7280]">Tracking Number</p>
+                            <label className="text-[10px] text-[#6B7280] font-bold flex items-center justify-between">
+                                <span>Tracking Number</span>
+                                {(data.status === 'processing' || data.status === 'delivered') && (
+                                    <span className="text-red-500 text-[9px] uppercase font-bold">Required for {data.status}</span>
+                                )}
+                            </label>
                             <Input
                                 value={data.tracking_number}
                                 onChange={(e) => setData('tracking_number', e.target.value)}
                                 placeholder="e.g. JT-99824125PH"
                                 className={inputCls}
                             />
+                            {errors.tracking_number && <p className="text-[10px] text-red-600">{errors.tracking_number}</p>}
                         </div>
 
                         <div className="space-y-1">
-                            <p className="text-[10px] text-[#6B7280]">Tracking URL</p>
+                            <label className="text-[10px] text-[#6B7280] font-bold">Tracking URL</label>
                             <Input
                                 value={data.tracking_url}
                                 onChange={(e) => setData('tracking_url', e.target.value)}
                                 placeholder="https://..."
                                 className={inputCls}
                             />
+                            {errors.tracking_url && <p className="text-[10px] text-red-600">{errors.tracking_url}</p>}
                         </div>
 
-                        <Button type="submit" disabled={processing} className="h-8 rounded-none bg-[#1A1C1E] text-white hover:bg-black w-full text-xs font-mono">
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-[#6B7280] font-bold flex items-center justify-between">
+                                <span>Notes / Reason</span>
+                                {data.status === 'cancelled' && (
+                                    <span className="text-red-500 text-[9px] uppercase font-bold">Required for cancellation</span>
+                                )}
+                            </label>
+                            <Input
+                                value={data.notes}
+                                onChange={(e) => setData('notes', e.target.value)}
+                                placeholder={data.status === 'cancelled' ? 'Enter reason for cancellation...' : 'Internal notes or fulfillment remarks...'}
+                                className={inputCls}
+                            />
+                            {errors.notes && <p className="text-[10px] text-red-600">{errors.notes}</p>}
+                        </div>
+
+                        <Button
+                            type="submit"
+                            disabled={processing || (order.status === 'delivered' || order.status === 'cancelled')}
+                            className="h-8 rounded-none bg-[#1A1C1E] text-white hover:bg-black w-full text-xs font-mono disabled:opacity-50"
+                        >
                             {processing ? 'Saving Changes...' : 'Update Order Status'}
                         </Button>
 

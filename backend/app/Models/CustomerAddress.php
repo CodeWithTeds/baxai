@@ -28,6 +28,8 @@ class CustomerAddress extends Model
         'barangay_name',
         'street_address',
         'postal_code',
+        'latitude',
+        'longitude',
         'delivery_instructions',
     ];
 
@@ -37,6 +39,8 @@ class CustomerAddress extends Model
         'province_code' => 'string',
         'city_code' => 'string',
         'barangay_code' => 'string',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     protected $appends = [
@@ -85,6 +89,103 @@ class CustomerAddress extends Model
             && ! empty(trim($this->street_address ?? ''));
     }
 
+    protected static function booted(): void
+    {
+        static::saving(function (CustomerAddress $address) {
+            $addressFieldsDirty = $address->isDirty([
+                'street_address',
+                'barangay_name',
+                'city_name',
+                'province_name',
+                'region_name',
+                'postal_code',
+            ]);
+
+            if (($addressFieldsDirty || (is_null($address->latitude) && is_null($address->longitude))) && $address->isComplete()) {
+                $address->geocode();
+            }
+        });
+    }
+
+    public function geocode(): bool
+    {
+        $queries = array_unique(array_filter([
+            // Tier 1: Full address
+            implode(', ', array_filter([
+                $this->street_address,
+                $this->barangay_name ? "Barangay {$this->barangay_name}" : null,
+                $this->city_name,
+                $this->province_name,
+                'Philippines',
+            ])),
+            // Tier 2: Barangay + City + Province
+            implode(', ', array_filter([
+                $this->barangay_name ? "Barangay {$this->barangay_name}" : null,
+                $this->city_name,
+                $this->province_name,
+                'Philippines',
+            ])),
+            // Tier 3: City + Province
+            implode(', ', array_filter([
+                $this->city_name,
+                $this->province_name,
+                'Philippines',
+            ])),
+            // Tier 4: Province
+            implode(', ', array_filter([
+                $this->province_name,
+                'Philippines',
+            ])),
+        ]));
+
+        foreach ($queries as $query) {
+            if (empty(trim($query))) continue;
+
+            try {
+                $response = \Illuminate\Support\Facades\Http::withHeaders([
+                    'User-Agent' => 'PlacidesApp/1.0 (contact@placides.local)',
+                ])->timeout(4)->get('https://nominatim.openstreetmap.org/search', [
+                    'q' => $query,
+                    'format' => 'jsonv2',
+                    'limit' => 1,
+                    'countrycodes' => 'ph',
+                ]);
+
+                if ($response->successful() && ! empty($response->json())) {
+                    $first = $response->json()[0];
+                    if (isset($first['lat'], $first['lon'])) {
+                        $this->latitude = (float) $first['lat'];
+                        $this->longitude = (float) $first['lon'];
+                        return true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Ignore failure and continue to next fallback tier
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Compute Haversine distance in kilometers to another set of coordinates.
+     */
+    public function distanceTo(?float $latitude, ?float $longitude): ?float
+    {
+        if (is_null($this->latitude) || is_null($this->longitude) || is_null($latitude) || is_null($longitude)) {
+            return null;
+        }
+
+        $dLat = deg2rad($latitude - $this->latitude);
+        $dLon = deg2rad($longitude - $this->longitude);
+
+        $a = sin($dLat / 2) ** 2 +
+            cos(deg2rad($this->latitude)) * cos(deg2rad($latitude)) *
+            sin($dLon / 2) ** 2;
+
+        return 6371 * 2 * asin(sqrt($a));
+    }
+
     /**
      * Create an immutable snapshot for order preservation.
      */
@@ -104,6 +205,8 @@ class CustomerAddress extends Model
             'barangay_name' => $this->barangay_name,
             'street_address' => $this->street_address,
             'postal_code' => $this->postal_code,
+            'latitude' => $this->latitude,
+            'longitude' => $this->longitude,
             'delivery_instructions' => $this->delivery_instructions,
             'formatted_address' => $this->formatted_address,
         ];

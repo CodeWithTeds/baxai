@@ -17,6 +17,7 @@ import {
     Clock,
     Download,
     Eye,
+    MapPin,
     PackageCheck,
     Plus,
     RotateCcw,
@@ -27,6 +28,7 @@ import {
     XCircle,
 } from 'lucide-react';
 import { dashboard } from '@/routes';
+import MapView, { MapMarker } from '@/components/Map/MapView';
 import {
     Dialog,
     DialogContent,
@@ -81,6 +83,20 @@ interface OrderRow {
     cancellation_reason?: string | null;
     tracking_steps?: any[];
     shipping_address?: any;
+    customer_address?: {
+        id: number;
+        latitude?: number | null;
+        longitude?: number | null;
+        street_address?: string;
+        formatted_address?: string;
+    } | null;
+    customerAddress?: {
+        id: number;
+        latitude?: number | null;
+        longitude?: number | null;
+        street_address?: string;
+        formatted_address?: string;
+    } | null;
     notes?: string | null;
     items?: OrderItemRow[];
 }
@@ -141,8 +157,30 @@ export default function OrdersIndex({
     const [quickViewOrder, setQuickViewOrder] = useState<OrderRow | null>(null);
     const [statusUpdating, setStatusUpdating] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
+    const [showMap, setShowMap] = useState(true);
 
     const safeData = Array.isArray(orders?.data) ? orders.data : [];
+
+    const orderMarkers: MapMarker[] = safeData
+        .map((order): MapMarker | null => {
+            const addr = order.customerAddress || order.customer_address;
+            const lat = typeof addr?.latitude === 'number' ? addr.latitude : order.shipping_address?.latitude;
+            const lng = typeof addr?.longitude === 'number' ? addr.longitude : order.shipping_address?.longitude;
+
+            if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+                return {
+                    id: order.id,
+                    latitude: Number(lat),
+                    longitude: Number(lng),
+                    label: `Order #${order.order_number}`,
+                    subtitle: `${order.customer_name} • ₱${Number(order.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+                    href: `/orders/${order.id}`,
+                    status: order.status,
+                };
+            }
+            return null;
+        })
+        .filter((m): m is MapMarker => m !== null);
 
     const handleFilterChange = (updates: Record<string, string>) => {
         const query: Record<string, unknown> = {
@@ -313,6 +351,27 @@ export default function OrdersIndex({
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <Link href="/orders/map">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 rounded-none border-[#D1D5DB] bg-white text-xs font-mono text-blue-700 hover:bg-blue-50"
+                            >
+                                <MapPin size={13} className="mr-1 text-blue-600" />
+                                Full Map Page
+                            </Button>
+                        </Link>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowMap(!showMap)}
+                            className="h-8 rounded-none border-[#D1D5DB] bg-white text-xs font-mono"
+                        >
+                            <MapPin size={13} className={`mr-1 ${showMap ? 'text-blue-600' : 'text-slate-400'}`} />
+                            {showMap ? 'Hide Map' : 'Show Map'} ({orderMarkers.length})
+                        </Button>
+
                         <div className="border border-[#E5E7EB] bg-white px-3 py-1 font-mono text-xs shadow-sm flex items-center gap-2">
                             <span className="text-[#6B7280]">Gross Sales:</span>
                             <strong className="text-[#1A1C1E] font-bold text-sm">₱{stats.total_revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
@@ -354,6 +413,27 @@ export default function OrdersIndex({
                     </button>
                 </div>
             </div>
+
+            {/* LIVE DELIVERY MAP CARD */}
+            {showMap && (
+                <div className="mb-3 rounded-none border border-[#E5E7EB] bg-white p-2">
+                    <div className="mb-1.5 flex items-center justify-between text-xs font-mono">
+                        <span className="font-semibold text-[#1A1C1E] flex items-center gap-1.5">
+                            <MapPin size={13} className="text-blue-600" />
+                            Live Delivery Locations ({orderMarkers.length} mapped)
+                        </span>
+                        <div className="flex items-center gap-2 text-[11px] text-[#6B7280]">
+                            {safeData.length - orderMarkers.length > 0 && (
+                                <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 border border-amber-200">
+                                    {safeData.length - orderMarkers.length} orders without coordinates
+                                </span>
+                            )}
+                            <span>MapLibre GL Multi-Style Map • Click pin to view order</span>
+                        </div>
+                    </div>
+                    <MapView markers={orderMarkers} height="320px" initialStyle="osm" />
+                </div>
+            )}
 
             {/* FILTER TOOLBAR PANEL */}
             <div className="mb-2.5 rounded-none border border-[#E5E7EB] bg-white p-2">

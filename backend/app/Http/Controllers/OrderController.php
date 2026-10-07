@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\BulkUpdateOrderStatusRequest;
+use App\Http\Requests\UpdateOrderStatusRequest;
 use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
@@ -13,7 +15,7 @@ class OrderController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Order::with(['items', 'customer'])->latest('placed_at');
+        $query = Order::with(['items', 'customer', 'customerAddress'])->latest('placed_at');
 
         if ($request->filled('filter.search')) {
             $search = trim($request->input('filter.search'));
@@ -71,6 +73,17 @@ class OrderController extends Controller
         ]);
     }
 
+    public function map(): Response
+    {
+        $orders = Order::with(['items', 'customer', 'customerAddress'])
+            ->latest('placed_at')
+            ->get();
+
+        return Inertia::render('orders/map', [
+            'orders' => $orders,
+        ]);
+    }
+
     public function show(Order $order): Response
     {
         return Inertia::render('orders/show', [
@@ -78,17 +91,9 @@ class OrderController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, Order $order): RedirectResponse
+    public function updateStatus(UpdateOrderStatusRequest $request, Order $order): RedirectResponse
     {
-        $validated = $request->validate([
-            'status' => 'required|in:in_progress,processing,delivered,cancelled',
-            'payment_status' => 'nullable|string|in:pending,paid,failed,refunded',
-            'courier_name' => 'nullable|string|max:100',
-            'tracking_number' => 'nullable|string|max:100',
-            'tracking_url' => 'nullable|string|max:500',
-            'notes' => 'nullable|string|max:2000',
-        ]);
-
+        $validated = $request->validated();
         $newStatus = $validated['status'];
 
         if ($newStatus === 'cancelled' && $order->status !== 'cancelled') {
@@ -145,22 +150,23 @@ class OrderController extends Controller
         return redirect()->route('orders.index')->with('success', 'Order removed successfully.');
     }
 
-    public function bulkUpdateStatus(Request $request): RedirectResponse
+    public function bulkUpdateStatus(BulkUpdateOrderStatusRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'integer|exists:orders,id',
-            'status' => 'required|string|in:in_progress,processing,delivered,cancelled',
-        ]);
-
+        $validated = $request->validated();
         $orders = Order::whereIn('id', $validated['ids'])->get();
+
         foreach ($orders as $order) {
-            $order->status = $validated['status'];
-            if ($validated['status'] === 'delivered') {
+            $oldStatus = $order->status;
+            $newStatus = $validated['status'];
+            $order->status = $newStatus;
+
+            if ($newStatus === 'delivered') {
                 $order->delivered_at = now();
                 $order->payment_status = 'paid';
-            } elseif ($validated['status'] === 'cancelled' && $order->status !== 'cancelled') {
+            } elseif ($newStatus === 'cancelled' && $oldStatus !== 'cancelled') {
                 $order->cancelled_at = now();
+                $order->cancellation_reason = $validated['notes'] ?? 'Bulk cancelled by admin';
+
                 foreach ($order->items as $item) {
                     if ($item->product_id) {
                         $prod = Product::find($item->product_id);
@@ -170,12 +176,27 @@ class OrderController extends Controller
                     }
                 }
             }
+
+            if (! empty($validated['courier_name'])) {
+                $order->courier_name = $validated['courier_name'];
+            }
+            if (! empty($validated['tracking_number'])) {
+                $order->tracking_number = $validated['tracking_number'];
+            }
+            if (! empty($validated['tracking_url'])) {
+                $order->tracking_url = $validated['tracking_url'];
+            }
+            if (! empty($validated['notes'])) {
+                $order->notes = $validated['notes'];
+            }
+
             $order->tracking_steps = Order::buildDefaultTrackingSteps(
-                $validated['status'],
+                $newStatus,
                 $order->placed_at ? $order->placed_at->format('M d, h:i A') : now()->format('M d, h:i A'),
                 $order->courier_name,
                 $order->tracking_number
             );
+
             $order->save();
         }
 
