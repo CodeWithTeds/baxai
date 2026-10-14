@@ -59,11 +59,16 @@ class CustomerAddressController extends Controller
      */
     public function saveAddress(Request $request): JsonResponse
     {
+        if ($request->has('phone_number')) {
+            $cleanedPhone = preg_replace('/\D/', '', (string) $request->input('phone_number'));
+            $request->merge(['phone_number' => $cleanedPhone]);
+        }
+
         $validated = $request->validate([
             'email' => 'required_without:customer_id|nullable|email|max:255',
             'customer_id' => 'nullable|integer',
             'recipient_name' => 'required|string|max:255',
-            'phone_number' => 'required|string|max:50',
+            'phone_number' => ['required', 'string', 'digits:11'],
             'region_code' => 'required|string|max:20',
             'region_name' => 'required|string|max:255',
             'province_code' => 'nullable|string|max:20',
@@ -78,6 +83,7 @@ class CustomerAddressController extends Controller
         ], [
             'recipient_name.required' => 'Recipient name is required.',
             'phone_number.required' => 'Contact phone number is required.',
+            'phone_number.digits' => 'Contact number must be exactly 11 digits (e.g., 09XXXXXXXXX).',
             'region_code.required' => 'Please select a Region from the dropdown.',
             'region_name.required' => 'Region name is required.',
             'city_code.required' => 'Please select a City/Municipality from the dropdown.',

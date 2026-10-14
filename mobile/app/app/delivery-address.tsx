@@ -215,8 +215,13 @@ export default function DeliveryAddressScreen() {
       Alert.alert('Required Field', 'Please enter the recipient full name.');
       return;
     }
-    if (!phoneNumber.trim()) {
+    const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
+    if (!cleanPhone) {
       Alert.alert('Required Field', 'Please enter a contact phone number.');
+      return;
+    }
+    if (cleanPhone.length !== 11) {
+      Alert.alert('Invalid Contact Number', 'Contact number must be exactly 11 digits (e.g., 09XXXXXXXXX).');
       return;
     }
     if (!selectedRegion) {
@@ -246,7 +251,7 @@ export default function DeliveryAddressScreen() {
     const payload = {
       email: user?.email,
       recipient_name: recipientName.trim(),
-      phone_number: phoneNumber.trim(),
+      phone_number: cleanPhone,
       region_code: selectedRegion.code,
       region_name: selectedRegion.name,
       province_code: selectedProvince ? selectedProvince.code : null,
@@ -369,14 +374,20 @@ export default function DeliveryAddressScreen() {
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Phone Number *</Text>
+              <View style={styles.fieldLabelRow}>
+                <Text style={styles.fieldLabel}>Phone Number *</Text>
+                <Text style={styles.phoneCounterText}>
+                  {phoneNumber.replace(/[^0-9]/g, '').length}/11 digits
+                </Text>
+              </View>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. 0917 123 4567"
+                placeholder="e.g. 09171234567"
                 placeholderTextColor="#9CA3AF"
                 value={phoneNumber}
-                onChangeText={setPhoneNumber}
+                onChangeText={(val) => setPhoneNumber(val.replace(/[^0-9]/g, '').slice(0, 11))}
                 keyboardType="phone-pad"
+                maxLength={11}
               />
             </View>
 
@@ -770,10 +781,20 @@ const styles = StyleSheet.create({
   fieldGroup: {
     gap: 6,
   },
+  fieldLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   fieldLabel: {
     fontSize: 13,
     fontWeight: '600',
     color: '#374151',
+  },
+  phoneCounterText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   input: {
     borderWidth: 1,
