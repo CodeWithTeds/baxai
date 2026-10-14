@@ -45,7 +45,7 @@ if (__DEV__) {
   // also suppress EXGL multisample throw from being logged as ERROR until renderer fixed
   console.error = (...args: any[]) => {
     const msg = typeof args[0] === 'string' ? args[0] : args[0]?.message ?? '';
-    if (typeof msg === 'string' && (msg.includes('renderbufferStorageMultisample') || msg.includes('EXGL:'))) return;
+    if (typeof msg === 'string' && (msg.includes('renderbufferStorageMultisample') || msg.includes('EXGL:') || msg.includes("The action 'GO_BACK' was not handled by any navigator"))) return;
     // @ts-ignore
     _error(...args);
   };
