@@ -174,7 +174,7 @@ function TermsOfServiceContent() {
       <Text style={styles.sectionHeading}>4. Pricing, Payments & Discounts</Text>
       <Text style={styles.paragraph}>
         All prices are listed in Philippine Pesos (PHP ₱). Payments may be made via supported digital payment gateways, GCash,
-        Maya, cards, and Cash on Delivery (COD) where available. Promotional discount coupons and loyalty VIP points must be
+        Maya, cards, and Cash on Delivery (COD) where available. Promotional discount coupons and loyalty points must be
         applied prior to order confirmation.
       </Text>
 

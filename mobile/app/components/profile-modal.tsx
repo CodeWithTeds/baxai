@@ -99,10 +99,6 @@ export default function ProfileModal({ visible, onClose, email: propEmail, name:
                 <Text style={styles.userEmail}>{displayEmail}</Text>
                 
                 <View style={styles.badgeRow}>
-                  <View style={styles.badge}>
-                    <Ionicons name="ribbon-outline" size={12} color="#D97706" />
-                    <Text style={styles.badgeText}>VIP Member</Text>
-                  </View>
                   <View style={[styles.badge, { backgroundColor: '#ECFDF5' }]}>
                     <View style={styles.greenDot} />
                     <Text style={[styles.badgeText, { color: '#059669' }]}>Active</Text>

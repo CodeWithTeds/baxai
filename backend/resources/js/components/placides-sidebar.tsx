@@ -3,15 +3,11 @@ import {
     BarChart3,
     Boxes,
     ChevronDown,
-    FileCheck,
-    FolderKanban,
     LayoutGrid,
     Package,
     Printer,
     Settings,
     ShoppingBag,
-    Sparkles,
-    Tag,
     Users,
     Warehouse,
 } from 'lucide-react';
@@ -203,26 +199,11 @@ export default function PlacidesSidebar() {
                             { label: 'Print Categories', href: '/print-categories' },
                         ]}
                     />
-                    <Item label="Proof Approvals">
-                        <FileCheck size={18} />
-                    </Item>
-                    <Item label="Production Queue">
-                        <FolderKanban size={18} />
-                    </Item>
                 </Group>
 
                 <Group label="Inventory & Stock">
                     <Item label="Paper & Stock" href="/print-items?filter[category_code]=STOCK">
                         <Warehouse size={18} />
-                    </Item>
-                </Group>
-
-                <Group label="Marketing & Deals">
-                    <Item label="Discounts & Coupons" href="/discounts">
-                        <Tag size={18} />
-                    </Item>
-                    <Item label="VIP & Rewards" href="/rewards">
-                        <Sparkles size={18} />
                     </Item>
                 </Group>
 

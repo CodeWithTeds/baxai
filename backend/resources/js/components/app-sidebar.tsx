@@ -2,16 +2,12 @@ import { Link } from '@inertiajs/react';
 import {
     BookOpen,
     Boxes,
-    FileCheck,
     FolderGit2,
-    FolderKanban,
     LayoutGrid,
     Package,
     Printer,
     Settings,
     ShoppingBag,
-    Sparkles,
-    Tag,
     Users,
     Warehouse,
 } from 'lucide-react';
@@ -68,16 +64,6 @@ const printNavItems: NavItem[] = [
             { title: 'Print Categories', href: '/print-categories' },
         ],
     },
-    {
-        title: 'Proof Approvals',
-        href: '#',
-        icon: FileCheck,
-    },
-    {
-        title: 'Production Queue',
-        href: '#',
-        icon: FolderKanban,
-    },
 ];
 
 const inventoryNavItems: NavItem[] = [
@@ -85,19 +71,6 @@ const inventoryNavItems: NavItem[] = [
         title: 'Paper & Stock',
         href: '/print-items?filter[category_code]=STOCK',
         icon: Warehouse,
-    },
-];
-
-const marketingNavItems: NavItem[] = [
-    {
-        title: 'Discounts & Coupons',
-        href: '/discounts',
-        icon: Tag,
-    },
-    {
-        title: 'VIP & Rewards',
-        href: '/rewards',
-        icon: Sparkles,
     },
 ];
 
@@ -130,7 +103,6 @@ export function AppSidebar() {
                 <NavMain label="Sales & Catalog" items={sellNavItems} />
                 <NavMain label="Printing Operations" items={printNavItems} />
                 <NavMain label="Inventory & Stock" items={inventoryNavItems} />
-                <NavMain label="Marketing & Deals" items={marketingNavItems} />
                 <NavMain label="System & Control" items={manageNavItems} />
             </SidebarContent>
 
