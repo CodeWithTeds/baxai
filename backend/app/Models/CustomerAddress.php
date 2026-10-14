@@ -92,16 +92,11 @@ class CustomerAddress extends Model
     protected static function booted(): void
     {
         static::saving(function (CustomerAddress $address) {
-            $addressFieldsDirty = $address->isDirty([
-                'street_address',
-                'barangay_name',
-                'city_name',
-                'province_name',
-                'region_name',
-                'postal_code',
-            ]);
+            // Only perform backend fallback geocoding if coordinates were NOT provided
+            // by the client (e.g., interactive map pin or GPS)
+            $hasCoordinates = ! is_null($address->latitude) && ! is_null($address->longitude) && (float) $address->latitude !== 0.0;
 
-            if (($addressFieldsDirty || (is_null($address->latitude) && is_null($address->longitude))) && $address->isComplete()) {
+            if (! $hasCoordinates && $address->isComplete()) {
                 $address->geocode();
             }
         });

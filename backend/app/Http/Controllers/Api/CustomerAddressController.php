@@ -79,6 +79,8 @@ class CustomerAddressController extends Controller
             'barangay_name' => 'required|string|max:255',
             'street_address' => 'required|string|max:500',
             'postal_code' => 'nullable|string|max:20',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
             'delivery_instructions' => 'nullable|string|max:500',
         ], [
             'recipient_name.required' => 'Recipient name is required.',
@@ -187,6 +189,8 @@ class CustomerAddressController extends Controller
                 'barangay_name' => trim($validated['barangay_name']),
                 'street_address' => trim($validated['street_address']),
                 'postal_code' => ! empty($validated['postal_code']) ? trim($validated['postal_code']) : null,
+                'latitude' => isset($validated['latitude']) && $validated['latitude'] !== null ? (float) $validated['latitude'] : null,
+                'longitude' => isset($validated['longitude']) && $validated['longitude'] !== null ? (float) $validated['longitude'] : null,
                 'delivery_instructions' => ! empty($validated['delivery_instructions']) ? trim($validated['delivery_instructions']) : null,
             ]
         );
