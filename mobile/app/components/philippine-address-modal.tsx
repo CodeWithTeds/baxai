@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,16 +16,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AddressMapPicker, { MapCoordinates } from './address-map-picker';
 import { BrandColors } from '@/constants/theme';
 import {
   CustomerAddress,
+  NominatimResult,
   PsgcItem,
   fetchCustomerAddress,
   fetchPsgcBarangays,
   fetchPsgcCities,
   fetchPsgcProvinces,
   fetchPsgcRegions,
+  formatStreetBuildingLabel,
   saveCustomerAddress,
+  searchAddress,
 } from '@/utils/api';
 
 interface Props {
@@ -57,6 +61,16 @@ export default function PhilippineAddressModal({
   const [streetAddress, setStreetAddress] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
+
+  // Map & Pin location
+  const [pinLocation, setPinLocation] = useState<MapCoordinates | null>(null);
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [pinnedSummary, setPinnedSummary] = useState('');
+
+  // Street / Building forward search suggestions
+  const [streetSuggestions, setStreetSuggestions] = useState<NominatimResult[]>([]);
+  const [isSearchingStreet, setIsSearchingStreet] = useState(false);
+  const streetSearchDebounceRef = useRef<any>(null);
 
   // Selected PSGC Items
   const [selectedRegion, setSelectedRegion] = useState<PsgcItem | null>(null);
@@ -109,6 +123,13 @@ export default function PhilippineAddressModal({
     setStreetAddress(addr.street_address || '');
     setPostalCode(addr.postal_code || '');
     setDeliveryInstructions(addr.delivery_instructions || '');
+
+    if (addr.latitude && addr.longitude) {
+      setPinLocation({
+        latitude: parseFloat(String(addr.latitude)),
+        longitude: parseFloat(String(addr.longitude)),
+      });
+    }
 
     if (addr.region_code) {
       const regItem: PsgcItem = { code: addr.region_code, name: addr.region_name };
@@ -165,6 +186,239 @@ export default function PhilippineAddressModal({
       setRegions(data);
     } finally {
       setLoadingRegions(false);
+    }
+  };
+
+  // ─── Map & Nominatim Auto-Fill ─────────────────────────────────────────────
+
+  const handleLocationSelect = async (coords: MapCoordinates, result: NominatimResult | null) => {
+    setPinLocation(coords);
+    if (result) {
+      setPinnedSummary(result.display_name);
+      await autoFillFromNominatim(result);
+    }
+  };
+
+  const autoFillFromNominatim = async (result: NominatimResult) => {
+    setIsAutoFilling(true);
+    try {
+      const addr = result.address || {};
+
+      // 1. Street Address using formatStreetBuildingLabel to prevent barangay pollution
+      const label = formatStreetBuildingLabel(result);
+      if (label.streetAddress) {
+        setStreetAddress(label.streetAddress);
+      }
+
+      // 2. Postal Code
+      if (addr.postcode) {
+        setPostalCode(addr.postcode.trim());
+      }
+
+      // 3. PSGC Cascading Match
+      const rawState = (addr.state || '').toLowerCase();
+      const rawRegion = (addr.region || '').toLowerCase();
+      const rawCounty = (addr.county || '').toLowerCase();
+      const rawCity = (addr.city || addr.town || addr.municipality || '').toLowerCase();
+      const rawBarangay = (addr.quarter || addr.suburb || addr.neighbourhood || addr.village || '').toLowerCase();
+
+      let currentRegions = regions;
+      if (!currentRegions.length) {
+        currentRegions = await fetchPsgcRegions();
+        setRegions(currentRegions);
+      }
+
+      const clean = (s: string) =>
+        s
+          .toLowerCase()
+          .replace(/^(city of|municipality of|barangay|brgy\.?|province of)\s+/i, '')
+          .trim();
+
+      // Find matched region
+      let matchedReg: PsgcItem | null = null;
+      for (const r of currentRegions) {
+        const rName = r.name.toLowerCase();
+        if (
+          (rawRegion.includes('ncr') ||
+            rawRegion.includes('metro manila') ||
+            rawState.includes('metro manila') ||
+            rawCounty.includes('metro manila') ||
+            rawCity.includes('manila') ||
+            rawCity.includes('quezon city') ||
+            rawCity.includes('makati') ||
+            rawCity.includes('taguig') ||
+            rawCity.includes('pasig') ||
+            rawCity.includes('mandaluyong') ||
+            rawCity.includes('paranaque') ||
+            rawCity.includes('pasay') ||
+            rawCity.includes('marikina') ||
+            rawCity.includes('valenzuela') ||
+            rawCity.includes('caloocan')) &&
+          (rName.includes('ncr') || rName.includes('national capital'))
+        ) {
+          matchedReg = r;
+          break;
+        }
+        if (
+          (rawRegion.includes('calabarzon') || rawState.includes('calabarzon') || rawRegion.includes('iv-a')) &&
+          (rName.includes('calabarzon') || rName.includes('iv-a'))
+        ) {
+          matchedReg = r;
+          break;
+        }
+        if (
+          (rawRegion.includes('mimaropa') || rawState.includes('mimaropa') || rawRegion.includes('iv-b')) &&
+          (rName.includes('mimaropa') || rName.includes('iv-b'))
+        ) {
+          matchedReg = r;
+          break;
+        }
+        if (
+          (rawRegion.includes('central visayas') || rawRegion.includes('vii')) &&
+          (rName.includes('central visayas') || rName.includes('vii'))
+        ) {
+          matchedReg = r;
+          break;
+        }
+        if (
+          (rawRegion.includes('western visayas') || rawRegion.includes('vi')) &&
+          (rName.includes('western visayas') || rName.includes('vi'))
+        ) {
+          matchedReg = r;
+          break;
+        }
+        if (
+          (rawRegion.includes('central luzon') || rawRegion.includes('iii')) &&
+          (rName.includes('central luzon') || rName.includes('iii'))
+        ) {
+          matchedReg = r;
+          break;
+        }
+        if (rName.includes(rawRegion) || (rawState && rName.includes(rawState))) {
+          matchedReg = r;
+          break;
+        }
+      }
+
+      if (matchedReg) {
+        setSelectedRegion(matchedReg);
+
+        // Fetch provinces for region
+        setLoadingProvinces(true);
+        const provs = await fetchPsgcProvinces(matchedReg.code);
+        setProvinces(provs);
+        setLoadingProvinces(false);
+
+        let matchedProv: PsgcItem | null = null;
+        if (provs.length > 0) {
+          for (const p of provs) {
+            const pClean = clean(p.name);
+            if (rawCounty && (pClean.includes(clean(rawCounty)) || clean(rawCounty).includes(pClean))) {
+              matchedProv = p;
+              break;
+            }
+            if (rawState && (pClean.includes(clean(rawState)) || clean(rawState).includes(pClean))) {
+              matchedProv = p;
+              break;
+            }
+          }
+          setSelectedProvince(matchedProv);
+        } else {
+          setSelectedProvince(null);
+        }
+
+        // Fetch cities
+        setLoadingCities(true);
+        const cityList = await fetchPsgcCities(matchedProv?.code, matchedReg.code);
+        setCities(cityList);
+        setLoadingCities(false);
+
+        let matchedCityItem: PsgcItem | null = null;
+        if (rawCity && cityList.length > 0) {
+          const cTarget = clean(rawCity);
+          for (const c of cityList) {
+            const cClean = clean(c.name);
+            if (cClean === cTarget || cClean.includes(cTarget) || cTarget.includes(cClean)) {
+              matchedCityItem = c;
+              break;
+            }
+          }
+        }
+
+        if (matchedCityItem) {
+          setSelectedCity(matchedCityItem);
+
+          // Fetch barangays
+          setLoadingBarangays(true);
+          const brgyList = await fetchPsgcBarangays(matchedCityItem.code);
+          setBarangays(brgyList);
+          setLoadingBarangays(false);
+
+          if (rawBarangay && brgyList.length > 0) {
+            const bTarget = clean(rawBarangay);
+            let matchedBrgyItem: PsgcItem | null = null;
+            for (const b of brgyList) {
+              const bClean = clean(b.name);
+              if (bClean === bTarget || bClean.includes(bTarget) || bTarget.includes(bClean)) {
+                matchedBrgyItem = b;
+                break;
+              }
+            }
+            if (matchedBrgyItem) {
+              setSelectedBarangay(matchedBrgyItem);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[AutoFill] PSGC auto-fill failed:', err);
+    } finally {
+      setIsAutoFilling(false);
+    }
+  };
+
+  // ─── Street / Building Forward Search ──────────────────────────────────────
+
+  const handleStreetTextChange = (text: string) => {
+    setStreetAddress(text);
+    if (streetSearchDebounceRef.current) {
+      clearTimeout(streetSearchDebounceRef.current);
+    }
+
+    const trimmed = text.trim();
+    if (trimmed.length < 3) {
+      setStreetSuggestions([]);
+      setIsSearchingStreet(false);
+      return;
+    }
+
+    setIsSearchingStreet(true);
+    streetSearchDebounceRef.current = setTimeout(async () => {
+      try {
+        const results = await searchAddress(trimmed, selectedCity?.name);
+        setStreetSuggestions(results);
+      } catch (e) {
+        setStreetSuggestions([]);
+      } finally {
+        setIsSearchingStreet(false);
+      }
+    }, 400);
+  };
+
+  const handleSelectStreetSuggestion = (item: NominatimResult) => {
+    const label = formatStreetBuildingLabel(item);
+    const chosenStreet = label.streetAddress || label.title;
+    setStreetAddress(chosenStreet);
+    setStreetSuggestions([]);
+
+    if (item.lat && item.lon) {
+      const coords: MapCoordinates = {
+        latitude: parseFloat(item.lat),
+        longitude: parseFloat(item.lon),
+      };
+      setPinLocation(coords);
+      setPinnedSummary(item.display_name);
+      autoFillFromNominatim(item);
     }
   };
 
@@ -295,6 +549,8 @@ export default function PhilippineAddressModal({
       barangay_name: selectedBarangay.name,
       street_address: streetAddress.trim(),
       postal_code: postalCode.trim() || null,
+      latitude: pinLocation ? pinLocation.latitude : null,
+      longitude: pinLocation ? pinLocation.longitude : null,
       delivery_instructions: deliveryInstructions.trim() || null,
     };
 
@@ -412,6 +668,16 @@ export default function PhilippineAddressModal({
                   maxLength={11}
                 />
               </View>
+
+              {/* Interactive Map & GPS Auto-Fill */}
+              <Text style={styles.sectionHeading}>Interactive Map & Pin Location</Text>
+              <AddressMapPicker
+                initialCoordinates={pinLocation}
+                onLocationSelect={handleLocationSelect}
+                pinnedAddressText={pinnedSummary}
+                isAutoFilling={isAutoFilling}
+                cityContext={selectedCity?.name}
+              />
 
               {/* Dependent Dropdowns */}
               <Text style={styles.sectionHeading}>Philippine Address Hierarchy (PSGC)</Text>
@@ -586,17 +852,59 @@ export default function PhilippineAddressModal({
               {/* Street & Postal Details */}
               <Text style={styles.sectionHeading}>Street & Building Details</Text>
 
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Street / Building / House No. / Unit *</Text>
+              <View style={[styles.fieldGroup, { zIndex: 50 }]}>
+                <View style={styles.fieldLabelRow}>
+                  <Text style={styles.fieldLabel}>Street / Building / House No. / Unit *</Text>
+                  {isSearchingStreet && (
+                    <ActivityIndicator size="small" color={BrandColors.primary} />
+                  )}
+                </View>
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   placeholder="e.g. Unit 4B, Emerald Tower, 24 Ruby St."
                   placeholderTextColor="#9CA3AF"
                   value={streetAddress}
-                  onChangeText={setStreetAddress}
+                  onChangeText={handleStreetTextChange}
                   multiline
                   numberOfLines={2}
                 />
+                {streetSuggestions.length > 0 && (
+                  <View style={styles.streetSuggestionsList}>
+                    <View style={styles.suggestionsHeader}>
+                      <Text style={styles.suggestionsHeaderText}>Suggested Streets & Buildings</Text>
+                      <Pressable onPress={() => setStreetSuggestions([])} hitSlop={8}>
+                        <Ionicons name="close" size={16} color="#6B7280" />
+                      </Pressable>
+                    </View>
+                    <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                      {streetSuggestions.map((item, idx) => {
+                        const label = formatStreetBuildingLabel(item);
+                        return (
+                          <Pressable
+                            key={`${item.place_id || idx}`}
+                            style={styles.suggestionItem}
+                            onPress={() => handleSelectStreetSuggestion(item)}
+                          >
+                            <Ionicons
+                              name="business-outline"
+                              size={18}
+                              color={BrandColors.primary}
+                              style={{ marginTop: 2, marginRight: 8 }}
+                            />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.suggestionTitle} numberOfLines={1}>
+                                {label.title}
+                              </Text>
+                              <Text style={styles.suggestionSubtitle} numberOfLines={1}>
+                                {label.subtitle}
+                              </Text>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
 
               <View style={styles.fieldGroup}>
@@ -957,5 +1265,53 @@ const styles = StyleSheet.create({
   emptyListText: {
     color: '#9CA3AF',
     fontSize: 14,
+  },
+  streetSuggestionsList: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginTop: 6,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    zIndex: 100,
+  },
+  suggestionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F3F4F6',
+  },
+  suggestionsHeaderText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F3F4F6',
+  },
+  suggestionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  suggestionSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
   },
 });
