@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\PrintItemAiController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DiscountController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PrintCategoryController;
@@ -31,7 +32,7 @@ Route::get('models/{file}', function ($file) {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Web bulk actions & orders
     Route::get('orders/map', [OrderController::class, 'map'])->name('orders.map');

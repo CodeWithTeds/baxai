@@ -1,34 +1,31 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
+    AlertTriangle,
     ArrowUpDown,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
     Clock,
+    Columns3,
     Download,
     Eye,
+    GripVertical,
+    Lock,
     MapPin,
     PackageCheck,
-    Plus,
     RotateCcw,
     Search,
     ShoppingBag,
-    SlidersHorizontal,
+    Table2,
     Truck,
     XCircle,
 } from 'lucide-react';
-import { dashboard } from '@/routes';
-import MapView, { MapMarker } from '@/components/Map/MapView';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import type { MapMarker } from '@/components/Map/MapView';
+import MapView from '@/components/Map/MapView';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -37,7 +34,15 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { dashboard } from '@/routes';
 
 interface OrderItemRow {
     id: number;
@@ -135,6 +140,32 @@ const SORT_OPTIONS = [
     { value: 'order_number', label: 'Order # (A-Z)' },
 ];
 
+const KANBAN_COLUMNS = [
+    { key: 'in_progress', label: 'In Progress', dot: 'bg-blue-600', terminal: false },
+    { key: 'processing', label: 'Processing / Printing', dot: 'bg-purple-600', terminal: false },
+    { key: 'delivered', label: 'Delivered', dot: 'bg-emerald-600', terminal: true },
+    { key: 'cancelled', label: 'Cancelled', dot: 'bg-red-600', terminal: true },
+] as const;
+
+type KanbanStatus = (typeof KANBAN_COLUMNS)[number]['key'];
+
+/** Mirrors order-status-validation.md transition rules (client-side fast path). */
+function canTransition(from: string, to: string): { ok: boolean; reason?: string } {
+    if (from === to) {
+return { ok: false, reason: 'Already in this stage.' };
+}
+
+    if (from === 'delivered' || from === 'cancelled') {
+        return { ok: false, reason: 'Terminal orders cannot change status.' };
+    }
+
+    if (from === 'delivered' && to === 'cancelled') {
+        return { ok: false, reason: 'Delivered orders cannot be cancelled.' };
+    }
+
+    return { ok: true };
+}
+
 export default function OrdersIndex({
     orders = { data: [], current_page: 1, last_page: 1, per_page: 10, total: 0, from: 0, to: 0 } as Paginated,
     filters = {},
@@ -158,8 +189,74 @@ export default function OrdersIndex({
     const [statusUpdating, setStatusUpdating] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
     const [showMap, setShowMap] = useState(true);
+    const [viewMode, setViewMode] = useState<'table' | 'pipeline'>('table');
+    const [dragOrderId, setDragOrderId] = useState<number | null>(null);
+    const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
     const safeData = Array.isArray(orders?.data) ? orders.data : [];
+
+    const kanbanGroups = (() => {
+        const groups: Record<string, OrderRow[]> = {
+            in_progress: [],
+            processing: [],
+            delivered: [],
+            cancelled: [],
+        };
+        safeData.forEach((o) => {
+            if (groups[o.status]) {
+                groups[o.status].push(o);
+            } else {
+                groups.in_progress.push(o);
+            }
+        });
+
+        return groups;
+    })();
+
+    const handleKanbanDrop = (orderId: number, targetStatus: KanbanStatus) => {
+        const order = safeData.find((o) => o.id === orderId);
+
+        if (!order) {
+return;
+}
+
+        const check = canTransition(order.status, targetStatus);
+
+        if (!check.ok) {
+            toast.error(check.reason ?? 'Move not allowed.');
+
+            return;
+        }
+
+        if (targetStatus === 'cancelled') {
+            if (!confirm(`Cancel Order #${order.order_number}? This restores inventory and cannot be undone from the board.`)) {
+return;
+}
+        }
+
+        if (
+            (targetStatus === 'processing' || targetStatus === 'delivered') &&
+            (!order.courier_name || !order.tracking_number)
+        ) {
+            toast.warning('No courier / tracking on this order — add it on the full order page after moving.');
+        }
+
+        setStatusUpdating(true);
+        router.post(
+            `/orders/${orderId}/status`,
+            { status: targetStatus },
+            {
+                onSuccess: () => {
+                    setStatusUpdating(false);
+                    toast.success(`Order #${order.order_number} moved to ${targetStatus.replace('_', ' ')}.`);
+                },
+                onError: () => {
+                    setStatusUpdating(false);
+                    toast.error('Move rejected by validation. Check courier / tracking / notes.');
+                },
+            }
+        );
+    };
 
     const orderMarkers: MapMarker[] = safeData
         .map((order): MapMarker | null => {
@@ -178,6 +275,7 @@ export default function OrdersIndex({
                     status: order.status,
                 };
             }
+
             return null;
         })
         .filter((m): m is MapMarker => m !== null);
@@ -223,7 +321,10 @@ export default function OrdersIndex({
     };
 
     const handleBulkStatus = (targetStatus: string) => {
-        if (selectedIds.length === 0) return;
+        if (selectedIds.length === 0) {
+return;
+}
+
         router.post(
             '/orders/bulk-update-status',
             { ids: selectedIds, status: targetStatus },
@@ -232,8 +333,14 @@ export default function OrdersIndex({
     };
 
     const handleBulkDestroy = () => {
-        if (selectedIds.length === 0) return;
-        if (!confirm(`Permanently delete ${selectedIds.length} selected order(s)?`)) return;
+        if (selectedIds.length === 0) {
+return;
+}
+
+        if (!confirm(`Permanently delete ${selectedIds.length} selected order(s)?`)) {
+return;
+}
+
         router.post(
             '/orders/bulk-destroy',
             { ids: selectedIds },
@@ -249,6 +356,7 @@ export default function OrdersIndex({
             {
                 onSuccess: () => {
                     setStatusUpdating(false);
+
                     if (quickViewOrder && quickViewOrder.id === orderId) {
                         setQuickViewOrder({ ...quickViewOrder, status: newStatus });
                     }
@@ -351,6 +459,28 @@ export default function OrdersIndex({
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* TABLE / PIPELINE VIEW TOGGLE */}
+                        <div className="flex border border-[#D1D5DB] bg-white font-mono text-[11px]">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('table')}
+                                title="Dense table view"
+                                className={`flex items-center gap-1 px-2.5 py-1.5 transition-colors ${viewMode === 'table' ? 'bg-[#1A1C1E] font-bold text-white' : 'text-[#4B5563] hover:bg-[#F9FAFB]'}`}
+                            >
+                                <Table2 size={13} />
+                                Table
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('pipeline')}
+                                title="Drag-and-drop fulfillment pipeline"
+                                className={`flex items-center gap-1 border-l border-[#D1D5DB] px-2.5 py-1.5 transition-colors ${viewMode === 'pipeline' ? 'bg-[#1A1C1E] font-bold text-white' : 'text-[#4B5563] hover:bg-[#F9FAFB]'}`}
+                            >
+                                <Columns3 size={13} />
+                                Pipeline
+                            </button>
+                        </div>
+
                         <Link href="/orders/map">
                             <Button
                                 variant="outline"
@@ -382,31 +512,41 @@ export default function OrdersIndex({
                 {/* SUMMARY STATS BAR */}
                 <div className="mt-2.5 flex items-center gap-3 border-t border-[#E5E7EB] pt-2 font-mono text-xs overflow-x-auto">
                     <button
-                        onClick={() => { setStatus('all'); handleFilterChange({ status: 'all' }); }}
+                        onClick={() => {
+ setStatus('all'); handleFilterChange({ status: 'all' }); 
+}}
                         className={`pb-0.5 whitespace-nowrap transition-colors ${status === 'all' ? 'border-b-2 border-[#1A1C1E] font-bold text-[#1A1C1E]' : 'text-[#6B7280] hover:text-[#1A1C1E]'}`}
                     >
                         All Orders ({stats.total})
                     </button>
                     <button
-                        onClick={() => { setStatus('in_progress'); handleFilterChange({ status: 'in_progress' }); }}
+                        onClick={() => {
+ setStatus('in_progress'); handleFilterChange({ status: 'in_progress' }); 
+}}
                         className={`pb-0.5 whitespace-nowrap transition-colors flex items-center gap-1 ${status === 'in_progress' ? 'border-b-2 border-blue-600 font-bold text-blue-700' : 'text-[#6B7280] hover:text-blue-700'}`}
                     >
                         <Clock size={12} className="text-blue-600" /> In Progress ({stats.in_progress})
                     </button>
                     <button
-                        onClick={() => { setStatus('processing'); handleFilterChange({ status: 'processing' }); }}
+                        onClick={() => {
+ setStatus('processing'); handleFilterChange({ status: 'processing' }); 
+}}
                         className={`pb-0.5 whitespace-nowrap transition-colors flex items-center gap-1 ${status === 'processing' ? 'border-b-2 border-purple-600 font-bold text-purple-700' : 'text-[#6B7280] hover:text-purple-700'}`}
                     >
                         <PackageCheck size={12} className="text-purple-600" /> Processing ({stats.processing})
                     </button>
                     <button
-                        onClick={() => { setStatus('delivered'); handleFilterChange({ status: 'delivered' }); }}
+                        onClick={() => {
+ setStatus('delivered'); handleFilterChange({ status: 'delivered' }); 
+}}
                         className={`pb-0.5 whitespace-nowrap transition-colors flex items-center gap-1 ${status === 'delivered' ? 'border-b-2 border-emerald-600 font-bold text-emerald-700' : 'text-[#6B7280] hover:text-emerald-700'}`}
                     >
                         <CheckCircle2 size={12} className="text-emerald-600" /> Delivered ({stats.delivered})
                     </button>
                     <button
-                        onClick={() => { setStatus('cancelled'); handleFilterChange({ status: 'cancelled' }); }}
+                        onClick={() => {
+ setStatus('cancelled'); handleFilterChange({ status: 'cancelled' }); 
+}}
                         className={`pb-0.5 whitespace-nowrap transition-colors flex items-center gap-1 ${status === 'cancelled' ? 'border-b-2 border-red-600 font-bold text-red-700' : 'text-[#6B7280] hover:text-red-700'}`}
                     >
                         <XCircle size={12} className="text-red-600" /> Cancelled ({stats.cancelled})
@@ -584,7 +724,8 @@ export default function OrdersIndex({
                 </div>
             )}
 
-            {/* HIGH-DENSITY PURE BOX TABLE */}
+            {/* HIGH-DENSITY PURE BOX TABLE / KANBAN PIPELINE */}
+            {viewMode === 'table' ? (
             <div className="overflow-x-auto border border-[#E5E7EB] bg-white">
                 <table className="w-full text-left text-xs border-collapse">
                     <thead>
@@ -683,6 +824,138 @@ export default function OrdersIndex({
                     </tbody>
                 </table>
             </div>
+            ) : (
+            /* KANBAN PIPELINE — drag cards across fulfillment stages */
+            <div>
+                <p className="mb-1.5 font-mono text-[11px] text-[#6B7280]">
+                    Board shows this page only (<strong className="text-[#1A1C1E]">{safeData.length}</strong> of {orders.total ?? 0} orders).
+                    Drag a card to change status — terminal stages lock. Touch device? Use Quick View instead.
+                    {statusUpdating && <span className="ml-2 font-bold text-blue-700">Updating…</span>}
+                </p>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+                    {KANBAN_COLUMNS.map((col) => {
+                        const cards = kanbanGroups[col.key] ?? [];
+                        const colTotal = cards.reduce((s, o) => s + Number(o.total || 0), 0);
+                        const isOver = dragOverColumn === col.key;
+
+                        return (
+                            <div
+                                key={col.key}
+                                onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.dataTransfer.dropEffect = 'move';
+                                    setDragOverColumn(col.key);
+                                }}
+                                onDragLeave={() => setDragOverColumn((c) => (c === col.key ? null : c))}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    setDragOverColumn(null);
+
+                                    if (dragOrderId != null) {
+handleKanbanDrop(dragOrderId, col.key);
+}
+
+                                    setDragOrderId(null);
+                                }}
+                                className={`flex min-h-[280px] flex-col border bg-white transition-colors ${isOver ? 'border-blue-600 bg-blue-50/50 shadow-[0_0_0_1px_#2563EB]' : 'border-[#E5E7EB]'}`}
+                            >
+                                <div className="flex items-center justify-between border-b border-[#E5E7EB] bg-[#F9FAFB] px-2.5 py-2">
+                                    <span className="flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-[#1A1C1E]">
+                                        <span className={`h-2 w-2 rounded-full ${col.dot}`} />
+                                        {col.label}
+                                    </span>
+                                    <span className="flex items-center gap-1.5 font-mono text-[11px] text-[#6B7280]">
+                                        {col.terminal && <span title="Terminal stage — cards lock here"><Lock size={11} className="text-[#8A8FA3]" /></span>}
+                                        <strong className="text-[#1A1C1E]">{cards.length}</strong>
+                                        <span>• ₱{colTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </span>
+                                </div>
+                                <div className="flex-1 space-y-1.5 p-1.5">
+                                    {cards.length === 0 && (
+                                        <div className={`border border-dashed p-4 text-center font-mono text-[11px] ${isOver ? 'border-blue-600 text-blue-700' : 'border-[#D1D5DB] text-[#8A8FA3]'}`}>
+                                            {isOver ? 'Drop here' : 'Empty — drop cards here'}
+                                        </div>
+                                    )}
+                                    {cards.map((order) => {
+                                        const locked = order.status === 'delivered' || order.status === 'cancelled';
+                                        const missingTracking = !order.courier_name || !order.tracking_number;
+                                        const dragging = dragOrderId === order.id;
+
+                                        return (
+                                            <div
+                                                key={order.id}
+                                                draggable={!locked && !statusUpdating}
+                                                onDragStart={(e) => {
+                                                    setDragOrderId(order.id);
+                                                    e.dataTransfer.effectAllowed = 'move';
+                                                }}
+                                                onDragEnd={() => {
+                                                    setDragOrderId(null);
+                                                    setDragOverColumn(null);
+                                                }}
+                                                className={`border bg-white p-2 text-[11px] shadow-sm transition-all ${dragging ? 'border-blue-600 opacity-60 shadow-md' : 'border-[#E5E7EB]'} ${locked ? '' : 'cursor-grab active:cursor-grabbing hover:border-[#1A1C1E]'}`}
+                                            >
+                                                <div className="flex items-center justify-between gap-1">
+                                                    <span className="flex min-w-0 items-center gap-1">
+                                                        {!locked && <GripVertical size={12} className="shrink-0 text-[#B9BED1]" />}
+                                                        {locked && <Lock size={11} className="shrink-0 text-[#8A8FA3]" />}
+                                                        <Link href={`/orders/${order.id}`} className="truncate font-mono font-bold text-[#1A1C1E] hover:underline">
+                                                            {order.order_number}
+                                                        </Link>
+                                                    </span>
+                                                    <span className="shrink-0 font-mono font-bold text-[#1A1C1E]">
+                                                        ₱{Number(order.total).toFixed(2)}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-0.5 truncate font-semibold text-[#1A1C1E]">{order.customer_name}</div>
+                                                <div className="truncate font-mono text-[10px] text-[#6B7280]">
+                                                    {order.items && order.items.length > 0
+                                                        ? order.items.map((i) => `${i.quantity}x ${i.product_name}`).join(', ')
+                                                        : 'No items'}
+                                                </div>
+                                                <div className="mt-1 flex items-center justify-between gap-1">
+                                                    <span>{renderPaymentBadge(order.payment_status)}</span>
+                                                    {missingTracking ? (
+                                                        <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-amber-700" title="No courier / tracking — add it on the full order page">
+                                                            <AlertTriangle size={10} /> No tracking
+                                                        </span>
+                                                    ) : (
+                                                        <span className="truncate font-mono text-[10px] text-[#6B7280]" title={order.tracking_number ?? ''}>
+                                                            {order.courier_name} • {order.tracking_number}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="mt-1.5 flex items-center justify-end gap-1 border-t border-[#F1F2F7] pt-1.5">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => setQuickViewOrder(order)}
+                                                        title="Quick View / Quick Status"
+                                                        className="h-6 w-6 rounded-none text-[#4A4E5A] hover:bg-gray-100"
+                                                    >
+                                                        <Eye size={12} />
+                                                    </Button>
+                                                    <Link href={`/orders/${order.id}`}>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            title="Full Order Details"
+                                                            className="h-6 w-6 rounded-none text-[#4A4E5A] hover:bg-gray-100"
+                                                        >
+                                                            <Truck size={12} />
+                                                        </Button>
+                                                    </Link>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+            )}
 
             {/* PAGINATION FOOTER */}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#E5E7EB] pt-2.5 font-mono text-xs text-[#6B7280]">

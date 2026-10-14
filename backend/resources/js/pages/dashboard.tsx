@@ -1,709 +1,1065 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
-    Bell,
-    Check,
-    ChevronLeft,
-    ChevronRight,
-    Files,
-    Inbox,
-    LayoutGrid,
-    MessageCircle,
-    MonitorSmartphone,
-    Moon,
-    NotebookPen,
-    Pencil,
+    Activity,
+    AlertTriangle,
+    ArrowUpRight,
+    BarChart3,
+    Box,
+    CheckCircle2,
+    CircleDot,
+    Clock,
+    Compass,
+    Database,
+    DollarSign,
+    Eye,
+    Filter,
+    Layers,
+    LineChart,
+    MapPin,
+    Network,
+    Package,
+    PieChart,
     Plus,
-    Search,
-    Settings,
-    ShoppingBag,
-    Sun,
-    Trash2,
-    Users,
     Printer,
+    RefreshCw,
+    Scale,
+    ScatterChart,
+    ShoppingBag,
+    Sparkles,
+    Thermometer,
+    TrendingUp,
+    Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes';
 
-/* --------------------------------- theme ---------------------------------- */
-/* Palette: primary #0052CC · deep #003D9B · navy #1A1C1E */
+/* --------------------------------- Types ---------------------------------- */
 
-/* ------------------------------- components ------------------------------- */
-
-function Card({
-    className = '',
-    children,
-}: {
-    className?: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <section
-            className={`rounded-[20px] border border-[#E9EBF3] bg-white p-5 shadow-[0_14px_34px_-22px_rgba(26,28,30,0.35)] transition-shadow duration-300 hover:shadow-[0_20px_44px_-22px_rgba(0,82,204,0.45)] ${className}`}
-        >
-            {children}
-        </section>
-    );
+interface DashboardStats {
+    revenue: {
+        total: number;
+        monthly: number;
+        avg_order_value: number;
+    };
+    orders: {
+        total: number;
+        in_progress: number;
+        processing: number;
+        delivered: number;
+        cancelled: number;
+        paid: number;
+        pending_payment: number;
+    };
+    customers: {
+        total: number;
+        active: number;
+        lead: number;
+        vip: number;
+    };
+    products: {
+        total: number;
+        active: number;
+        customizable: number;
+        with_3d: number;
+        low_stock: number;
+    };
+    printing: {
+        items_count: number;
+        categories_count: number;
+    };
 }
 
-function CardHead({
-    title,
-    action,
-}: {
-    title: string;
-    action?: React.ReactNode;
-}) {
-    return (
-        <div className="flex items-center justify-between">
-            <h2 className="text-[16px] font-extrabold tracking-tight text-[#1A1C1E]">
-                {title}
-            </h2>
-            {action}
-        </div>
-    );
+interface SalesTimelineItem {
+    date: string;
+    raw_date: string;
+    orders_count: number;
+    revenue: number;
+    cumulative_revenue: number;
 }
 
-function GhostAction({ children }: { children: React.ReactNode }) {
-    return (
-        <button className="flex items-center gap-1 text-[11px] font-semibold text-[#B9BED1] transition hover:text-[#0052CC]">
-            {children}
-        </button>
-    );
+interface OrderStatusSlice {
+    status: string;
+    label: string;
+    count: number;
+    percentage: number;
+    color: string;
 }
 
-function DotsMenu() {
-    return (
-        <button
-            aria-label="More actions"
-            className="font-extrabold tracking-widest text-[#B9BED1] transition hover:text-[#0052CC]"
-        >
-            •••
-        </button>
-    );
+interface CategoryDistItem {
+    category: string;
+    product_count: number;
+    stock_quantity: number;
 }
 
-function ProgressBar({ value }: { value: number }) {
-    return (
-        <div className="flex items-center gap-2">
-            <span className="w-9 text-right text-[11px] font-extrabold text-[#1A1C1E]">
-                {value}%
-            </span>
-            <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-[#EEF0F7]">
-                <div
-                    className="h-full rounded-full bg-[#0052CC]"
-                    style={{ width: `${value}%` }}
-                />
-            </div>
-        </div>
-    );
+interface RfmCustomerItem {
+    id: number;
+    name: string;
+    code: string;
+    orders: number;
+    spend: number;
+    cluster: string;
+    color: string;
 }
 
-function Ring({ value, color }: { value: number; color: string }) {
-    const r = 30;
-    const c = 2 * Math.PI * r;
-
-    return (
-        <div className="relative h-[76px] w-[76px] shrink-0">
-            <svg viewBox="0 0 76 76" className="h-full w-full -rotate-90">
-                <circle
-                    cx="38"
-                    cy="38"
-                    r={r}
-                    fill="none"
-                    stroke="#EEF0F7"
-                    strokeWidth="7"
-                />
-                <circle
-                    cx="38"
-                    cy="38"
-                    r={r}
-                    fill="none"
-                    stroke={color}
-                    strokeWidth="7"
-                    strokeLinecap="round"
-                    strokeDasharray={c}
-                    strokeDashoffset={c - (c * value) / 100}
-                />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[14px] font-extrabold text-[#1A1C1E]">
-                {value}%
-            </span>
-        </div>
-    );
+interface QuartilesData {
+    min: number;
+    q1: number;
+    median: number;
+    q3: number;
+    max: number;
+    mean: number;
+    iqr: number;
+    sample_size: number;
 }
 
-function Avatar({
-    initials,
-    bg,
-    size = 'h-6 w-6 text-[9px]',
-}: {
-    initials: string;
-    bg: string;
-    size?: string;
-}) {
-    return (
-        <span
-            className={`flex ${size} shrink-0 items-center justify-center rounded-full font-extrabold text-white ring-2 ring-white ${bg}`}
-        >
-            {initials}
-        </span>
-    );
+interface RadarMetricItem {
+    axis: string;
+    value: number;
+    fullMark: number;
 }
 
-/* ---------------------------------- data ---------------------------------- */
+interface FunnelStageItem {
+    stage: string;
+    count: number;
+    percentage: number;
+}
 
-const weekDays = ['Mon', 'Tue', 'Wed', 'Thr', 'Fri', 'Sat', 'Sun'];
-const weekNums = [14, 15, 16, 17, 18, 19, 20];
+type HeatmapMatrix = Record<string, Record<string, number>>;
 
-const tasks = [
-    {
-        title: 'Conduct research',
-        date: '4 May, 09:20 AM',
-        duration: '02 h 45 m',
-        progress: 90,
-        comments: 4,
-        files: 16,
-        due: '16',
+interface OrderSummary {
+    id: number;
+    order_number: string;
+    customer_name: string;
+    customer_email: string;
+    status: string;
+    payment_status: string;
+    total: number;
+    placed_at: string;
+    items_count: number;
+    first_item_name?: string;
+}
+
+interface ProductSummary {
+    id: number;
+    name: string;
+    sku: string;
+    category?: string | null;
+    base_price: string | number;
+    stock_quantity: number;
+    status: string;
+    is_customizable: boolean;
+}
+
+interface DashboardProps {
+    stats?: DashboardStats;
+    sales_timeline?: SalesTimelineItem[];
+    order_status_distribution?: OrderStatusSlice[];
+    category_distribution?: CategoryDistItem[];
+    rfm_scatter?: RfmCustomerItem[];
+    quartiles?: QuartilesData;
+    radar_metrics?: RadarMetricItem[];
+    conversion_funnel?: FunnelStageItem[];
+    heatmap_matrix?: HeatmapMatrix;
+    recent_orders?: OrderSummary[];
+    low_stock_products?: ProductSummary[];
+}
+
+export default function Dashboard({
+    stats = {
+        revenue: { total: 0, monthly: 0, avg_order_value: 0 },
+        orders: { total: 0, in_progress: 0, processing: 0, delivered: 0, cancelled: 0, paid: 0, pending_payment: 0 },
+        customers: { total: 0, active: 0, lead: 0, vip: 0 },
+        products: { total: 0, active: 0, customizable: 0, with_3d: 0, low_stock: 0 },
+        printing: { items_count: 0, categories_count: 0 },
     },
-    {
-        title: 'Schedule a meeting',
-        date: '14 May, 12:45 AM',
-        duration: '06 h 55 m',
-        progress: 50,
-        comments: 4,
-        files: '3 June',
-        due: '3 June',
-    },
-    {
-        title: 'Send out reminders',
-        date: '21 May, 10:30 AM',
-        duration: '01 h 30 m',
-        progress: 10,
-        comments: 16,
-        files: '3 June',
-        due: '3 June',
-    },
-];
+    sales_timeline = [],
+    order_status_distribution: orderStatusDistribution = [],
+    category_distribution = [],
+    rfm_scatter = [],
+    quartiles = { min: 0, q1: 0, median: 0, q3: 0, max: 0, mean: 0, iqr: 0, sample_size: 0 },
+    radar_metrics = [],
+    conversion_funnel = [],
+    heatmap_matrix = {},
+    recent_orders = [],
+    low_stock_products = [],
+}: DashboardProps) {
+    // Chart filter mode
+    const [chartFilter, setChartFilter] = useState<'all' | 'temporal' | 'multivariate' | 'statistical'>('all');
+    const [timeMetric, setTimeMetric] = useState<'revenue' | 'cumulative' | 'orders'>('revenue');
+    const [hoveredScatter, setHoveredScatter] = useState<RfmCustomerItem | null>(null);
+    const [hoveredTimelineIdx, setHoveredTimelineIdx] = useState<number | null>(null);
 
-/* ---------------------------------- page ---------------------------------- */
+    // Helpers
+    const formatCurrency = (val: number | string | null | undefined) => {
+        const num = Number(val) || 0;
+        return `₱${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
 
-export default function Dashboard() {
-    const [mode, setMode] = useState<'light' | 'dark'>('light');
+    /* -------------------------------------------------------------------------- */
+    /* 1. TIME-SERIES MATH & PATH GENERATOR                                        */
+    /* -------------------------------------------------------------------------- */
+    const timelineData = useMemo(() => {
+        if (!sales_timeline || sales_timeline.length === 0) {
+            return [{ date: 'Today', raw_date: 'today', orders_count: 1, revenue: 100, cumulative_revenue: 100 }];
+        }
+        return sales_timeline;
+    }, [sales_timeline]);
+
+    const maxTimelineY = useMemo(() => {
+        if (timeMetric === 'revenue') {
+            return Math.max(...timelineData.map((d) => d.revenue), 1000) * 1.2;
+        } else if (timeMetric === 'cumulative') {
+            return Math.max(...timelineData.map((d) => d.cumulative_revenue), 1000) * 1.15;
+        } else {
+            return Math.max(...timelineData.map((d) => d.orders_count), 5) * 1.3;
+        }
+    }, [timelineData, timeMetric]);
+
+    // Generate SVG path points
+    const timelinePoints = useMemo(() => {
+        const svgW = 600;
+        const svgH = 150;
+        const padX = 40;
+        const padY = 20;
+        const innerW = svgW - padX * 2;
+        const innerH = svgH - padY * 2;
+        const len = timelineData.length;
+
+        return timelineData.map((item, i) => {
+            const x = padX + (len <= 1 ? innerW / 2 : (i / (len - 1)) * innerW);
+            const val =
+                timeMetric === 'revenue'
+                    ? item.revenue
+                    : timeMetric === 'cumulative'
+                    ? item.cumulative_revenue
+                    : item.orders_count;
+            const y = padY + innerH - (val / Math.max(1, maxTimelineY)) * innerH;
+            return { x, y, item, val };
+        });
+    }, [timelineData, timeMetric, maxTimelineY]);
+
+    const timelinePathD = useMemo(() => {
+        if (timelinePoints.length === 0) return '';
+        if (timelinePoints.length === 1) return `M ${timelinePoints[0].x} ${timelinePoints[0].y}`;
+
+        // Build smooth curved spline
+        let d = `M ${timelinePoints[0].x} ${timelinePoints[0].y}`;
+        for (let i = 0; i < timelinePoints.length - 1; i++) {
+            const curr = timelinePoints[i];
+            const next = timelinePoints[i + 1];
+            const cx = (curr.x + next.x) / 2;
+            d += ` C ${cx} ${curr.y}, ${cx} ${next.y}, ${next.x} ${next.y}`;
+        }
+        return d;
+    }, [timelinePoints]);
+
+    const timelineAreaD = useMemo(() => {
+        if (!timelinePathD || timelinePoints.length === 0) return '';
+        const last = timelinePoints[timelinePoints.length - 1];
+        const first = timelinePoints[0];
+        return `${timelinePathD} L ${last.x} 140 L ${first.x} 140 Z`;
+    }, [timelinePathD, timelinePoints]);
+
+    /* -------------------------------------------------------------------------- */
+    /* 2. DONUT / MARKOV STATE MACHINE CALCULATIONS                                */
+    /* -------------------------------------------------------------------------- */
+    const donutRadius = 55;
+    const donutCircumference = 2 * Math.PI * donutRadius;
+    const donutSlices = useMemo(() => {
+        let accumulatedPercent = 0;
+        return orderStatusDistribution.map((slice) => {
+            const strokeDasharray = `${(slice.percentage / 100) * donutCircumference} ${donutCircumference}`;
+            const strokeDashoffset = -((accumulatedPercent / 100) * donutCircumference);
+            accumulatedPercent += slice.percentage;
+            return { ...slice, strokeDasharray, strokeDashoffset };
+        });
+    }, [orderStatusDistribution, donutCircumference]);
+
+    /* -------------------------------------------------------------------------- */
+    /* 3. RADAR / KIVIAT DIAGRAM CALCULATIONS                                     */
+    /* -------------------------------------------------------------------------- */
+    const radarCenter = 100;
+    const radarMaxR = 70;
+    const radarPoints = useMemo(() => {
+        const totalAxes = radar_metrics.length || 6;
+        return radar_metrics.map((m, i) => {
+            const angle = (Math.PI * 2 * i) / totalAxes - Math.PI / 2;
+            const r = (m.value / 100) * radarMaxR;
+            const x = radarCenter + r * Math.cos(angle);
+            const y = radarCenter + r * Math.sin(angle);
+            const labelX = radarCenter + (radarMaxR + 18) * Math.cos(angle);
+            const labelY = radarCenter + (radarMaxR + 14) * Math.sin(angle);
+            return { ...m, x, y, labelX, labelY, angle };
+        });
+    }, [radar_metrics]);
+
+    const radarPolygonD = useMemo(() => {
+        if (radarPoints.length === 0) return '';
+        return radarPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + ' Z';
+    }, [radarPoints]);
+
+    /* -------------------------------------------------------------------------- */
+    /* 4. SCATTER PLOT MATH (RFM CARTESIAN FIELD)                                  */
+    /* -------------------------------------------------------------------------- */
+    const maxScatterOrders = useMemo(() => Math.max(...rfm_scatter.map((c) => c.orders), 10), [rfm_scatter]);
+    const maxScatterSpend = useMemo(() => Math.max(...rfm_scatter.map((c) => c.spend), 1500), [rfm_scatter]);
 
     return (
         <>
-            <Head title="Dashboard" />
-            <div className="pt-1 pb-24 text-[#1A1C1E] md:pb-10">
-                <div className="mx-auto w-full max-w-[1380px]">
-                        {/* top nav */}
-                        <header className="flex flex-wrap items-center gap-3">
-                            <nav className="flex items-center gap-5 text-[13px] font-semibold">
-                                <span className="border-b-2 border-[#1A1C1E] pb-1 text-[#1A1C1E]">
-                                    Dashboard
-                                </span>
-                                <button className="hidden pb-1 text-[#8A8FA3] transition hover:text-[#1A1C1E] sm:block">
-                                    Workflows
-                                </button>
-                                <button className="hidden pb-1 text-[#8A8FA3] transition hover:text-[#1A1C1E] sm:block">
-                                    Integrations
-                                </button>
-                            </nav>
-                            <div className="relative mx-auto hidden w-full max-w-[300px] flex-1 lg:block">
-                                <Search
-                                    size={14}
-                                    className="absolute top-1/2 left-4 -translate-y-1/2 text-[#B9BED1]"
-                                />
-                                <input
-                                    placeholder="Search or type command"
-                                    className="w-full rounded-full border border-[#E9EBF3] bg-white py-2.5 pr-4 pl-10 text-xs text-[#1A1C1E] shadow-[0_8px_20px_-16px_rgba(26,28,30,0.4)] outline-none placeholder:text-[#B9BED1] focus:border-[#0052CC]"
-                                />
-                            </div>
-                            <div className="ml-auto flex items-center gap-2">
-                                <div className="hidden items-center rounded-full bg-[#E4E6F0] p-1 text-[11px] font-bold sm:flex">
-                                    <button
-                                        onClick={() => setMode('light')}
-                                        className={`flex items-center gap-1 rounded-full px-3 py-1.5 transition ${
-                                            mode === 'light'
-                                                ? 'bg-[#0052CC] text-white shadow'
-                                                : 'text-[#8A8FA3] hover:text-[#1A1C1E]'
-                                        }`}
-                                    >
-                                        <Sun size={12} /> Light
-                                    </button>
-                                    <button
-                                        onClick={() => setMode('dark')}
-                                        className={`flex items-center gap-1 rounded-full px-3 py-1.5 transition ${
-                                            mode === 'dark'
-                                                ? 'bg-[#1A1C1E] text-white shadow'
-                                                : 'text-[#8A8FA3] hover:text-[#1A1C1E]'
-                                        }`}
-                                    >
-                                        <Moon size={12} /> Dark
-                                    </button>
-                                </div>
-                                <button
-                                    aria-label="Notifications"
-                                    className="flex h-9 w-9 items-center justify-center rounded-full text-[#1A1C1E] transition hover:bg-white"
-                                >
-                                    <Bell size={17} />
-                                </button>
-                                <button
-                                    aria-label="Settings"
-                                    className="flex h-9 w-9 items-center justify-center rounded-full text-[#1A1C1E] transition hover:bg-white"
-                                >
-                                    <Settings size={17} />
-                                </button>
-                                <button className="hidden items-center gap-1.5 rounded-xl bg-white px-3.5 py-2.5 text-xs font-bold text-[#1A1C1E] shadow-[0_8px_20px_-14px_rgba(26,28,30,0.5)] transition hover:shadow-[0_10px_24px_-12px_rgba(0,82,204,0.6)] md:flex">
-                                    ↓ Export data
-                                    <span className="rounded-md bg-[#EEF0F7] px-1.5 py-0.5 text-[10px] font-extrabold text-[#8A8FA3]">
-                                        Sale
-                                    </span>
-                                </button>
-                                <button className="rounded-xl bg-[#1A1C1E] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-black">
-                                    Add new board
-                                </button>
-                            </div>
-                        </header>
+            <Head title="Computer Science & Data Visualization Matrix - Placides" />
 
-                        <main className="mt-6 space-y-5">
-                            {/* hero */}
-                            <section className="grid gap-5 xl:grid-cols-[1.15fr_0.72fr_1fr_1fr_1fr]">
-                                <div className="flex flex-col justify-center">
-                                    <h1 className="text-[30px] leading-[1.15] font-extrabold tracking-tight text-[#1A1C1E]">
-                                        Hi, James! 👋
-                                        <br />
-                                        What are your planes for today?
-                                    </h1>
-                                    <p className="mt-3 max-w-[300px] text-[13px] leading-relaxed text-[#8A8FA3]">
-                                        This platform is designed to
-                                        revolutionize the way you organize and
-                                        access your notes
-                                    </p>
-                                </div>
-                                <button
-                                    aria-label="Add new item"
-                                    className="flex min-h-[190px] items-center justify-center rounded-[20px] border-2 border-dashed border-[#0052CC]/25 bg-[#0052CC]/[0.05] transition hover:bg-[#0052CC]/10"
-                                >
-                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0052CC] text-white shadow-[0_10px_20px_-8px_rgba(0,82,204,0.9)] transition hover:scale-105">
-                                        <Plus size={20} />
-                                    </span>
-                                </button>
-                                <Card className="flex flex-col">
-                                    <div className="flex h-24 items-center justify-center text-[#1A1C1E]">
-                                        <NotebookPen
-                                            size={64}
-                                            strokeWidth={1.1}
-                                        />
-                                    </div>
-                                    <p className="mt-2 text-center text-[14px] font-extrabold">
-                                        Stay organized
-                                    </p>
-                                    <p className="mt-1 text-center text-[11px] leading-snug text-[#8A8FA3]">
-                                        A clear structure for your notes
-                                    </p>
-                                </Card>
-                                <Card className="flex flex-col">
-                                    <div className="flex h-24 items-center justify-center text-[#1A1C1E]">
-                                        <Files size={64} strokeWidth={1.1} />
-                                    </div>
-                                    <p className="mt-2 text-center text-[14px] font-extrabold">
-                                        Sync your notes
-                                    </p>
-                                    <p className="mt-1 text-center text-[11px] leading-snug text-[#8A8FA3]">
-                                        Ensure that notes are synced
-                                    </p>
-                                </Card>
-                                <Card className="flex flex-col">
-                                    <div className="flex h-24 items-center justify-center text-[#1A1C1E]">
-                                        <MonitorSmartphone
-                                            size={64}
-                                            strokeWidth={1.1}
-                                        />
-                                    </div>
-                                    <p className="mt-2 text-center text-[14px] font-extrabold">
-                                        Collaborate and share
-                                    </p>
-                                    <p className="mt-1 text-center text-[11px] leading-snug text-[#8A8FA3]">
-                                        Share notes with colleagues
-                                    </p>
-                                </Card>
-                            </section>
-
-                            {/* middle row */}
-                            <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-                                {/* notifications */}
-                                <Card>
-                                    <CardHead
-                                        title="Notifications"
-                                        action={
-                                            <GhostAction>🗑 Clear</GhostAction>
-                                        }
-                                    />
-                                    <div className="mt-4 rounded-2xl border border-[#E9EBF3] p-4">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <p className="text-[13px] font-extrabold">
-                                                Upcoming event{' '}
-                                                <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-[#3DD598]" />
-                                            </p>
-                                            <DotsMenu />
-                                        </div>
-                                        <p className="mt-1 text-[11px] text-[#8A8FA3]">
-                                            Landing design meeting • Time: 120
-                                            min
-                                        </p>
-                                        <div className="mt-3 flex items-center justify-between border-t border-dashed border-black/10 pt-3 text-[11px] text-[#8A8FA3]">
-                                            <span className="flex items-center gap-3">
-                                                <span className="flex items-center gap-1">
-                                                    📅 Sat, 10 May
-                                                </span>
-                                                <span className="flex items-center gap-1">
-                                                    🕚 11 AM - 11:45 AM
-                                                </span>
-                                            </span>
-                                            <span className="flex gap-2.5">
-                                                <button
-                                                    aria-label="Delete"
-                                                    className="transition hover:text-[#F0506E]"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                                <button
-                                                    aria-label="Edit"
-                                                    className="transition hover:text-[#0052CC]"
-                                                >
-                                                    <Pencil size={14} />
-                                                </button>
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 rounded-2xl bg-[#F6F7FB] p-4">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <p className="text-[13px] font-extrabold">
-                                                Message | Product design
-                                            </p>
-                                            <DotsMenu />
-                                        </div>
-                                        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-[#8A8FA3]">
-                                            <MessageCircle size={11} /> Message
-                                            from Ken Smith
-                                        </p>
-                                        <p className="mt-2 rounded-lg bg-[#E8F0FE] px-3 py-2 text-[11px] text-[#8A8FA3]">
-                                            Hey team, just wanted to check in
-                                            and see how th…
-                                        </p>
-                                    </div>
-                                </Card>
-
-                                {/* assignments */}
-                                <Card>
-                                    <CardHead
-                                        title="Assignments"
-                                        action={
-                                            <GhostAction>✎ Edit</GhostAction>
-                                        }
-                                    />
-                                    <div className="mt-4 flex items-center gap-3 text-[11px] font-bold">
-                                        <span className="text-[#0052CC]">
-                                            Motion design
-                                        </span>
-                                        <span className="text-[#8A8FA3]">
-                                            Logo
-                                        </span>
-                                        <span className="ml-auto">
-                                            <DotsMenu />
-                                        </span>
-                                    </div>
-                                    <p className="mt-1.5 text-[15px] leading-snug font-extrabold">
-                                        Design a packaging concept for a new
-                                        product
-                                    </p>
-                                    <div className="mt-3 flex items-center justify-between">
-                                        <span className="rounded-full bg-[#3DD598]/20 px-3.5 py-1.5 text-[11px] font-extrabold text-[#0E9F6E]">
-                                            Package design
-                                        </span>
-                                        <span className="flex items-center gap-1.5 text-[11px] text-[#8A8FA3]">
-                                            Rachel Lou
-                                            <Avatar
-                                                initials="RL"
-                                                bg="bg-[#F5B544]"
-                                            />
-                                        </span>
-                                    </div>
-                                    <div className="mt-2 flex justify-end">
-                                        <span className="rounded-full bg-[#FFE4E9] px-3.5 py-1.5 text-[11px] font-extrabold text-[#F0506E]">
-                                            High
-                                        </span>
-                                    </div>
-                                    <button className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#0052CC]/25 bg-[#0052CC]/[0.05] py-3.5 text-[12px] font-bold text-[#1A1C1E] transition hover:bg-[#0052CC]/10">
-                                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[#0052CC] text-white">
-                                            <Plus size={13} />
-                                        </span>
-                                        Add new assignment
-                                    </button>
-                                </Card>
-
-                                {/* calendar */}
-                                <Card className="lg:col-span-2 xl:col-span-1">
-                                    <CardHead
-                                        title="May 2021"
-                                        action={
-                                            <span className="flex gap-1 text-[#B9BED1]">
-                                                <button
-                                                    aria-label="Previous week"
-                                                    className="transition hover:text-[#0052CC]"
-                                                >
-                                                    <ChevronLeft size={15} />
-                                                </button>
-                                                <button
-                                                    aria-label="Next week"
-                                                    className="transition hover:text-[#0052CC]"
-                                                >
-                                                    <ChevronRight size={15} />
-                                                </button>
-                                            </span>
-                                        }
-                                    />
-                                    <div className="mt-4 grid grid-cols-7 text-center">
-                                        {weekDays.map((d) => (
-                                            <p
-                                                key={d}
-                                                className="text-[10px] font-semibold text-[#B9BED1]"
-                                            >
-                                                {d}
-                                            </p>
-                                        ))}
-                                        {weekNums.map((n) => (
-                                            <p
-                                                key={n}
-                                                className={`mx-auto mt-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-extrabold ${
-                                                    n === 18
-                                                        ? 'bg-[#0052CC] text-white shadow-[0_6px_14px_-4px_rgba(0,82,204,0.9)]'
-                                                        : 'text-[#1A1C1E]'
-                                                }`}
-                                            >
-                                                {n}
-                                            </p>
-                                        ))}
-                                    </div>
-                                    <div className="mt-4 border-t border-dashed border-black/10 pt-4">
-                                        <p className="text-[11px] font-extrabold">
-                                            04:30–05:00 PM
-                                        </p>
-                                        <div className="mt-1.5 flex items-center justify-between">
-                                            <p className="flex items-center gap-1.5 text-[13px] font-bold">
-                                                <Users
-                                                    size={14}
-                                                    className="text-[#B9BED1]"
-                                                />
-                                                Team meeting
-                                            </p>
-                                            <DotsMenu />
-                                        </div>
-                                        <p className="mt-1 text-[11px] text-[#8A8FA3]">
-                                            12:00 – 12:30 ♥ UX/UI design
-                                        </p>
-                                    </div>
-                                    <div className="mt-4 border-t border-dashed border-black/10 pt-4">
-                                        <p className="text-[11px] font-extrabold">
-                                            11:30–12:30 PM
-                                        </p>
-                                        <div className="mt-1.5 flex items-center justify-between">
-                                            <p className="flex items-center gap-1.5 text-[13px] font-bold">
-                                                <Inbox
-                                                    size={14}
-                                                    className="text-[#B9BED1]"
-                                                />
-                                                Meeting with new client
-                                            </p>
-                                            <DotsMenu />
-                                        </div>
-                                        <p className="mt-1 text-[11px] text-[#8A8FA3]">
-                                            12:30 – 01:30 PM ♥ Job interview
-                                        </p>
-                                    </div>
-                                </Card>
-                            </section>
-
-                            {/* bottom row */}
-                            <section className="grid gap-5 xl:grid-cols-12">
-                                {/* today tasks */}
-                                <Card className="xl:col-span-5">
-                                    <div className="flex items-center justify-between">
-                                        <h2 className="flex items-center gap-2 text-[16px] font-extrabold tracking-tight">
-                                            Today tasks
-                                            <span className="flex -space-x-1.5">
-                                                <Avatar
-                                                    initials="KS"
-                                                    bg="bg-[#3DD598]"
-                                                />
-                                                <Avatar
-                                                    initials="RL"
-                                                    bg="bg-[#F5B544]"
-                                                />
-                                                <Avatar
-                                                    initials="+"
-                                                    bg="bg-[#0052CC]"
-                                                />
-                                            </span>
-                                        </h2>
-                                        <span className="flex items-center gap-3 text-[11px] font-semibold text-[#B9BED1]">
-                                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0052CC] text-[9px] font-extrabold text-white">
-                                                88
-                                            </span>
-                                            <GhostAction>✎ Edit</GhostAction>
-                                            <GhostAction>⇪ Share</GhostAction>
-                                        </span>
-                                    </div>
-                                    <div className="mt-3">
-                                        {tasks.map((t) => (
-                                            <div
-                                                key={t.title}
-                                                className="border-b border-black/[0.05] py-3.5 last:border-0"
-                                            >
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                        <p className="truncate text-[13px] font-extrabold">
-                                                            {t.title}
-                                                        </p>
-                                                        <p className="text-[11px] text-[#B9BED1]">
-                                                            {t.date}
-                                                        </p>
-                                                    </div>
-                                                    <div className="hidden shrink-0 text-right sm:block">
-                                                        <p className="text-[10px] font-semibold tracking-wide text-[#B9BED1] uppercase">
-                                                            Duration
-                                                        </p>
-                                                        <p className="text-[11px] font-bold text-[#8A8FA3]">
-                                                            {t.duration}
-                                                        </p>
-                                                    </div>
-                                                    <div className="w-32 shrink-0">
-                                                        <ProgressBar
-                                                            value={t.progress}
-                                                        />
-                                                    </div>
-                                                    <div className="hidden shrink-0 items-center gap-3 text-[11px] text-[#B9BED1] md:flex">
-                                                        <span className="flex items-center gap-1">
-                                                            👁 {t.comments}
-                                                        </span>
-                                                        <span className="flex items-center gap-1">
-                                                            📎 {t.files}
-                                                        </span>
-                                                        <span className="flex items-center gap-1">
-                                                            📅 {t.due}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Card>
-
-                                {/* premium */}
-                                <div className="flex flex-col items-center justify-center rounded-[20px] bg-[#0052CC] p-6 text-center text-white shadow-[0_20px_44px_-20px_rgba(0,82,204,0.8)] xl:col-span-2">
-                                    <NotebookPen size={72} strokeWidth={1} />
-                                    <p className="mt-4 text-[20px] font-extrabold tracking-tight">
-                                        Go premium!
-                                    </p>
-                                    <p className="mt-2 text-[11px] leading-relaxed text-white/80">
-                                        Gain access to a range of benefits
-                                        designed to enhance your user experience
-                                    </p>
-                                    <button className="mt-5 rounded-xl bg-[#1A1C1E] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-black">
-                                        Find out more
-                                    </button>
-                                </div>
-
-                                {/* rings + board meeting */}
-                                <div className="grid gap-5 sm:grid-cols-2 xl:col-span-5 xl:grid-cols-1">
-                                    <Card>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="flex items-start gap-3">
-                                                <Ring
-                                                    value={90}
-                                                    color="#22C55E"
-                                                />
-                                                <div>
-                                                    <p className="text-[9px] font-extrabold tracking-widest text-[#22C55E] uppercase">
-                                                        Data research
-                                                    </p>
-                                                    <p className="text-[13px] font-extrabold">
-                                                        Marketing
-                                                    </p>
-                                                    <p className="mt-1.5 text-[10px] leading-snug text-[#B9BED1]">
-                                                        You marked 5/5
-                                                        <br />
-                                                        All assignments are
-                                                        done!
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-start gap-3">
-                                                <Ring
-                                                    value={65}
-                                                    color="#F0506E"
-                                                />
-                                                <div>
-                                                    <p className="text-[9px] font-extrabold tracking-widest text-[#F0506E] uppercase">
-                                                        UX/UI design
-                                                    </p>
-                                                    <p className="text-[13px] font-extrabold">
-                                                        Typography
-                                                    </p>
-                                                    <p className="mt-1.5 text-[10px] leading-snug text-[#B9BED1]">
-                                                        You marked 3/5
-                                                        <br />2 assignments left
-                                                    </p>
-                                                    <button className="mt-2 flex items-center gap-1 rounded-lg bg-[#0052CC] px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-[#003D9B]">
-                                                        <Check size={11} />
-                                                        Check
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Card>
-                                    <Card>
-                                        <div className="flex items-center justify-between">
-                                            <h2 className="text-[16px] font-extrabold tracking-tight">
-                                                Board meeting
-                                            </h2>
-                                            <GhostAction>✎ Edit</GhostAction>
-                                        </div>
-                                        <p className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold text-[#8A8FA3]">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-[#0052CC]" />
-                                            March 24 at 4:00 PM
-                                        </p>
-                                        <p className="mt-2 text-[13px] leading-relaxed text-[#8A8FA3]">
-                                            Meeting with John Smith,
-                                            <br />
-                                            4th floor, room 159
-                                        </p>
-                                        <div className="mt-4 flex gap-2">
-                                            <button className="rounded-xl bg-[#EEF0F7] px-4 py-2.5 text-[11px] font-bold text-[#1A1C1E] transition hover:bg-[#E2E5F1]">
-                                                Reschedule
-                                            </button>
-                                            <button className="rounded-xl bg-[#0052CC] px-4 py-2.5 text-[11px] font-bold text-white transition hover:bg-[#003D9B]">
-                                                Accept Invite
-                                            </button>
-                                        </div>
-                                    </Card>
-                                </div>
-                            </section>
-                        </main>
+            <div className="flex flex-col gap-5 font-sans text-[#1A1C1E]">
+                {/* -------------------- HEADER & CHART DISPATCHER -------------------- */}
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E5E7EB] pb-3.5">
+                    <div className="max-w-[720px]">
+                        <div className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 items-center justify-center bg-[#1A1C1E] text-white font-mono text-[11px] font-bold">
+                                ∑
+                            </span>
+                            <h1 className="text-[17px] font-semibold tracking-tight text-[#1A1C1E]">
+                                Data Visualization & Statistical Matrix
+                            </h1>
+                            <Badge variant="outline" className="font-mono text-[10px] text-blue-700 bg-blue-50 border-blue-200">
+                                9 Chart Engines Active
+                            </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-[#6B7280]">
+                            Multidimensional computational analytics across time-series regressions, Markov state models, bivariate cartesian clustering, Tukey quartile dispersions, and Kiviat polygons.
+                        </p>
                     </div>
 
-                {/* mobile nav */}
-                <nav
-                    aria-label="Mobile"
-                    className="fixed right-4 bottom-4 left-4 z-30 flex items-center justify-around rounded-2xl bg-[#1A1C1E] px-2 py-3 text-white shadow-2xl md:hidden"
-                >
-                    <LayoutGrid size={20} />
-                    <ShoppingBag size={20} className="opacity-60" />
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0052CC]">
-                        <Plus size={20} />
-                    </span>
-                    <Printer size={20} className="opacity-60" />
-                    <Settings size={20} className="opacity-60" />
-                </nav>
+                    {/* Chart Filter Pills */}
+                    <div className="flex flex-wrap items-center gap-1.5 bg-[#F3F4F6] p-1 font-mono text-[11px]">
+                        <button
+                            type="button"
+                            onClick={() => setChartFilter('all')}
+                            className={`px-2.5 py-1 transition ${
+                                chartFilter === 'all' ? 'bg-white font-bold text-[#1A1C1E] shadow-xs' : 'text-[#6B7280] hover:text-[#1A1C1E]'
+                            }`}
+                        >
+                            All Charts
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setChartFilter('temporal')}
+                            className={`px-2.5 py-1 transition ${
+                                chartFilter === 'temporal' ? 'bg-white font-bold text-[#1A1C1E] shadow-xs' : 'text-[#6B7280] hover:text-[#1A1C1E]'
+                            }`}
+                        >
+                            Time-Series
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setChartFilter('multivariate')}
+                            className={`px-2.5 py-1 transition ${
+                                chartFilter === 'multivariate' ? 'bg-white font-bold text-[#1A1C1E] shadow-xs' : 'text-[#6B7280] hover:text-[#1A1C1E]'
+                            }`}
+                        >
+                            Multivariate
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setChartFilter('statistical')}
+                            className={`px-2.5 py-1 transition ${
+                                chartFilter === 'statistical' ? 'bg-white font-bold text-[#1A1C1E] shadow-xs' : 'text-[#6B7280] hover:text-[#1A1C1E]'
+                            }`}
+                        >
+                            Statistical
+                        </button>
+                    </div>
+                </div>
+
+                {/* -------------------- COMPACT COMPUTATIONAL READOUTS -------------------- */}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6 font-mono text-xs">
+                    <div className="border border-[#E5E7EB] bg-white p-2.5">
+                        <span className="text-[10px] text-[#6B7280] uppercase">Gross Revenue (₱)</span>
+                        <div className="font-bold text-[#1A1C1E] text-[15px]">{formatCurrency(stats.revenue.total)}</div>
+                        <span className="text-[10px] text-emerald-700">∑ Cumulative</span>
+                    </div>
+                    <div className="border border-[#E5E7EB] bg-white p-2.5">
+                        <span className="text-[10px] text-[#6B7280] uppercase">Orders Count (N)</span>
+                        <div className="font-bold text-[#1A1C1E] text-[15px]">{stats.orders.total}</div>
+                        <span className="text-[10px] text-blue-700">{stats.orders.in_progress} in queue</span>
+                    </div>
+                    <div className="border border-[#E5E7EB] bg-white p-2.5">
+                        <span className="text-[10px] text-[#6B7280] uppercase">Mean Basket (μ)</span>
+                        <div className="font-bold text-[#1A1C1E] text-[15px]">{formatCurrency(quartiles.mean)}</div>
+                        <span className="text-[10px] text-[#6B7280]">Median: {formatCurrency(quartiles.median)}</span>
+                    </div>
+                    <div className="border border-[#E5E7EB] bg-white p-2.5">
+                        <span className="text-[10px] text-[#6B7280] uppercase">IQR Spread</span>
+                        <div className="font-bold text-[#1A1C1E] text-[15px]">₱{quartiles.iqr}</div>
+                        <span className="text-[10px] text-[#6B7280]">Q3 - Q1 delta</span>
+                    </div>
+                    <div className="border border-[#E5E7EB] bg-white p-2.5">
+                        <span className="text-[10px] text-[#6B7280] uppercase">Customer Nodes</span>
+                        <div className="font-bold text-[#1A1C1E] text-[15px]">{stats.customers.total}</div>
+                        <span className="text-[10px] text-purple-700">{stats.customers.vip} Tier VIP</span>
+                    </div>
+                    <div className="border border-[#E5E7EB] bg-white p-2.5">
+                        <span className="text-[10px] text-[#6B7280] uppercase">Catalog Entities</span>
+                        <div className="font-bold text-[#1A1C1E] text-[15px]">{stats.products.total}</div>
+                        <span className="text-[10px] text-amber-700">{stats.products.low_stock} Low Stock</span>
+                    </div>
+                </div>
+
+                {/* ========================================================================= */}
+                {/* CHART 1: CONTINUOUS TIME-SERIES REGRESSION & AREA SPLINE                  */}
+                {/* ========================================================================= */}
+                {(chartFilter === 'all' || chartFilter === 'temporal') && (
+                    <div className="border border-[#E5E7EB] bg-white p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#F3F4F6] pb-3">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <LineChart size={15} className="text-blue-600" />
+                                    <h2 className="text-[13px] font-semibold text-[#1A1C1E]">
+                                        Chart 1: Temporal Revenue Velocity & Regression Spline (Time-Series Analysis)
+                                    </h2>
+                                </div>
+                                <p className="text-[11px] text-[#6B7280]">
+                                    Continuous cubic Bézier interpolation curve over discrete chronological transaction epochs.
+                                </p>
+                            </div>
+
+                            {/* Metric Toggle */}
+                            <div className="flex items-center gap-1 bg-[#F3F4F6] p-0.5 font-mono text-[11px]">
+                                <button
+                                    type="button"
+                                    onClick={() => setTimeMetric('revenue')}
+                                    className={`px-2.5 py-1 transition ${
+                                        timeMetric === 'revenue' ? 'bg-white font-bold text-[#1A1C1E] shadow-xs' : 'text-[#6B7280]'
+                                    }`}
+                                >
+                                    Daily Velocity (₱)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTimeMetric('cumulative')}
+                                    className={`px-2.5 py-1 transition ${
+                                        timeMetric === 'cumulative' ? 'bg-white font-bold text-[#1A1C1E] shadow-xs' : 'text-[#6B7280]'
+                                    }`}
+                                >
+                                    Cumulative Integral (∫)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTimeMetric('orders')}
+                                    className={`px-2.5 py-1 transition ${
+                                        timeMetric === 'orders' ? 'bg-white font-bold text-[#1A1C1E] shadow-xs' : 'text-[#6B7280]'
+                                    }`}
+                                >
+                                    Order Volume (N)
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Interactive SVG Canvas */}
+                        <div className="relative mt-3 h-48 w-full">
+                            <svg className="h-full w-full overflow-visible" viewBox="0 0 600 150" preserveAspectRatio="none">
+                                <defs>
+                                    <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#2563EB" stopOpacity="0.25" />
+                                        <stop offset="100%" stopColor="#2563EB" stopOpacity="0.0" />
+                                    </linearGradient>
+                                </defs>
+
+                                {/* Cartesian Grid Lines */}
+                                <line x1="40" y1="20" x2="560" y2="20" stroke="#F3F4F6" strokeDasharray="3 3" />
+                                <line x1="40" y1="60" x2="560" y2="60" stroke="#F3F4F6" strokeDasharray="3 3" />
+                                <line x1="40" y1="100" x2="560" y2="100" stroke="#F3F4F6" strokeDasharray="3 3" />
+                                <line x1="40" y1="140" x2="560" y2="140" stroke="#E5E7EB" />
+
+                                {/* Spline Area Fill */}
+                                <path d={timelineAreaD} fill="url(#areaGradient)" />
+
+                                {/* Main Curve */}
+                                <path d={timelinePathD} fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" />
+
+                                {/* Data Nodes */}
+                                {timelinePoints.map((pt, i) => (
+                                    <g key={i} className="cursor-pointer" onMouseEnter={() => setHoveredTimelineIdx(i)} onMouseLeave={() => setHoveredTimelineIdx(null)}>
+                                        <circle
+                                            cx={pt.x}
+                                            cy={pt.y}
+                                            r={hoveredTimelineIdx === i ? 6 : 3.5}
+                                            fill="#FFFFFF"
+                                            stroke="#2563EB"
+                                            strokeWidth={hoveredTimelineIdx === i ? 3 : 2}
+                                            className="transition-all duration-200"
+                                        />
+                                    </g>
+                                ))}
+                            </svg>
+
+                            {/* Hover Coordinate Overlay */}
+                            {hoveredTimelineIdx !== null && timelinePoints[hoveredTimelineIdx] && (
+                                <div
+                                    className="absolute -top-1 pointer-events-none -translate-x-1/2 border border-[#1A1C1E] bg-[#1A1C1E] px-2.5 py-1 text-white shadow-md font-mono text-[11px]"
+                                    style={{ left: `${(timelinePoints[hoveredTimelineIdx].x / 600) * 100}%` }}
+                                >
+                                    <div>{timelinePoints[hoveredTimelineIdx].item.date}</div>
+                                    <div className="text-emerald-400 font-bold">
+                                        ₱{timelinePoints[hoveredTimelineIdx].item.revenue.toLocaleString()} ({timelinePoints[hoveredTimelineIdx].item.orders_count} orders)
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* X-Axis Labels */}
+                        <div className="flex justify-between px-8 pt-2 font-mono text-[10px] text-[#6B7280]">
+                            {timelinePoints.map((pt, i) => (
+                                <span key={i} className={hoveredTimelineIdx === i ? 'font-bold text-[#1A1C1E]' : ''}>
+                                    {pt.item.date}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* ========================================================================= */}
+                {/* 2-COLUMN CLUSTER: MARKOV FINITE-STATE (DONUT) & KIVIAT MULTI-AXIS RADAR    */}
+                {/* ========================================================================= */}
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    {/* CHART 2: MARKOV STATE RING / POLAR DONUT */}
+                    {(chartFilter === 'all' || chartFilter === 'temporal') && (
+                        <div className="border border-[#E5E7EB] bg-white p-4">
+                            <div className="flex items-center justify-between border-b border-[#F3F4F6] pb-2.5">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <PieChart size={15} className="text-indigo-600" />
+                                        <h2 className="text-[13px] font-semibold text-[#1A1C1E]">
+                                            Chart 2: Markov State Allocation (Polar State Machine Donut)
+                                        </h2>
+                                    </div>
+                                    <p className="text-[11px] text-[#6B7280]">
+                                        Finite-state machine distribution across discrete order fulfillment stages.
+                                    </p>
+                                </div>
+                                <span className="font-mono text-[11px] text-[#6B7280]">{stats.orders.total} States</span>
+                            </div>
+
+                            <div className="mt-4 flex flex-col sm:flex-row items-center justify-around gap-6">
+                                {/* SVG Polar Donut */}
+                                <div className="relative h-44 w-44 shrink-0">
+                                    <svg className="h-full w-full -rotate-90" viewBox="0 0 140 140">
+                                        <circle cx="70" cy="70" r={donutRadius} fill="none" stroke="#F3F4F6" strokeWidth="16" />
+                                        {donutSlices.map((s, i) => (
+                                            <circle
+                                                key={i}
+                                                cx="70"
+                                                cy="70"
+                                                r={donutRadius}
+                                                fill="none"
+                                                stroke={s.color}
+                                                strokeWidth="16"
+                                                strokeDasharray={s.strokeDasharray}
+                                                strokeDashoffset={s.strokeDashoffset}
+                                                className="transition-all duration-500 hover:opacity-80"
+                                            />
+                                        ))}
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center font-mono text-center">
+                                        <span className="text-xs text-[#6B7280]">Total</span>
+                                        <span className="text-xl font-bold text-[#1A1C1E]">{stats.orders.total}</span>
+                                        <span className="text-[9px] text-emerald-700 font-semibold">100% Vector</span>
+                                    </div>
+                                </div>
+
+                                {/* Legend & Transition State Probabilities */}
+                                <div className="w-full max-w-[220px] space-y-2 font-mono text-xs">
+                                    {orderStatusDistribution.map((item) => (
+                                        <div key={item.status} className="flex items-center justify-between border-b border-[#F9FAFB] pb-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+                                                <span className="text-[#1A1C1E] text-[11px]">{item.label}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="font-bold text-[#1A1C1E]">{item.count}</span>
+                                                <span className="ml-1 text-[10px] text-[#6B7280]">({item.percentage}%)</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CHART 3: KIVIAT / RADAR MULTI-AXIS POLYGON */}
+                    {(chartFilter === 'all' || chartFilter === 'multivariate') && (
+                        <div className="border border-[#E5E7EB] bg-white p-4">
+                            <div className="flex items-center justify-between border-b border-[#F3F4F6] pb-2.5">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <Compass size={15} className="text-purple-600" />
+                                        <h2 className="text-[13px] font-semibold text-[#1A1C1E]">
+                                            Chart 3: Kiviat Multi-Axis Radar (Multivariate Health Vector)
+                                        </h2>
+                                    </div>
+                                    <p className="text-[11px] text-[#6B7280]">
+                                        6-Dimensional polar vector evaluation normalized across 0–100 percentile limits.
+                                    </p>
+                                </div>
+                                <span className="font-mono text-[10px] bg-purple-50 text-purple-700 px-1.5 py-0.5 border border-purple-200">
+                                    6 Dimensions
+                                </span>
+                            </div>
+
+                            <div className="mt-3 flex items-center justify-center">
+                                <div className="relative h-48 w-48">
+                                    <svg className="h-full w-full overflow-visible" viewBox="0 0 200 200">
+                                        {/* Concentric Reference Polygons (25%, 50%, 75%, 100%) */}
+                                        {[0.25, 0.5, 0.75, 1].map((scale, sIdx) => {
+                                            const pts = radar_metrics.map((_, i) => {
+                                                const angle = (Math.PI * 2 * i) / radar_metrics.length - Math.PI / 2;
+                                                const r = radarMaxR * scale;
+                                                return `${radarCenter + r * Math.cos(angle)},${radarCenter + r * Math.sin(angle)}`;
+                                            }).join(' ');
+                                            return <polygon key={sIdx} points={pts} fill="none" stroke="#EEF0F6" strokeWidth="1" />;
+                                        })}
+
+                                        {/* Axis Rays */}
+                                        {radarPoints.map((p, i) => (
+                                            <line
+                                                key={i}
+                                                x1={radarCenter}
+                                                y1={radarCenter}
+                                                x2={radarCenter + radarMaxR * Math.cos(p.angle)}
+                                                y2={radarCenter + radarMaxR * Math.sin(p.angle)}
+                                                stroke="#E5E7EB"
+                                                strokeWidth="1"
+                                            />
+                                        ))}
+
+                                        {/* Shaded Kiviat Vector Polygon */}
+                                        <polygon points={radarPoints.map((p) => `${p.x},${p.y}`).join(' ')} fill="rgba(124, 58, 237, 0.15)" stroke="#7C3AED" strokeWidth="2" />
+
+                                        {/* Polygon Nodes */}
+                                        {radarPoints.map((p, i) => (
+                                            <circle key={i} cx={p.x} cy={p.y} r="3" fill="#7C3AED" />
+                                        ))}
+
+                                        {/* Axis Text Labels */}
+                                        {radarPoints.map((p, i) => (
+                                            <text
+                                                key={i}
+                                                x={p.labelX}
+                                                y={p.labelY}
+                                                textAnchor="middle"
+                                                dominantBaseline="middle"
+                                                className="fill-[#4B5563] font-mono text-[8px] font-medium"
+                                            >
+                                                {p.axis} ({p.value}%)
+                                            </text>
+                                        ))}
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* ========================================================================= */}
+                {/* 2-COLUMN CLUSTER: CARTESIAN SCATTER (RFM) & PARETO BAR HISTOGRAM          */}
+                {/* ========================================================================= */}
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    {/* CHART 4: CARTESIAN 2D SCATTER PLOT */}
+                    {(chartFilter === 'all' || chartFilter === 'multivariate') && (
+                        <div className="border border-[#E5E7EB] bg-white p-4">
+                            <div className="flex items-center justify-between border-b border-[#F3F4F6] pb-2.5">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <ScatterChart size={15} className="text-emerald-600" />
+                                        <h2 className="text-[13px] font-semibold text-[#1A1C1E]">
+                                            Chart 4: Cartesian Bivariate Scatter Field (Customer RFM Clusters)
+                                        </h2>
+                                    </div>
+                                    <p className="text-[11px] text-[#6B7280]">
+                                        X-Axis: Order Frequency (λ) · Y-Axis: Cumulative Monetary Volume (M in ₱).
+                                    </p>
+                                </div>
+                                <span className="font-mono text-[10px] text-[#6B7280]">{rfm_scatter.length} Nodes</span>
+                            </div>
+
+                            {/* Scatter Field SVG */}
+                            <div className="relative mt-4 h-48 w-full">
+                                <svg className="h-full w-full overflow-visible" viewBox="0 0 400 150">
+                                    {/* Quadrant Divider Grid */}
+                                    <line x1="30" y1="130" x2="390" y2="130" stroke="#E5E7EB" />
+                                    <line x1="30" y1="10" x2="30" y2="130" stroke="#E5E7EB" />
+                                    <line x1="210" y1="10" x2="210" y2="130" stroke="#F3F4F6" strokeDasharray="3 3" />
+                                    <line x1="30" y1="70" x2="390" y2="70" stroke="#F3F4F6" strokeDasharray="3 3" />
+
+                                    {/* Scatter Nodes */}
+                                    {rfm_scatter.map((c) => {
+                                        const cx = 35 + (c.orders / Math.max(1, maxScatterOrders)) * 340;
+                                        const cy = 125 - (c.spend / Math.max(1, maxScatterSpend)) * 110;
+                                        const isHovered = hoveredScatter?.id === c.id;
+
+                                        return (
+                                            <g
+                                                key={c.id}
+                                                className="cursor-pointer"
+                                                onMouseEnter={() => setHoveredScatter(c)}
+                                                onMouseLeave={() => setHoveredScatter(null)}
+                                            >
+                                                <circle
+                                                    cx={cx}
+                                                    cy={cy}
+                                                    r={isHovered ? 7 : 4.5}
+                                                    fill={c.color}
+                                                    stroke="#FFFFFF"
+                                                    strokeWidth="1.5"
+                                                    className="transition-all duration-200"
+                                                />
+                                            </g>
+                                        );
+                                    })}
+                                </svg>
+
+                                {/* Tooltip readout */}
+                                {hoveredScatter && (
+                                    <div className="absolute top-2 right-2 border border-[#E5E7EB] bg-white p-2 text-xs font-mono shadow-md">
+                                        <div className="font-bold text-[#1A1C1E]">{hoveredScatter.name}</div>
+                                        <div className="text-[11px] text-[#6B7280]">
+                                            Orders: <span className="text-[#1A1C1E] font-bold">{hoveredScatter.orders}</span> · Spend: <span className="text-emerald-700 font-bold">₱{hoveredScatter.spend.toLocaleString()}</span>
+                                        </div>
+                                        <span className="text-[9px] uppercase px-1 py-0.2 rounded-none font-bold" style={{ backgroundColor: `${hoveredScatter.color}20`, color: hoveredScatter.color }}>
+                                            {hoveredScatter.cluster}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Axis Labels */}
+                            <div className="flex justify-between px-6 pt-1 font-mono text-[10px] text-[#6B7280]">
+                                <span>Low Frequency (0 Orders)</span>
+                                <span className="font-bold text-[#1A1C1E]">Order Frequency Spectrum (λ) →</span>
+                                <span>High Frequency ({maxScatterOrders} Orders)</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CHART 5: PARETO FREQUENCY DISTRIBUTION (BAR HISTOGRAM) */}
+                    {(chartFilter === 'all' || chartFilter === 'statistical') && (
+                        <div className="border border-[#E5E7EB] bg-white p-4">
+                            <div className="flex items-center justify-between border-b border-[#F3F4F6] pb-2.5">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <BarChart3 size={15} className="text-amber-600" />
+                                        <h2 className="text-[13px] font-semibold text-[#1A1C1E]">
+                                            Chart 5: Pareto Frequency Distribution (Category Inventory Mass)
+                                        </h2>
+                                    </div>
+                                    <p className="text-[11px] text-[#6B7280]">
+                                        Ranked discrete mass allocation across merchandise categories.
+                                    </p>
+                                </div>
+                                <span className="font-mono text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 border border-amber-200">
+                                    Pareto Ranked
+                                </span>
+                            </div>
+
+                            <div className="mt-4 space-y-3 font-mono text-xs">
+                                {category_distribution.map((cat, idx) => {
+                                    const maxStock = Math.max(...category_distribution.map((c) => c.stock_quantity), 100);
+                                    const pct = Math.min(100, Math.round((cat.stock_quantity / maxStock) * 100));
+
+                                    return (
+                                        <div key={idx} className="space-y-1">
+                                            <div className="flex items-center justify-between text-[11px]">
+                                                <span className="font-semibold text-[#1A1C1E]">{cat.category}</span>
+                                                <span className="text-[#6B7280]">
+                                                    <span className="font-bold text-[#1A1C1E]">{cat.stock_quantity}</span> units ({cat.product_count} items)
+                                                </span>
+                                            </div>
+                                            <div className="h-3 w-full bg-[#F3F4F6] overflow-hidden">
+                                                <div
+                                                    style={{ width: `${pct}%` }}
+                                                    className="h-full bg-[#1A1C1E] transition-all duration-500 hover:bg-[#0052CC]"
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* ========================================================================= */}
+                {/* 2-COLUMN CLUSTER: STATISTICAL BOX PLOT & CONVERSION FUNNEL                */}
+                {/* ========================================================================= */}
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    {/* CHART 6: TUKEY BOX-AND-WHISKER PLOT */}
+                    {(chartFilter === 'all' || chartFilter === 'statistical') && (
+                        <div className="border border-[#E5E7EB] bg-white p-4">
+                            <div className="flex items-center justify-between border-b border-[#F3F4F6] pb-2.5">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <Scale size={15} className="text-rose-600" />
+                                        <h2 className="text-[13px] font-semibold text-[#1A1C1E]">
+                                            Chart 6: Tukey Box-and-Whisker Plot (Order Dispersion & IQR)
+                                        </h2>
+                                    </div>
+                                    <p className="text-[11px] text-[#6B7280]">
+                                        Quartile partition: Min (Q0), 25% (Q1), Median (Q2), 75% (Q3), Max (Q4).
+                                    </p>
+                                </div>
+                                <span className="font-mono text-[10px] text-[#6B7280]">N = {quartiles.sample_size}</span>
+                            </div>
+
+                            {/* Box Plot Graphic */}
+                            <div className="mt-4 flex flex-col justify-center">
+                                <div className="relative h-28 w-full">
+                                    <svg className="h-full w-full" viewBox="0 0 500 100">
+                                        {/* Scale line */}
+                                        <line x1="30" y1="50" x2="470" y2="50" stroke="#CBD5E1" strokeWidth="2" />
+
+                                        {/* Left Whisker (Min to Q1) */}
+                                        <line x1="30" y1="50" x2="140" y2="50" stroke="#1E293B" strokeWidth="2" />
+                                        <line x1="30" y1="35" x2="30" y2="65" stroke="#1E293B" strokeWidth="2" />
+
+                                        {/* IQR Box (Q1 to Q3) */}
+                                        <rect x="140" y="25" width="110" height="50" fill="#F8FAFC" stroke="#1E293B" strokeWidth="2" />
+
+                                        {/* Median Line (Q2) */}
+                                        <line x1="165" y1="25" x2="165" y2="75" stroke="#EF4444" strokeWidth="2.5" />
+
+                                        {/* Right Whisker (Q3 to Max) */}
+                                        <line x1="250" y1="50" x2="470" y2="50" stroke="#1E293B" strokeWidth="2" />
+                                        <line x1="470" y1="35" x2="470" y2="65" stroke="#1E293B" strokeWidth="2" />
+
+                                        {/* Outlier Nodes */}
+                                        <circle cx="470" cy="50" r="4" fill="#EF4444" />
+                                    </svg>
+                                </div>
+
+                                {/* Quartile Metrics Readout Grid */}
+                                <div className="grid grid-cols-5 gap-2 border-t border-[#F3F4F6] pt-3 text-center font-mono text-[11px]">
+                                    <div>
+                                        <span className="text-[#6B7280] text-[10px]">Min (Q0)</span>
+                                        <div className="font-bold text-[#1A1C1E]">₱{quartiles.min}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-[#6B7280] text-[10px]">Q1 (25%)</span>
+                                        <div className="font-bold text-[#1A1C1E]">₱{quartiles.q1}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-rose-600 font-bold text-[10px]">Median (Q2)</span>
+                                        <div className="font-bold text-rose-600">₱{quartiles.median}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-[#6B7280] text-[10px]">Q3 (75%)</span>
+                                        <div className="font-bold text-[#1A1C1E]">₱{quartiles.q3}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-[#6B7280] text-[10px]">Max (Q4)</span>
+                                        <div className="font-bold text-[#1A1C1E]">₱{quartiles.max}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CHART 7: STAGE-GATE CONVERSION FUNNEL */}
+                    {(chartFilter === 'all' || chartFilter === 'statistical') && (
+                        <div className="border border-[#E5E7EB] bg-white p-4">
+                            <div className="flex items-center justify-between border-b border-[#F3F4F6] pb-2.5">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <Filter size={15} className="text-teal-600" />
+                                        <h2 className="text-[13px] font-semibold text-[#1A1C1E]">
+                                            Chart 7: Stage-Gate Pipeline Funnel (Lifecycle Sunk Cost)
+                                        </h2>
+                                    </div>
+                                    <p className="text-[11px] text-[#6B7280]">
+                                        Sequential step-down conversion from initial registry to recurring VIP patrons.
+                                    </p>
+                                </div>
+                                <span className="font-mono text-[10px] bg-teal-50 text-teal-700 px-1.5 py-0.5 border border-teal-200">
+                                    Funnel
+                                </span>
+                            </div>
+
+                            <div className="mt-4 space-y-2.5 font-mono text-xs">
+                                {conversion_funnel.map((stage, idx) => {
+                                    const widthPercent = Math.max(25, stage.percentage);
+
+                                    return (
+                                        <div key={idx} className="space-y-1">
+                                            <div className="flex items-center justify-between text-[11px]">
+                                                <span className="font-semibold text-[#1A1C1E]">
+                                                    {idx + 1}. {stage.stage}
+                                                </span>
+                                                <span className="text-[#6B7280]">
+                                                    <span className="font-bold text-[#1A1C1E]">{stage.count}</span> accounts ({stage.percentage}%)
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-center">
+                                                <div
+                                                    style={{ width: `${widthPercent}%` }}
+                                                    className={`h-5 flex items-center justify-center text-[10px] text-white font-bold transition-all duration-500 ${
+                                                        idx === 0
+                                                            ? 'bg-[#1A1C1E]'
+                                                            : idx === 1
+                                                            ? 'bg-blue-600'
+                                                            : idx === 2
+                                                            ? 'bg-indigo-600'
+                                                            : 'bg-purple-600'
+                                                    }`}
+                                                >
+                                                    {stage.percentage}%
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* ========================================================================= */}
+                {/* 2-COLUMN CLUSTER: ACTIVITY HEATMAP TENSOR & PRODUCTION GAUGE              */}
+                {/* ========================================================================= */}
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    {/* CHART 8: 2D ACTIVITY HEATMAP TENSOR */}
+                    {(chartFilter === 'all' || chartFilter === 'temporal') && (
+                        <div className="border border-[#E5E7EB] bg-white p-4">
+                            <div className="flex items-center justify-between border-b border-[#F3F4F6] pb-2.5">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <Activity size={15} className="text-orange-600" />
+                                        <h2 className="text-[13px] font-semibold text-[#1A1C1E]">
+                                            Chart 8: Temporal Density Matrix (Weekly Daypart Heatmap)
+                                        </h2>
+                                    </div>
+                                    <p className="text-[11px] text-[#6B7280]">
+                                        Order placement intensity mapped across Days of Week × Daypart intervals.
+                                    </p>
+                                </div>
+                                <span className="font-mono text-[10px] text-[#6B7280]">7 × 4 Grid</span>
+                            </div>
+
+                            {/* Heatmap Grid */}
+                            <div className="mt-4 overflow-x-auto">
+                                <table className="w-full text-center font-mono text-[11px]">
+                                    <thead>
+                                        <tr className="text-[#6B7280]">
+                                            <th className="p-1 text-left">Day</th>
+                                            <th className="p-1">Morning (06-12)</th>
+                                            <th className="p-1">Afternoon (12-18)</th>
+                                            <th className="p-1">Evening (18-22)</th>
+                                            <th className="p-1">Night (22-06)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[#F9FAFB]">
+                                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+                                            const parts = heatmap_matrix[day] || { Morning: 0, Afternoon: 0, Evening: 0, Night: 0 };
+                                            const getColor = (count: number) => {
+                                                if (count === 0) return 'bg-[#F9FAFB] text-[#9CA3AF]';
+                                                if (count === 1) return 'bg-orange-100 text-orange-800 font-bold';
+                                                if (count <= 3) return 'bg-orange-300 text-orange-950 font-bold';
+                                                return 'bg-orange-500 text-white font-bold';
+                                            };
+
+                                            return (
+                                                <tr key={day}>
+                                                    <td className="p-1.5 text-left font-semibold text-[#1A1C1E]">{day}</td>
+                                                    <td className={`p-1.5 ${getColor(parts.Morning)}`}>{parts.Morning}</td>
+                                                    <td className={`p-1.5 ${getColor(parts.Afternoon)}`}>{parts.Afternoon}</td>
+                                                    <td className={`p-1.5 ${getColor(parts.Evening)}`}>{parts.Evening}</td>
+                                                    <td className={`p-1.5 ${getColor(parts.Night)}`}>{parts.Night}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CHART 9: PRODUCTION THROUGHPUT TACHOMETER (GAUGE) */}
+                    {(chartFilter === 'all' || chartFilter === 'multivariate') && (
+                        <div className="border border-[#E5E7EB] bg-white p-4">
+                            <div className="flex items-center justify-between border-b border-[#F3F4F6] pb-2.5">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <Thermometer size={15} className="text-cyan-600" />
+                                        <h2 className="text-[13px] font-semibold text-[#1A1C1E]">
+                                            Chart 9: Print Lab Queue Saturation (Throughput Gauge)
+                                        </h2>
+                                    </div>
+                                    <p className="text-[11px] text-[#6B7280]">
+                                        System capacity utilization based on active in-progress print queue.
+                                    </p>
+                                </div>
+                                <span className="font-mono text-[10px] bg-cyan-50 text-cyan-700 px-1.5 py-0.5 border border-cyan-200">
+                                    Load Vector
+                                </span>
+                            </div>
+
+                            {/* Gauge Arc Graphic */}
+                            <div className="mt-4 flex flex-col items-center justify-center">
+                                <div className="relative h-32 w-56">
+                                    <svg className="h-full w-full" viewBox="0 0 200 120">
+                                        {/* Background Track Arc */}
+                                        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#F1F5F9" strokeWidth="16" strokeLinecap="round" />
+                                        {/* Load Arc (e.g. 52.6% saturation) */}
+                                        <path
+                                            d="M 20 100 A 80 80 0 0 1 180 100"
+                                            fill="none"
+                                            stroke="#0284C7"
+                                            strokeWidth="16"
+                                            strokeLinecap="round"
+                                            strokeDasharray="251.2"
+                                            strokeDashoffset={251.2 * (1 - Math.min(1, stats.orders.in_progress / 20))}
+                                            className="transition-all duration-700"
+                                        />
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-end pb-2 font-mono text-center">
+                                        <span className="text-2xl font-bold text-[#1A1C1E]">
+                                            {Math.round((stats.orders.in_progress / 20) * 100)}%
+                                        </span>
+                                        <span className="text-[10px] text-[#6B7280]">
+                                            {stats.orders.in_progress} / 20 Queue Capacity
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="mt-3 flex items-center justify-between w-full max-w-[280px] font-mono text-[11px] border-t border-[#F3F4F6] pt-2 text-[#6B7280]">
+                                    <span>Nominal</span>
+                                    <span className="font-bold text-[#1A1C1E]">Active State: In Queue</span>
+                                    <span>Saturation Limit</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* -------------------- COMPACT ENTITY AUDIT FOOTER -------------------- */}
+                <div className="border border-[#E5E7EB] bg-white p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-3">
+                        <Link href="/orders" className="flex items-center gap-1 font-mono text-blue-700 hover:underline">
+                            <ShoppingBag size={13} /> View All {stats.orders.total} Orders
+                        </Link>
+                        <span className="text-[#D1D5DB]">•</span>
+                        <Link href="/customers" className="flex items-center gap-1 font-mono text-purple-700 hover:underline">
+                            <Users size={13} /> View All {stats.customers.total} Customers
+                        </Link>
+                        <span className="text-[#D1D5DB]">•</span>
+                        <Link href="/products" className="flex items-center gap-1 font-mono text-amber-700 hover:underline">
+                            <Package size={13} /> View All {stats.products.total} Catalog Products
+                        </Link>
+                    </div>
+
+                    <div className="flex items-center gap-2 font-mono text-[11px] text-[#6B7280]">
+                        <Clock size={12} />
+                        <span>Computational Data Engine v2.0 · Live Execution</span>
+                    </div>
+                </div>
             </div>
         </>
     );
