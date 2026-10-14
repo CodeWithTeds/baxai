@@ -279,6 +279,8 @@ export interface CustomerAddress {
   barangay_name: string;
   street_address: string;
   postal_code?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   delivery_instructions?: string | null;
   formatted_address?: string;
 }
@@ -430,6 +432,179 @@ export async function saveCustomerAddress(
     }
   }
   throw lastError || new Error('Could not connect to server to save address');
+}
+
+// ─── Nominatim OpenStreetMap Geocoding (Free, No API Key) ─────────────────────
+
+const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
+
+export interface NominatimAddress {
+  road?: string;
+  street?: string;
+  building?: string;
+  house_number?: string;
+  suburb?: string;
+  village?: string;
+  neighbourhood?: string;
+  quarter?: string;
+  city_district?: string;
+  city?: string;
+  town?: string;
+  municipality?: string;
+  county?: string;
+  state?: string;
+  region?: string;
+  postcode?: string;
+  country?: string;
+  amenity?: string;
+  shop?: string;
+  office?: string;
+  leisure?: string;
+  residential?: string;
+}
+
+export interface NominatimResult {
+  place_id?: number | string;
+  name?: string;
+  display_name: string;
+  lat: string;
+  lon: string;
+  class?: string;
+  type?: string;
+  addresstype?: string;
+  address: NominatimAddress;
+}
+
+export function formatStreetBuildingLabel(item: NominatimResult): {
+  title: string;
+  subtitle: string;
+  streetAddress: string;
+} {
+  const addr = item.address || {};
+
+  const buildingName =
+    item.name ||
+    addr.building ||
+    addr.amenity ||
+    addr.shop ||
+    addr.office ||
+    addr.residential ||
+    '';
+  const houseNo = addr.house_number || '';
+  const road = addr.road || addr.street || '';
+
+  const streetParts: string[] = [];
+  if (buildingName && buildingName !== road) {
+    streetParts.push(buildingName);
+  }
+  if (houseNo && road) {
+    streetParts.push(`${houseNo} ${road}`);
+  } else {
+    if (houseNo) streetParts.push(houseNo);
+    if (road) streetParts.push(road);
+  }
+
+  // If no road or building detected, check subdivision / neighbourhood
+  if (streetParts.length === 0) {
+    if (
+      addr.neighbourhood &&
+      !addr.neighbourhood.toLowerCase().startsWith('barangay') &&
+      !addr.neighbourhood.toLowerCase().startsWith('brgy')
+    ) {
+      streetParts.push(addr.neighbourhood);
+    }
+  }
+
+  const cleanStreet = streetParts.join(', ');
+  const title =
+    cleanStreet ||
+    (item.display_name &&
+    !item.display_name.toLowerCase().startsWith('barangay') &&
+    !item.display_name.toLowerCase().startsWith('brgy')
+      ? item.display_name.split(',')[0]?.trim()
+      : '') ||
+    'Selected Location';
+
+  const subtitleParts = [
+    addr.quarter || addr.suburb || (addr.neighbourhood?.toLowerCase().startsWith('barangay') ? addr.neighbourhood : ''),
+    addr.city || addr.town || addr.municipality,
+    addr.county || addr.region || addr.state,
+  ].filter(Boolean);
+
+  return {
+    title,
+    subtitle: subtitleParts.join(', ') || item.display_name,
+    streetAddress: cleanStreet,
+  };
+}
+
+export async function reverseGeocode(lat: number, lon: number): Promise<NominatimResult | null> {
+  try {
+    const res = await fetch(
+      `${NOMINATIM_BASE}/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&countrycodes=ph&zoom=18`,
+      {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'PlacidesApp/1.0 (support@placides.com)',
+        },
+      }
+    );
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn('[Nominatim] Reverse geocode failed:', err);
+    return null;
+  }
+}
+
+export async function searchAddress(query: string, cityContext?: string): Promise<NominatimResult[]> {
+  const cleanQ = query ? query.trim() : '';
+  if (!cleanQ || cleanQ.length < 2) return [];
+
+  // Helper to fetch from Nominatim
+  const doFetch = async (q: string): Promise<NominatimResult[]> => {
+    try {
+      const res = await fetch(
+        `${NOMINATIM_BASE}/search?q=${encodeURIComponent(q)}&format=json&countrycodes=ph&addressdetails=1&limit=8`,
+        {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'PlacidesApp/1.0 (support@placides.com)',
+          },
+        }
+      );
+      if (!res.ok) return [];
+      return await res.json();
+    } catch {
+      return [];
+    }
+  };
+
+  // 1. Try raw query with cityContext if provided
+  let results = await doFetch(cityContext ? `${cleanQ}, ${cityContext}` : cleanQ);
+
+  // 2. If no results and cityContext was attached, try raw query alone
+  if (!results.length && cityContext) {
+    results = await doFetch(cleanQ);
+  }
+
+  // 3. If still no results, strip unit/room/floor/block/lot noise and retry
+  if (!results.length) {
+    const stripped = cleanQ
+      .replace(/\b(unit|rm|room|flr|floor|bldg|building|blk|block|lot|phase|purok|sitio)\s+[a-z0-9\-#\/]+/gi, '')
+      .replace(/#\s*\d+[a-z]?\b/gi, '')
+      .replace(/,\s*,/g, ',')
+      .trim();
+
+    if (stripped && stripped !== cleanQ && stripped.length >= 3) {
+      results = await doFetch(cityContext ? `${stripped}, ${cityContext}` : stripped);
+      if (!results.length) {
+        results = await doFetch(stripped);
+      }
+    }
+  }
+
+  return results;
 }
 
 export async function createOrder(payload: Record<string, any>): Promise<Record<string, any>> {
