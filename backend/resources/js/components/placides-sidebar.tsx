@@ -8,6 +8,7 @@ import {
     Printer,
     Settings,
     ShoppingBag,
+    TrendingUp,
     Users,
     Warehouse,
 } from 'lucide-react';
@@ -174,6 +175,9 @@ export default function PlacidesSidebar() {
                 <Group label="Overview">
                     <Item label="Dashboard" href="/dashboard">
                         <LayoutGrid size={18} />
+                    </Item>
+                    <Item label="Sales" href="/sales">
+                        <TrendingUp size={18} />
                     </Item>
                 </Group>
 

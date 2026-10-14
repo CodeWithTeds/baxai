@@ -8,6 +8,7 @@ import {
     Printer,
     Settings,
     ShoppingBag,
+    TrendingUp,
     Users,
     Warehouse,
 } from 'lucide-react';
@@ -24,7 +25,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard } from '@/routes';
+import { dashboard, sales } from '@/routes';
 import { edit as profileEdit } from '@/routes/profile';
 import type { NavItem } from '@/types';
 
@@ -33,6 +34,11 @@ const overviewNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Sales',
+        href: sales(),
+        icon: TrendingUp,
     },
 ];
 

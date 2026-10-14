@@ -9,6 +9,7 @@ use App\Http\Controllers\PrintCategoryController;
 use App\Http\Controllers\PrintItemController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RewardController;
+use App\Http\Controllers\SalesController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -33,6 +34,7 @@ Route::get('models/{file}', function ($file) {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('sales', [SalesController::class, 'index'])->name('sales');
 
     // Web bulk actions & orders
     Route::get('orders/map', [OrderController::class, 'map'])->name('orders.map');
