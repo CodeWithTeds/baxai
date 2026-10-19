@@ -36,6 +36,7 @@ class DatabaseSeeder extends Seeder
             PrintCategorySeeder::class,
             PrintItemSeeder::class,
             PromotionsSeeder::class,
+            AuditLogSeeder::class,
         ]);
     }
 }
