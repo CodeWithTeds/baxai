@@ -56,6 +56,10 @@ class CustomerController extends Controller
 
     public function destroy(Customer $customer): RedirectResponse
     {
+        if (auth()->user()?->role === 'staff') {
+            return redirect()->route('customers.index')->with('error', 'Staff members are not authorized to delete records.');
+        }
+
         $this->customers->delete($customer);
 
         return redirect()->route('customers.index')->with('success', 'Customer archived successfully.');
@@ -73,6 +77,10 @@ class CustomerController extends Controller
 
     public function bulkDestroy(BulkCustomerRequest $request): RedirectResponse
     {
+        if (auth()->user()?->role === 'staff') {
+            return redirect()->route('customers.index')->with('error', 'Staff members are not authorized to delete records.');
+        }
+
         return redirect()->route('customers.index')->with('success', $this->customers->bulkDelete($request->validated()['ids']).' customers deleted.');
     }
 }
