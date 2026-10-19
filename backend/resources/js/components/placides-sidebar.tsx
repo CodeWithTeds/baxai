@@ -6,6 +6,7 @@ import {
     LayoutGrid,
     Package,
     Printer,
+    ScrollText,
     Settings,
     ShoppingBag,
     TrendingUp,
@@ -215,6 +216,9 @@ export default function PlacidesSidebar() {
                 <Group label="System & Control">
                     <Item label="Staff Management" href="/staff">
                         <UserCheck size={18} />
+                    </Item>
+                    <Item label="Audit Logs" href="/audit-logs">
+                        <ScrollText size={18} />
                     </Item>
                     <Item label="Settings" href="/profile">
                         <Settings size={18} />

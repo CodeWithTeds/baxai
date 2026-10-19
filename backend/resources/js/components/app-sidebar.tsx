@@ -6,6 +6,7 @@ import {
     LayoutGrid,
     Package,
     Printer,
+    ScrollText,
     Settings,
     ShoppingBag,
     TrendingUp,
@@ -86,6 +87,11 @@ const manageNavItems: NavItem[] = [
         title: 'Staff Management',
         href: '/staff',
         icon: UserCheck,
+    },
+    {
+        title: 'Audit Logs',
+        href: '/audit-logs',
+        icon: ScrollText,
     },
     {
         title: 'Settings',
