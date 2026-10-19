@@ -140,6 +140,10 @@ class OrderController extends Controller
 
     public function destroy(Order $order): RedirectResponse
     {
+        if (auth()->user()?->role === 'staff') {
+            return redirect()->route('orders.index')->with('error', 'Staff members are not authorized to delete records.');
+        }
+
         $order->delete();
 
         return redirect()->route('orders.index')->with('success', 'Order removed successfully.');
@@ -193,6 +197,10 @@ class OrderController extends Controller
 
     public function bulkDestroy(Request $request): RedirectResponse
     {
+        if (auth()->user()?->role === 'staff') {
+            return redirect()->route('orders.index')->with('error', 'Staff members are not authorized to delete records.');
+        }
+
         $validated = $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'integer|exists:orders,id',
