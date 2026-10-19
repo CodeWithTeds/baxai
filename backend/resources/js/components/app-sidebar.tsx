@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     Boxes,
@@ -41,6 +41,14 @@ const overviewNavItems: NavItem[] = [
         title: 'Sales',
         href: sales(),
         icon: TrendingUp,
+    },
+];
+
+const staffOverviewNavItems: NavItem[] = [
+    {
+        title: 'Staff Portal',
+        href: '/staff-portal',
+        icon: LayoutGrid,
     },
 ];
 
@@ -100,15 +108,18 @@ const manageNavItems: NavItem[] = [
     },
 ];
 
-
 export function AppSidebar() {
+    const { auth } = usePage().props as unknown as { auth?: { user?: { role?: string } } };
+    const userRole = auth?.user?.role;
+    const isStaff = userRole === 'staff' || (userRole && !['admin', 'superadmin', 'manager'].includes(userRole));
+
     return (
         <Sidebar collapsible="icon" variant="sidebar">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
+                            <Link href={isStaff ? '/staff-portal' : dashboard()} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
@@ -117,11 +128,11 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain label="Overview" items={overviewNavItems} />
+                <NavMain label="Overview" items={isStaff ? staffOverviewNavItems : overviewNavItems} />
                 <NavMain label="Sales & Catalog" items={sellNavItems} />
                 <NavMain label="Printing Operations" items={printNavItems} />
                 <NavMain label="Inventory & Stock" items={inventoryNavItems} />
-                <NavMain label="System & Control" items={manageNavItems} />
+                {!isStaff && <NavMain label="System & Control" items={manageNavItems} />}
             </SidebarContent>
 
             <SidebarFooter>
