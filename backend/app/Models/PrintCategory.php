@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 ])]
 class PrintCategory extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, \App\Traits\Auditable;
 
     protected function casts(): array
     {
