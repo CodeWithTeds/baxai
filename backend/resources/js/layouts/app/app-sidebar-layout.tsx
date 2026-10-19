@@ -1,4 +1,4 @@
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import { AppContent } from '@/components/app-content';
@@ -11,12 +11,28 @@ export default function AppSidebarLayout({
     children,
     breadcrumbs = [],
 }: AppLayoutProps) {
-    const flash = (usePage().props as unknown as { flash?: { success?: string; error?: string } }).flash ?? {};
+    const flash = (usePage().props as unknown as {
+        flash?: { success?: string; error?: string; undo_audit_id?: number };
+    }).flash ?? {};
 
     useEffect(() => {
-        if (flash.error) toast.error(flash.error);
-        if (flash.success) toast.success(flash.success);
-    }, [flash.error, flash.success]);
+        if (flash.error) {
+            toast.error(flash.error);
+        }
+        if (flash.success) {
+            if (flash.undo_audit_id) {
+                toast.success(flash.success, {
+                    action: {
+                        label: 'Undo Change',
+                        onClick: () => router.post(`/audit-logs/${flash.undo_audit_id}/undo`),
+                    },
+                    duration: 8000,
+                });
+            } else {
+                toast.success(flash.success);
+            }
+        }
+    }, [flash.error, flash.success, flash.undo_audit_id]);
 
     return (
         <AppShell variant="sidebar">

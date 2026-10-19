@@ -104,7 +104,7 @@ export default function CustomersIndex({
     stats?: { total: number; active: number; lead: number; vip: number };
 }) {
     const pageProps = usePage().props as unknown as {
-        flash?: { success?: string };
+        flash?: { success?: string; error?: string; undo_audit_id?: number };
     };
     const flash = pageProps.flash ?? {};
     const rows = Array.isArray(customers?.data) ? customers.data : [];
@@ -335,6 +335,34 @@ export default function CustomersIndex({
                         </Link>
                     </div>
                 </div>
+
+                {/* FLASH & UNDO BANNER */}
+                {flash.success && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-none border border-[#1A1C1E] bg-[#F9FAFB] px-3 py-1.5 text-[11px] text-[#1A1C1E]">
+                        <div className="flex items-center gap-2">
+                            <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                            <span className="font-normal">{flash.success}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {flash.undo_audit_id && (
+                                <Button
+                                    size="sm"
+                                    type="button"
+                                    onClick={() => router.post(`/audit-logs/${flash.undo_audit_id}/undo`)}
+                                    className="h-6 rounded-none bg-[#1A1C1E] hover:bg-black text-white px-2 text-[10px] font-mono font-normal"
+                                >
+                                    <RotateCcw size={10} className="mr-1" /> Undo Change
+                                </Button>
+                            )}
+                            <Link
+                                href="/audit-logs"
+                                className="font-mono text-[10px] text-[#6B7280] hover:text-[#1A1C1E] hover:underline"
+                            >
+                                View in Audit Logs →
+                            </Link>
+                        </div>
+                    </div>
+                )}
 
                 {/* NAVIGATION TABS */}
                 <div className="flex items-center gap-2 border-b border-[#E5E7EB] pb-2 font-mono text-xs">
