@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\PrintItemAiController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DiscountController;
@@ -61,6 +62,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('staff/bulk-destroy', [StaffController::class, 'bulkDestroy'])->name('staff.bulk-destroy');
     Route::post('staff/{staff}/toggle-status', [StaffController::class, 'toggleStatus'])->name('staff.toggle-status');
     Route::resource('staff', StaffController::class);
+
+    // Audit Logs
+    Route::post('audit-logs/purge', [AuditLogController::class, 'purge'])->name('audit-logs.purge');
+    Route::post('audit-logs/bulk-archive', [AuditLogController::class, 'bulkArchive'])->name('audit-logs.bulk-archive');
+    Route::post('audit-logs/bulk-restore', [AuditLogController::class, 'bulkRestore'])->name('audit-logs.bulk-restore');
+    Route::post('audit-logs/{id}/archive', [AuditLogController::class, 'archive'])->name('audit-logs.archive');
+    Route::post('audit-logs/{id}/restore', [AuditLogController::class, 'restore'])->name('audit-logs.restore');
+    Route::post('audit-logs/{id}/undo', [AuditLogController::class, 'undo'])->name('audit-logs.undo');
+    Route::post('audit-logs/{id}/redo', [AuditLogController::class, 'redo'])->name('audit-logs.redo');
+    Route::get('audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
 
     Route::post('print-items/ai-recognize', [PrintItemAiController::class, 'recognize'])->name('print-items.ai-recognize');
     Route::post('print-items/bulk-activate', [PrintItemController::class, 'bulkActivate'])->name('print-items.bulk-activate');
