@@ -73,7 +73,13 @@ class CustomerRepository extends BaseRepository implements CustomerRepositoryInt
 
     public function bulkUpdateStatus(array $ids, string $status): int
     {
-        return DB::transaction(fn () => Customer::whereIn('id', $ids)->update(['status' => $status]));
+        return DB::transaction(function () use ($ids, $status) {
+            $customers = Customer::whereIn('id', $ids)->get();
+            foreach ($customers as $customer) {
+                $customer->update(['status' => $status]);
+            }
+            return $customers->count();
+        });
     }
 
     public function bulkDelete(array $ids): int
