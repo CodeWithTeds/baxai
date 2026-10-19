@@ -56,6 +56,10 @@ class ProductController extends Controller
 
     public function destroy(Product $product): RedirectResponse
     {
+        if (auth()->user()?->role === 'staff') {
+            return redirect()->route('products.index')->with('error', 'Staff members are not authorized to delete records.');
+        }
+
         $this->products->delete($product);
 
         return redirect()->route('products.index')->with('success', 'Product archived successfully.');
@@ -73,6 +77,10 @@ class ProductController extends Controller
 
     public function bulkDestroy(BulkProductRequest $request): RedirectResponse
     {
+        if (auth()->user()?->role === 'staff') {
+            return redirect()->route('products.index')->with('error', 'Staff members are not authorized to delete records.');
+        }
+
         return redirect()->route('products.index')->with('success', $this->products->bulkDelete($request->validated()['ids']).' products deleted.');
     }
 }
