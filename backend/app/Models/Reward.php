@@ -22,6 +22,7 @@ class Reward extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use \App\Traits\Auditable;
 
     protected $casts = [
         'points_required' => 'integer',

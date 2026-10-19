@@ -27,6 +27,7 @@ class Discount extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use \App\Traits\Auditable;
 
     protected $casts = [
         'value' => 'decimal:2',
