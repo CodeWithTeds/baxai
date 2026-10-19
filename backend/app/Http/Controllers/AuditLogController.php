@@ -35,10 +35,16 @@ class AuditLogController extends Controller
         protected AuditLogRepositoryInterface $auditLogs
     ) {}
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
         $user = $request->user();
-        abort_if(!$user || !in_array($user->role, ['admin', 'superadmin', 'manager'], true), 403, 'Unauthorized access to audit logs.');
+        if (! $user || ! in_array($user->role, ['admin', 'superadmin', 'manager'], true)) {
+            if ($request->header('X-Inertia')) {
+                abort(403, 'Unauthorized access to audit logs.');
+            }
+
+            return redirect()->route('staff.portal')->with('error', 'Unauthorized access to audit logs.');
+        }
 
         return Inertia::render('audit-logs/index', [
             'logs' => $this->auditLogs->paginated(
