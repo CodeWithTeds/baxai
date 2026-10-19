@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\PrintCategory;
 use App\Models\PrintItem;
 use App\Models\Product;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -15,8 +16,12 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
+        if (! $request->user()->isManager()) {
+            return redirect()->route('staff.portal');
+        }
+
         // Total revenue (non-cancelled orders)
         $totalRevenue = (float) Order::where('status', '!=', 'cancelled')->sum('total');
 
