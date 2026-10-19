@@ -24,7 +24,7 @@ class PrintItemController extends Controller
     {
         return PrintItemResource::collection($this->items->paginated($request->only('filter', 'sort'), (int) $request->get('per_page', 15)));
     }
-    
+
     public function store(StorePrintItemRequest $request): JsonResponse
     {
         $data = $request->validated();

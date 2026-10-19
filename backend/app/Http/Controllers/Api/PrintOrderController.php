@@ -6,15 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePrintOrderRequest;
 use App\Http\Requests\UpdatePrintOrderStatusRequest;
 use App\Http\Resources\PrintOrderResource;
+use App\Models\CustomerAddress;
 use App\Models\PrintOrder;
 use App\Models\PrintService;
-use App\Models\Customer;
-use App\Models\CustomerAddress;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 class PrintOrderController extends Controller
 {

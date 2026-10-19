@@ -237,6 +237,7 @@ class SalesController extends Controller
         // Clean out temporary internal keys
         $cleanBestSellers = array_map(function ($bs) {
             unset($bs['_raw_product_id']);
+
             return $bs;
         }, $bestSellers);
 
@@ -374,6 +375,7 @@ PROMPT;
 
                 if ($response->failed()) {
                     Log::warning('Groq AI sales projection failed for model '.$model, ['status' => $response->status()]);
+
                     continue;
                 }
 

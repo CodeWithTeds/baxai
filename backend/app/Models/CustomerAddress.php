@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Http;
 
 class CustomerAddress extends Model
 {
@@ -134,10 +135,12 @@ class CustomerAddress extends Model
         ]));
 
         foreach ($queries as $query) {
-            if (empty(trim($query))) continue;
+            if (empty(trim($query))) {
+                continue;
+            }
 
             try {
-                $response = \Illuminate\Support\Facades\Http::withHeaders([
+                $response = Http::withHeaders([
                     'User-Agent' => 'PlacidesApp/1.0 (contact@placides.local)',
                 ])->timeout(4)->get('https://nominatim.openstreetmap.org/search', [
                     'q' => $query,
@@ -151,6 +154,7 @@ class CustomerAddress extends Model
                     if (isset($first['lat'], $first['lon'])) {
                         $this->latitude = (float) $first['lat'];
                         $this->longitude = (float) $first['lon'];
+
                         return true;
                     }
                 }

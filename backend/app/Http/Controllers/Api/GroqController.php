@@ -784,12 +784,12 @@ PROMPT;
 
                     // Build a human-readable, accurate status description based on actual status
                     $statusDescription = match ($order->status) {
-                        'cancelled'   => 'CANCELLED — this order has been cancelled and will NOT be fulfilled',
-                        'delivered'   => 'DELIVERED — the order has been successfully delivered to the customer',
-                        'shipped'     => 'SHIPPED — the order is on its way and currently in transit',
+                        'cancelled' => 'CANCELLED — this order has been cancelled and will NOT be fulfilled',
+                        'delivered' => 'DELIVERED — the order has been successfully delivered to the customer',
+                        'shipped' => 'SHIPPED — the order is on its way and currently in transit',
                         'in_progress' => 'IN PROGRESS — order is being finished and packaged',
-                        'processing'  => 'PROCESSING — order is in active production and printing queue',
-                        default       => "{$order->status} — status as recorded in the system",
+                        'processing' => 'PROCESSING — order is in active production and printing queue',
+                        default => "{$order->status} — status as recorded in the system",
                     };
 
                     // Include cancellation reason if available

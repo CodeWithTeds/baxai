@@ -8,7 +8,7 @@ use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\Product;
+use App\Services\Order\OrderInventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
+    public function __construct(protected OrderInventoryService $inventory) {}
+
     /**
      * Display a listing of orders.
      */
@@ -160,6 +162,11 @@ class OrderController extends Controller
         }
 
         $order = DB::transaction(function () use ($validated, $request, $customer, $address) {
+            // Reserve inventory first. Throws InsufficientStockException and rolls
+            // the whole transaction back if any tracked product cannot cover the
+            // requested quantity.
+            $this->inventory->reserve($validated['items']);
+
             // Generate distinct order number e.g. RD-8842
             $randomNum = mt_rand(1000, 9999);
             $orderNumber = 'RD-'.$randomNum;
@@ -220,12 +227,6 @@ class OrderController extends Controller
                 $lineTotal = (float) ($itemData['total_price'] ?? ($unitPrice * $qty));
 
                 $productId = $itemData['product_id'] ?? null;
-                if ($productId && is_numeric($productId)) {
-                    $prod = Product::find($productId);
-                    if ($prod && $prod->track_inventory && $prod->stock_quantity > 0) {
-                        $prod->decrement('stock_quantity', min($qty, $prod->stock_quantity));
-                    }
-                }
 
                 OrderItem::create([
                     'order_id' => $order->id,
@@ -344,14 +345,7 @@ class OrderController extends Controller
 
             // Restore inventory if not already cancelled
             if ($order->status !== 'cancelled') {
-                foreach ($order->items as $item) {
-                    if ($item->product_id) {
-                        $prod = Product::find($item->product_id);
-                        if ($prod && $prod->track_inventory) {
-                            $prod->increment('stock_quantity', $item->quantity);
-                        }
-                    }
-                }
+                $this->inventory->restore($order);
             }
         } elseif ($newStatus === 'delivered') {
             $order->delivered_at = now();
@@ -409,14 +403,7 @@ class OrderController extends Controller
         $order->notes = $reason;
 
         // Restore inventory
-        foreach ($order->items as $item) {
-            if ($item->product_id) {
-                $prod = Product::find($item->product_id);
-                if ($prod && $prod->track_inventory) {
-                    $prod->increment('stock_quantity', $item->quantity);
-                }
-            }
-        }
+        $this->inventory->restore($order);
 
         $order->tracking_steps = Order::buildDefaultTrackingSteps(
             'cancelled',

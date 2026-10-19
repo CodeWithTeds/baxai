@@ -396,18 +396,18 @@ sales.form = salesForm;
 ## Environment
 
 Already configured:
-- `GROQ_API=your-groq-api-key` (in `.env`)
+- `GROQ_API=your-groq-api-key-here` (in `.env` line 68)
 
 No additional env vars needed.
 
----
+---sal
 
-## Verification Checklist (Status: Implemented & Verified)
+## Verification Checklist
 
-1. **Route:** `/sales` registered and active via `SalesController@index`.
-2. **Nav links:** Both `app-sidebar.tsx` and `placides-sidebar.tsx` include "Sales" with `TrendingUp` icon.
-3. **Groq AI Integration:** Multi-model pipeline (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`) providing executive macro analysis, product trajectory trends, multi-horizon projections (7d, 14d, 30d), confidence scores, and stocking market signals.
-4. **Resilience & Fallback:** Least-squares linear regression & WMA fallback active if API is unreachable.
-5. **Caching & On-Demand Re-run:** Projections cached for 30 minutes with instant "Re-run AI Matrix" button.
-6. **Design:** Matches dashboard design language (monospace, sharp corners, `#1A1C1E` dark-on-white aesthetic, pure SVG line & bar charts).
-7. **Production Build:** Vite production build compiles with 0 errors.
+1. **Route:** Visit `/sales` — page loads without errors
+2. **Nav links:** Both sidebars show "Sales" with active state
+3. **Groq AI:** Projections return valid data (check storage/logs/laravel.log)
+4. **Animations:** All charts animate on scroll into view
+5. **Fallback:** If Groq API fails, moving average fallback works
+6. **Design:** Matches dashboard aesthetic (monospace, sharp corners, same colors)
+7. **Console:** No React warnings or errors

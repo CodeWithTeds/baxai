@@ -30,7 +30,7 @@ class AuthController extends Controller
         $validated = $request->validated();
 
         $username = trim($validated['username']);
-        $name = !empty($validated['name']) ? trim($validated['name']) : $username;
+        $name = ! empty($validated['name']) ? trim($validated['name']) : $username;
 
         $user = User::create([
             'name' => $name,

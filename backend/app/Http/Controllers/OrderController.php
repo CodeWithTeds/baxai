@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\BulkUpdateOrderStatusRequest;
 use App\Http\Requests\UpdateOrderStatusRequest;
 use App\Models\Order;
-use App\Models\Product;
+use App\Services\Order\OrderInventoryService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -13,6 +13,8 @@ use Inertia\Response;
 
 class OrderController extends Controller
 {
+    public function __construct(protected OrderInventoryService $inventory) {}
+
     public function index(Request $request): Response
     {
         $query = Order::with(['items', 'customer', 'customerAddress'])->latest('placed_at');
@@ -100,14 +102,7 @@ class OrderController extends Controller
             $order->cancelled_at = now();
             $order->cancellation_reason = $validated['notes'] ?? 'Cancelled by admin';
 
-            foreach ($order->items as $item) {
-                if ($item->product_id) {
-                    $prod = Product::find($item->product_id);
-                    if ($prod && $prod->track_inventory) {
-                        $prod->increment('stock_quantity', $item->quantity);
-                    }
-                }
-            }
+            $this->inventory->restore($order);
         } elseif ($newStatus === 'delivered') {
             $order->delivered_at = now();
             $order->payment_status = 'paid';
@@ -167,14 +162,7 @@ class OrderController extends Controller
                 $order->cancelled_at = now();
                 $order->cancellation_reason = $validated['notes'] ?? 'Bulk cancelled by admin';
 
-                foreach ($order->items as $item) {
-                    if ($item->product_id) {
-                        $prod = Product::find($item->product_id);
-                        if ($prod && $prod->track_inventory) {
-                            $prod->increment('stock_quantity', $item->quantity);
-                        }
-                    }
-                }
+                $this->inventory->restore($order);
             }
 
             if (! empty($validated['courier_name'])) {
