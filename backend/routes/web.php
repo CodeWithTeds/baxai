@@ -10,6 +10,7 @@ use App\Http\Controllers\PrintItemController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RewardController;
 use App\Http\Controllers\SalesController;
+use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -53,6 +54,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('customers/bulk-archive', [CustomerController::class, 'bulkArchive'])->name('customers.bulk-archive');
     Route::post('customers/bulk-destroy', [CustomerController::class, 'bulkDestroy'])->name('customers.bulk-destroy');
     Route::resource('customers', CustomerController::class);
+
+    // Staff Management
+    Route::post('staff/bulk-activate', [StaffController::class, 'bulkActivate'])->name('staff.bulk-activate');
+    Route::post('staff/bulk-deactivate', [StaffController::class, 'bulkDeactivate'])->name('staff.bulk-deactivate');
+    Route::post('staff/bulk-destroy', [StaffController::class, 'bulkDestroy'])->name('staff.bulk-destroy');
+    Route::post('staff/{staff}/toggle-status', [StaffController::class, 'toggleStatus'])->name('staff.toggle-status');
+    Route::resource('staff', StaffController::class);
 
     Route::post('print-items/ai-recognize', [PrintItemAiController::class, 'recognize'])->name('print-items.ai-recognize');
     Route::post('print-items/bulk-activate', [PrintItemController::class, 'bulkActivate'])->name('print-items.bulk-activate');
