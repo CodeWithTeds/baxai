@@ -158,6 +158,10 @@ function SubMenu({
  * Used by dashboard AND all admin pages. Edit here once.
  */
 export default function PlacidesSidebar() {
+    const { auth } = usePage().props as unknown as { auth?: { user?: { role?: string } } };
+    const userRole = auth?.user?.role;
+    const isStaff = userRole === 'staff' || (userRole && !['admin', 'superadmin', 'manager'].includes(userRole));
+
     return (
         <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col bg-[#0052CC] md:flex" style={{ fontFamily: "'DM Sans', sans-serif" }}>
             <div className="flex h-14 shrink-0 items-center gap-2.5 px-4 border-b border-white/10">
@@ -169,18 +173,26 @@ export default function PlacidesSidebar() {
                         NUYDA ENTERPRISE
                     </span>
                     <span className="block text-[10px] leading-tight text-white/75 font-medium">
-                        Admin panel
+                        {isStaff ? 'Staff workspace' : 'Admin panel'}
                     </span>
                 </span>
             </div>
-            <nav aria-label="Admin" className="flex flex-1 flex-col gap-4 overflow-y-auto px-2.5 py-4">
+            <nav aria-label="Navigation" className="flex flex-1 flex-col gap-4 overflow-y-auto px-2.5 py-4">
                 <Group label="Overview">
-                    <Item label="Dashboard" href="/dashboard">
-                        <LayoutGrid size={18} />
-                    </Item>
-                    <Item label="Sales" href="/sales">
-                        <TrendingUp size={18} />
-                    </Item>
+                    {isStaff ? (
+                        <Item label="Staff Portal" href="/staff-portal">
+                            <LayoutGrid size={18} />
+                        </Item>
+                    ) : (
+                        <>
+                            <Item label="Dashboard" href="/dashboard">
+                                <LayoutGrid size={18} />
+                            </Item>
+                            <Item label="Sales" href="/sales">
+                                <TrendingUp size={18} />
+                            </Item>
+                        </>
+                    )}
                 </Group>
 
                 <Group label="Sales & Catalog">
@@ -213,17 +225,19 @@ export default function PlacidesSidebar() {
                     </Item>
                 </Group>
 
-                <Group label="System & Control">
-                    <Item label="Staff Management" href="/staff">
-                        <UserCheck size={18} />
-                    </Item>
-                    <Item label="Audit Logs" href="/audit-logs">
-                        <ScrollText size={18} />
-                    </Item>
-                    <Item label="Settings" href="/profile">
-                        <Settings size={18} />
-                    </Item>
-                </Group>
+                {!isStaff && (
+                    <Group label="System & Control">
+                        <Item label="Staff Management" href="/staff">
+                            <UserCheck size={18} />
+                        </Item>
+                        <Item label="Audit Logs" href="/audit-logs">
+                            <ScrollText size={18} />
+                        </Item>
+                        <Item label="Settings" href="/profile">
+                            <Settings size={18} />
+                        </Item>
+                    </Group>
+                )}
             </nav>
         </aside>
     );
