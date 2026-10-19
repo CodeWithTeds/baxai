@@ -10,6 +10,8 @@ use App\Repositories\PrintItemRepository;
 use App\Repositories\PrintItemRepositoryInterface;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductRepositoryInterface;
+use App\Repositories\StaffRepository;
+use App\Repositories\StaffRepositoryInterface;
 use App\Repositories\TaskRepository;
 use App\Repositories\TaskRepositoryInterface;
 use Illuminate\Support\ServiceProvider;
@@ -21,6 +23,7 @@ class RepositoryServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(StaffRepositoryInterface::class, StaffRepository::class);
         $this->app->singleton(TaskRepositoryInterface::class, TaskRepository::class);
         $this->app->singleton(ProductRepositoryInterface::class, ProductRepository::class);
         $this->app->singleton(CustomerRepositoryInterface::class, CustomerRepository::class);
