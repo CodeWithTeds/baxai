@@ -46,6 +46,7 @@ class Product extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use \App\Traits\Auditable;
 
     protected $casts = [
         'base_price' => 'decimal:2',
