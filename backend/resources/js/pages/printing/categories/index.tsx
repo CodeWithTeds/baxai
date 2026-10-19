@@ -19,7 +19,6 @@ import {
     Printer,
     RotateCcw,
     Search,
-    Trash2,
 } from 'lucide-react';
 import { dashboard } from '@/routes';
 import {
@@ -89,12 +88,6 @@ export default function PrintCategoriesIndex({
         setSearch('');
         setStatus('all');
         router.get('/print-categories', {}, { preserveState: true, replace: true });
-    };
-
-    const handleDelete = (cat: CategoryRow) => {
-        if (confirm(`Are you sure you want to delete category "${cat.name}"?`)) {
-            router.delete(`/print-categories/${cat.id}`);
-        }
     };
 
     // FORM FOR CREATE & EDIT
@@ -306,15 +299,6 @@ export default function PrintCategoriesIndex({
                                                 className="h-7 w-7 rounded-none hover:bg-gray-100 text-[#4A4E5A]"
                                             >
                                                 <Pencil size={13} />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => handleDelete(cat)}
-                                                title="Delete Category"
-                                                className="h-7 w-7 rounded-none hover:bg-red-50 text-red-600"
-                                            >
-                                                <Trash2 size={13} />
                                             </Button>
                                         </div>
                                     </td>

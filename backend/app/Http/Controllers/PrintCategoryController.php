@@ -40,8 +40,6 @@ class PrintCategoryController extends Controller
 
     public function destroy(PrintCategory $printCategory): RedirectResponse
     {
-        $this->categories->delete($printCategory);
-
-        return redirect()->back();
+        return redirect()->back()->with('error', 'Category deletion is disabled. Please update status instead.');
     }
 }
