@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Repositories\AuditLogRepository;
+use App\Repositories\AuditLogRepositoryInterface;
 use App\Repositories\CustomerRepository;
 use App\Repositories\CustomerRepositoryInterface;
 use App\Repositories\PrintCategoryRepository;
@@ -23,6 +25,7 @@ class RepositoryServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(AuditLogRepositoryInterface::class, AuditLogRepository::class);
         $this->app->singleton(StaffRepositoryInterface::class, StaffRepository::class);
         $this->app->singleton(TaskRepositoryInterface::class, TaskRepository::class);
         $this->app->singleton(ProductRepositoryInterface::class, ProductRepository::class);
