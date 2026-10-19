@@ -22,8 +22,13 @@ export default function PlacidesAdminLayout({
     title: string;
     children: ReactNode;
 }) {
-    const pageProps = usePage().props as unknown as { flash?: { success?: string; error?: string } };
+    const pageProps = usePage().props as unknown as {
+        flash?: { success?: string; error?: string };
+        auth?: { user?: { role?: string } };
+    };
     const flash = pageProps.flash ?? {};
+    const userRole = pageProps.auth?.user?.role;
+    const isStaff = userRole === 'staff' || (userRole && !['admin', 'superadmin', 'manager'].includes(userRole));
 
     useEffect(() => {
         if (flash.error) toast.error(flash.error);
@@ -40,8 +45,11 @@ export default function PlacidesAdminLayout({
                     <div className="mx-auto w-full max-w-[1380px]">
                         <header className="flex flex-wrap items-center gap-3">
                             <nav className="flex items-center gap-5 text-[13px] font-semibold">
-                                <Link href="/dashboard" className="pb-1 text-[#8A8FA3] transition hover:text-[#1A1C1E]">
-                                    Dashboard
+                                <Link
+                                    href={isStaff ? '/staff-portal' : '/dashboard'}
+                                    className="pb-1 text-[#8A8FA3] transition hover:text-[#1A1C1E]"
+                                >
+                                    {isStaff ? 'Staff Portal' : 'Dashboard'}
                                 </Link>
                                 <span className="border-b-2 border-[#1A1C1E] pb-1 text-[#1A1C1E]">{title}</span>
                             </nav>
@@ -56,9 +64,11 @@ export default function PlacidesAdminLayout({
                                 <button aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white">
                                     <Bell size={17} />
                                 </button>
-                                <button aria-label="Settings" className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white">
-                                    <Settings size={17} />
-                                </button>
+                                {!isStaff && (
+                                    <Link href="/profile" aria-label="Settings" className="flex h-9 w-9 items-center justify-center rounded-full transition hover:bg-white">
+                                        <Settings size={17} />
+                                    </Link>
+                                )}
                             </div>
                         </header>
                         <main className="mt-6">{children}</main>
