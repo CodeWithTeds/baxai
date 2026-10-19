@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StaffProfile extends Model
 {
-    use HasFactory;
+    use HasFactory, \App\Traits\Auditable;
 
     protected $fillable = [
         'user_id',
