@@ -9,6 +9,7 @@ import {
     Settings,
     ShoppingBag,
     TrendingUp,
+    UserCheck,
     Users,
     Warehouse,
 } from 'lucide-react';
@@ -81,6 +82,11 @@ const inventoryNavItems: NavItem[] = [
 ];
 
 const manageNavItems: NavItem[] = [
+    {
+        title: 'Staff Management',
+        href: '/staff',
+        icon: UserCheck,
+    },
     {
         title: 'Settings',
         href: profileEdit(),

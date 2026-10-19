@@ -9,6 +9,7 @@ import {
     Settings,
     ShoppingBag,
     TrendingUp,
+    UserCheck,
     Users,
     Warehouse,
 } from 'lucide-react';
@@ -212,6 +213,9 @@ export default function PlacidesSidebar() {
                 </Group>
 
                 <Group label="System & Control">
+                    <Item label="Staff Management" href="/staff">
+                        <UserCheck size={18} />
+                    </Item>
                     <Item label="Settings" href="/profile">
                         <Settings size={18} />
                     </Item>
