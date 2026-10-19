@@ -12,6 +12,8 @@ use App\Repositories\PrintItemRepository;
 use App\Repositories\PrintItemRepositoryInterface;
 use App\Repositories\ProductRepository;
 use App\Repositories\ProductRepositoryInterface;
+use App\Repositories\StaffPortalRepository;
+use App\Repositories\StaffPortalRepositoryInterface;
 use App\Repositories\StaffRepository;
 use App\Repositories\StaffRepositoryInterface;
 use App\Repositories\TaskRepository;
@@ -25,6 +27,7 @@ class RepositoryServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(StaffPortalRepositoryInterface::class, StaffPortalRepository::class);
         $this->app->singleton(AuditLogRepositoryInterface::class, AuditLogRepository::class);
         $this->app->singleton(StaffRepositoryInterface::class, StaffRepository::class);
         $this->app->singleton(TaskRepositoryInterface::class, TaskRepository::class);
