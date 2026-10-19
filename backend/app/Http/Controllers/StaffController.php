@@ -57,8 +57,21 @@ class StaffController extends Controller
         protected StaffRepositoryInterface $staff
     ) {}
 
+    protected function authorizeManager(): void
+    {
+        $user = auth()->user();
+        if (! $user || ! in_array($user->role, ['admin', 'superadmin', 'manager'], true)) {
+            if (request()->header('X-Inertia')) {
+                abort(403, 'Unauthorized. Staff members cannot access user management.');
+            }
+            redirect()->route('staff.portal')->with('error', 'Unauthorized. Staff members cannot access user management.')->throwResponse();
+        }
+    }
+
     public function index(Request $request): Response
     {
+        $this->authorizeManager();
+
         return Inertia::render('staff/index', [
             'staff' => $this->staff->paginated(
                 $request->only('filter', 'sort'),
@@ -76,6 +89,8 @@ class StaffController extends Controller
 
     public function create(): Response
     {
+        $this->authorizeManager();
+
         return Inertia::render('staff/create', [
             'departments' => self::DEPARTMENTS,
             'roles' => self::ROLES,
@@ -87,6 +102,8 @@ class StaffController extends Controller
 
     public function store(StoreStaffRequest $request): RedirectResponse
     {
+        $this->authorizeManager();
+
         $this->staff->createStaff($request->validated());
 
         return redirect()->route('staff.index')->with('success', 'Staff member created successfully.');
@@ -94,6 +111,8 @@ class StaffController extends Controller
 
     public function show(User $staff): Response
     {
+        $this->authorizeManager();
+
         $staff->load(['staffProfile', 'tasks']);
 
         return Inertia::render('staff/show', [
@@ -104,6 +123,8 @@ class StaffController extends Controller
 
     public function edit(User $staff): Response
     {
+        $this->authorizeManager();
+
         $staff->load('staffProfile');
 
         return Inertia::render('staff/edit', [
@@ -117,6 +138,8 @@ class StaffController extends Controller
 
     public function update(UpdateStaffRequest $request, User $staff): RedirectResponse
     {
+        $this->authorizeManager();
+
         $this->staff->updateStaff($staff, $request->validated());
 
         return redirect()->route('staff.index')->with('success', 'Staff profile updated successfully.');
@@ -124,6 +147,8 @@ class StaffController extends Controller
 
     public function destroy(User $staff): RedirectResponse
     {
+        $this->authorizeManager();
+
         if ($staff->id === auth()->id()) {
             return redirect()->route('staff.index')->with('error', 'You cannot delete your own account.');
         }
@@ -139,6 +164,8 @@ class StaffController extends Controller
 
     public function toggleStatus(User $staff): RedirectResponse
     {
+        $this->authorizeManager();
+
         if ($staff->id === auth()->id()) {
             return redirect()->route('staff.index')->with('error', 'You cannot deactivate your own account.');
         }
@@ -152,6 +179,8 @@ class StaffController extends Controller
 
     public function bulkActivate(BulkStaffRequest $request): RedirectResponse
     {
+        $this->authorizeManager();
+
         $count = $this->staff->bulkUpdateStatus($request->validated()['ids'], true);
 
         return redirect()->route('staff.index')->with('success', "{$count} staff members activated.");
@@ -159,6 +188,8 @@ class StaffController extends Controller
 
     public function bulkDeactivate(BulkStaffRequest $request): RedirectResponse
     {
+        $this->authorizeManager();
+
         $ids = array_diff($request->validated()['ids'], [auth()->id()]);
         $count = $this->staff->bulkUpdateStatus($ids, false);
 
@@ -167,6 +198,8 @@ class StaffController extends Controller
 
     public function bulkDestroy(BulkStaffRequest $request): RedirectResponse
     {
+        $this->authorizeManager();
+
         if (auth()->user()?->role === 'staff') {
             return redirect()->route('staff.index')->with('error', 'Staff members are not authorized to delete records.');
         }
