@@ -20,6 +20,10 @@ class ApiExceptionHandler
 
     public function handle(Throwable $e, Request $request): JsonResponse
     {
+        if ($e instanceof InsufficientStockException) {
+            return response()->json($e->toArray(), 422);
+        }
+
         if ($e instanceof ValidationException) {
             return $this->errorResponse('Validation failed', 422, $e->errors());
         }
