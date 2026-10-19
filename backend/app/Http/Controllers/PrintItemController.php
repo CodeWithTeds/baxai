@@ -70,9 +70,7 @@ class PrintItemController extends Controller
 
     public function destroy(PrintItem $printItem): RedirectResponse
     {
-        $this->items->delete($printItem);
-
-        return redirect()->route('print-items.index');
+        return redirect()->route('print-items.index')->with('error', 'Print item deletion is disabled. Please use archive instead.');
     }
 
     public function bulkActivate(BulkPrintItemRequest $request): RedirectResponse
@@ -91,8 +89,6 @@ class PrintItemController extends Controller
 
     public function bulkDestroy(BulkPrintItemRequest $request): RedirectResponse
     {
-        $this->items->bulkDelete($request->validated()['ids']);
-
-        return redirect()->route('print-items.index');
+        return redirect()->route('print-items.index')->with('error', 'Bulk deletion is disabled. Please use bulk archive instead.');
     }
 }

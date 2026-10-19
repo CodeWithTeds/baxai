@@ -1,7 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { dashboard } from '@/routes';
-import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit } from 'lucide-react';
 
 interface PrintItemDetail {
     id: number;
@@ -30,11 +30,6 @@ interface PrintItemDetail {
 }
 
 export default function ShowPrintItem({ item }: { item: PrintItemDetail }) {
-    const handleDelete = () => {
-        if (confirm(`Are you sure you want to delete ${item.name}?`)) {
-            router.delete(`/print-items/${item.id}`);
-        }
-    };
 
     const prettySides = (val: string) => {
         if (val === 'single_sided') return 'Single-Sided (1S)';
@@ -81,10 +76,6 @@ export default function ShowPrintItem({ item }: { item: PrintItemDetail }) {
                             Edit Resource
                         </Button>
                     </Link>
-                    <Button variant="destructive" onClick={handleDelete} className="h-8 rounded-none px-3 text-xs font-normal">
-                        <Trash2 size={13} className="mr-1.5" />
-                        Delete
-                    </Button>
                 </div>
             </div>
 

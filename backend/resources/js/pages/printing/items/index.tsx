@@ -194,9 +194,8 @@ export default function PrintItemsIndex({
         setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
     };
 
-    const handleBulkAction = (action: 'activate' | 'archive' | 'destroy') => {
+    const handleBulkAction = (action: 'activate' | 'archive') => {
         if (selectedIds.length === 0) return;
-        if (action === 'destroy' && !confirm(`Permanently delete ${selectedIds.length} print item(s)?`)) return;
 
         router.post(
             `/print-items/bulk-${action}`,
@@ -532,14 +531,6 @@ export default function PrintItemsIndex({
                             className="h-7 rounded-none border-[#D1D5DB] text-[11px] font-mono text-[#1A1C1E] bg-white hover:bg-gray-100"
                         >
                             Archive
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleBulkAction('destroy')}
-                            className="h-7 rounded-none text-[11px] font-mono"
-                        >
-                            Delete Selected
                         </Button>
                     </div>
                 </div>
